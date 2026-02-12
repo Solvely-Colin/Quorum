@@ -203,7 +203,7 @@ Project-local config (like `.eslintrc`):
 
 ## Status Tracker
 
-### ✅ Shipped (14/27)
+### ✅ V1 Shipped (26/27)
 | # | Feature | Notes |
 |---|---------|-------|
 | 1 | File/Code Review Mode | `quorum review <files>`, auto code-review profile |
@@ -218,22 +218,51 @@ Project-local config (like `.eslintrc`):
 | 10 | Decision Matrix Mode | `agents/decision.yaml`, scoring grid in gather/synthesize |
 | 11 | Custom Phase Pipelines | `phases:` in profile YAML, `agents/quick.yaml` + `thorough.yaml` |
 | 12 | Provider Statistics | `quorum stats`, win rates, bar charts |
+| 13 | Confidence-Weighted Synthesis | Vote rankings feed into synthesis prompt |
+| 14 | Debate Replay | `quorum replay <session> --phase --provider --speed` |
+| 15 | Re-run with Different Providers | `quorum rerun last --providers x,y --compare` |
 | 16 | Meta-Analysis | `quorum explain <session\|last>` |
 | 17 | Head-to-Head Mode | `quorum versus <p1> <p2> "question"` |
+| 19 | Report Export | `quorum export last --format html --output report.html` |
+| 20 | Git/PR Integration | `quorum review --staged`, `--diff`, `--pr <number>` |
+| 21 | Watch Mode | `quorum watch src/*.ts --rapid --debounce 1000` |
+| 22 | Plugin/Hook System | `hooks:` in profile YAML, pre/post per phase, `--no-hooks` |
+| 23 | MCP/Tool Use | `--tools`, `--allow-shell`, `agents/research-tools.yaml` |
+| 24 | Consensus Heatmap | `quorum heatmap last`, Spearman correlation, ASCII grid |
+| 25 | Custom Voting Algorithms | Borda, ranked-choice, approval, Condorcet |
+| 26 | Weighted Providers | `--weight claude=2,openai=1` + profile YAML |
+| 27 | `.quorumrc` Project Config | Project-local YAML, walks to homedir |
 
-### 🔲 Remaining (13/27)
-| # | Feature | Effort | Notes |
-|---|---------|--------|-------|
-| 26 | Weighted Providers | Low | `--weight claude=2,openai=1` |
-| 27 | `.quorumrc` Project Config | Low | Project-local defaults |
-| 13 | Confidence-Weighted Synthesis | Medium | Weight by Borda scores |
-| 14 | Debate Replay | Medium | Phase-by-phase streaming playback |
-| 15 | Re-run with Different Providers | Medium | Same question, new providers, auto-compare |
-| 19 | Report Export | Medium | `--output report.html`, collapsible sections |
-| 21 | Watch Mode | Medium | `quorum watch <file>` on save |
-| 25 | Custom Voting Algorithms | Medium | Condorcet, ranked-choice, approval |
-| 18 | Cost Tracking | Medium | Deferred by user — revisit later |
-| 24 | Consensus Heatmap | Medium-High | ASCII/SVG agreement topology |
-| 20 | Git/PR Integration | High | `--staged`, `--pr <url>` |
-| 22 | Plugin/Hook System | High | Pre/post hooks per phase |
-| 23 | MCP/Tool Use | High | Web search, code exec in gather |
+### ⏸️ V1 Deferred (1/27)
+| # | Feature | Notes |
+|---|---------|-------|
+| 18 | Cost Tracking | Deferred by user — revisit later |
+
+---
+
+## V2 Roadmap — Next Generation
+
+*Source: 3-agent deliberation (Kimi K2.5 × Codex × Claude Opus) — 2026-02-12*
+*Winner: Kimi | Synthesizer: Codex | Consensus: 0.82*
+
+### Phase 1 — Trust + Production (build first)
+| # | Feature | Description |
+|---|---------|-------------|
+| 28 | Evidence-Backed Claims Protocol | Claims require source metadata; voting penalizes unsupported assertions. Modes: `advisory`, `strict`. `quorum run --evidence strict` |
+| 29 | Deterministic Replay + Signed Ledger | Persist all run artifacts (prompts, model versions, votes). Hash-chain ledger. `quorum replay <run-id>` for near-reproducible reruns. ADR-style decision records. |
+| 30 | Policy-as-Code Guardrails | Rego/Cedar-style policies: allowed tools, escalation thresholds, max cost, required evidence level, human approval gates. |
+| 31 | Native PR/CI Integration (Deep) | `/quorum` command in PRs/issues. CI confidence gates ("Security Council ≥ 0.8"). Returns patch suggestions, risk matrix, dissent summary. |
+
+### Phase 2 — Quality + Cost Engine
+| # | Feature | Description |
+|---|---------|-------------|
+| 32 | Adaptive Debate Controller | Dynamic round/model allocation based on disagreement entropy. Stop/expand logic. Presets: `fast`, `balanced`, `critical`. Multi-armed bandit optimization. |
+| 33 | Deliberation Memory Graph | Cross-run graph memory: tasks, role setups, vote splits, outcomes. Retrieval at run start. Contradiction detection vs prior decisions. |
+| 34 | Adversarial Red-Team Mode | Non-voting attacker agents. Domain attack packs (`code`, `security`, `legal`, `medical`). Outputs `resilience_score` + unresolved risk register. |
+
+### Phase 3 — Moat + Platform
+| # | Feature | Description |
+|---|---------|-------------|
+| 35 | Cognitive Topology DSL | Declarative debate structures: `star`, `mesh`, `tournament`, `map_reduce`, `adversarial_tree`. Template marketplace for common jobs. |
+| 36 | Human-in-the-Loop Checkpoints | Mid-run decision gates. Live debugger showing argument graph, vote shifts, "why agent B changed mind." |
+| 37 | Eval Arena + Reputation Specialists | Continuous benchmark suite. Track role/agent performance by domain. Reputation-weighted influence. Judge models as meta-evaluators. |
