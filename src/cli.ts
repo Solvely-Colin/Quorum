@@ -33,6 +33,7 @@ import chalk from 'chalk';
 import { loadConfig, saveConfig, detectProviders, loadAgentProfile, loadProjectConfig, CONFIG_PATH } from './config.js';
 import type { ProjectConfig } from './config.js';
 import { CouncilV2 } from './council-v2.js';
+import type { AdaptivePreset } from './adaptive.js';
 import { createProvider } from './providers/base.js';
 import { writeFile, readFile, readdir } from 'node:fs/promises';
 const existsSync = _existsSync;
@@ -153,6 +154,7 @@ program
   .option('--tools', 'Enable tool use in gather phase (web search, file reading)')
   .option('--allow-shell', 'Enable shell tool (requires --tools)')
   .option('--evidence <mode>', 'Evidence-backed claims mode: off, advisory, strict')
+  .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -414,6 +416,7 @@ program
       devilsAdvocate: opts.devilsAdvocate ?? profile.devilsAdvocate ?? false,
       weights: profile.weights,
       noHooks: opts.hooks === false,
+      adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       onEvent(event, data) {
         if (isJSON) return;
         const d = data as Record<string, unknown>;
@@ -444,6 +447,16 @@ program
           case 'evidence': {
             const report = d.report as { provider: string; supportedClaims: number; unsupportedClaims: number; totalClaims: number; evidenceScore: number };
             console.log(chalk.dim(`  📋 ${report.provider}: ${report.supportedClaims}/${report.totalClaims} claims supported (${Math.round(report.evidenceScore * 100)}%)`));
+            break;
+          }
+          case 'adaptive': {
+            const { phase, decision } = d as { phase: string; decision: { action: string; reason: string; entropy: number } };
+            const entropyPct = Math.round(decision.entropy * 100);
+            if (decision.action === 'continue') {
+              // Don't clutter output for continue decisions
+            } else {
+              console.log(chalk.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`));
+            }
             break;
           }
           case 'devilsAdvocate':
@@ -554,6 +567,22 @@ program
             }
           } catch { /* no evidence report */ }
         }
+        if (opts.adaptive && opts.adaptive !== 'off') {
+          try {
+            const { readFile: rf } = await import('node:fs/promises');
+            const { join: pjoin } = await import('node:path');
+            const adaptiveData = JSON.parse(
+              await rf(pjoin(result.sessionPath, 'adaptive-decisions.json'), 'utf-8')
+            ) as { decisions: Array<{ action: string; reason: string; entropy: number }>; entropyHistory: Record<string, number> };
+            const nonContinue = adaptiveData.decisions.filter(d => d.action !== 'continue');
+            if (nonContinue.length > 0) {
+              console.log(chalk.yellow(`\nAdaptive decisions: ${nonContinue.length}`));
+              for (const d of nonContinue) {
+                console.log(chalk.dim(`  ⚡ ${d.action}: ${d.reason}`));
+              }
+            }
+          } catch { /* no adaptive data */ }
+        }
         console.log(chalk.dim(`Session: ${result.sessionPath}`));
         console.log('');
       }
@@ -590,6 +619,7 @@ program
   .option('--focus <topics>', 'Comma-separated list to override profile focus')
   .option('--convergence <threshold>', 'Override convergenceThreshold (0.0-1.0)')
   .option('--rounds <n>', 'Override number of rounds')
+  .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .action(async (files: string[], opts) => {
     let content = '';
     let gitContextStr = '';
@@ -689,8 +719,291 @@ program
     if (opts.focus) { askArgs.push('--focus', opts.focus as string); }
     if (opts.convergence) { askArgs.push('--convergence', opts.convergence as string); }
     if (opts.rounds) { askArgs.push('--rounds', opts.rounds as string); }
+    if (opts.adaptive) { askArgs.push('--adaptive', opts.adaptive as string); }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
+  });
+
+// --- quorum ci ---
+program
+  .command('ci')
+  .description('CI/CD-optimized code review with structured output and exit codes')
+  .option('--pr <number>', 'Review a GitHub PR (requires gh CLI)')
+  .option('--diff [ref]', 'Review diff against a ref (defaults to HEAD)')
+  .option('--staged', 'Review staged changes (git diff --cached)')
+  .option('--confidence-threshold <number>', 'Exit code 1 if confidence below this (0-1)', '0')
+  .option('--format <type>', 'Output format: json, markdown, github', 'github')
+  .option('--post-comment', 'Post result as PR comment via gh')
+  .option('--label', 'Add labels to PR based on result')
+  .option('--evidence <mode>', 'Evidence mode: off, advisory, strict')
+  .option('--profile <name>', 'Agent profile', 'code-review')
+  .option('-p, --providers <names>', 'Comma-separated provider names')
+  .option('--max-files <n>', 'Skip review if PR has more than N changed files')
+  .option('--focus <areas>', 'Comma-separated focus areas')
+  .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
+  .option('-r, --rapid', 'Rapid mode — skip plan, formulate, adjust, rebuttal, vote phases')
+  .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
+  .action(async (opts) => {
+    // --- Resolve diff content ---
+    let content = '';
+    let prNumber: string | undefined;
+    let gitContextStr = '';
+
+    const gitCtx = await getGitContext();
+    if (gitCtx) {
+      gitContextStr = `Repository: ${gitCtx.repoName} | Branch: ${gitCtx.branch}`;
+    }
+
+    try {
+      if (opts.staged) {
+        const diff = await getGitDiff({ staged: true });
+        if (!diff.trim()) {
+          console.error('No staged changes found.');
+          process.exit(2);
+        }
+        content = `## Git Diff (staged changes)\n${gitContextStr ? `\n${gitContextStr}\n` : ''}\n\`\`\`diff\n${diff}\n\`\`\`\n`;
+      } else if (opts.diff !== undefined) {
+        const ref = typeof opts.diff === 'string' ? opts.diff : 'HEAD';
+        const diff = await getGitDiff({ ref });
+        if (!diff.trim()) {
+          console.error(`No diff found against ${ref}.`);
+          process.exit(2);
+        }
+        content = `## Git Diff (vs ${ref})\n${gitContextStr ? `\n${gitContextStr}\n` : ''}\n\`\`\`diff\n${diff}\n\`\`\`\n`;
+      } else if (opts.pr) {
+        prNumber = String(opts.pr);
+        // Check --max-files
+        if (opts.maxFiles) {
+          const maxFiles = parseInt(opts.maxFiles as string);
+          try {
+            const { execFile: execFileCb } = await import('node:child_process');
+            const { promisify } = await import('node:util');
+            const execFileAsync = promisify(execFileCb);
+            const { stdout } = await execFileAsync('gh', ['pr', 'view', prNumber, '--json', 'files', '--jq', '.files | length']);
+            const fileCount = parseInt(stdout.trim());
+            if (fileCount > maxFiles) {
+              const skipResult = { approved: true, confidence: 1, consensus: 1, evidenceGrade: 'N/A',
+                riskMatrix: [], suggestions: [], dissent: '', synthesis: `Skipped: PR has ${fileCount} files (max: ${maxFiles})`,
+                providers: [], duration: 0, sessionId: '' };
+              console.log(JSON.stringify(skipResult, null, 2));
+              process.exit(0);
+            }
+          } catch { /* proceed anyway */ }
+        }
+        const pr = await getPrDiff(prNumber);
+        if (!pr.diff.trim()) {
+          console.error(`PR #${prNumber} has no diff.`);
+          process.exit(2);
+        }
+        content = `## Pull Request #${prNumber}: ${pr.title}\n${gitContextStr ? `\n${gitContextStr}\n` : ''}`;
+        if (pr.body.trim()) content += `\n### Description\n${pr.body}\n`;
+        content += `\n### Diff\n\`\`\`diff\n${pr.diff}\n\`\`\`\n`;
+      } else {
+        // Try stdin
+        if (!process.stdin.isTTY) {
+          content = await readStdin();
+        }
+        if (!content.trim()) {
+          console.error('No input. Use --pr, --diff, --staged, or pipe content.');
+          process.exit(2);
+        }
+      }
+    } catch (err) {
+      console.error(`Error: ${err instanceof Error ? err.message : err}`);
+      process.exit(2);
+    }
+
+    // --- Load config, profile, providers ---
+    const config = await loadConfig();
+    const projectConfig = await loadProjectConfig();
+
+    if (config.providers.length === 0) {
+      console.error('No providers configured. Run: quorum init');
+      process.exit(2);
+    }
+
+    const profile = await loadAgentProfile(opts.profile as string);
+    if (!profile) {
+      console.error(`Profile not found: ${opts.profile}`);
+      process.exit(2);
+    }
+
+    if (opts.focus) {
+      profile.focus = (opts.focus as string).split(',').map(s => s.trim()).filter(Boolean);
+    }
+    if (opts.evidence) {
+      const mode = opts.evidence as string;
+      if (!['off', 'advisory', 'strict'].includes(mode)) {
+        console.error(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`);
+        process.exit(2);
+      }
+      profile.evidence = mode as 'off' | 'advisory' | 'strict';
+    }
+
+    const timeoutOverride = opts.timeout ? parseInt(opts.timeout as string) : undefined;
+    if (timeoutOverride !== undefined && !isNaN(timeoutOverride) && timeoutOverride > 0) {
+      for (const p of config.providers) p.timeout = timeoutOverride;
+    }
+
+    let providers = config.providers;
+    if (opts.providers) {
+      const names = (opts.providers as string).split(',').map(s => s.trim());
+      providers = config.providers.filter(p => names.includes(p.name));
+      if (providers.length === 0) {
+        console.error(`No matching providers: ${opts.providers}`);
+        process.exit(2);
+      }
+    } else if (projectConfig?.providers) {
+      const names = projectConfig.providers;
+      const filtered = config.providers.filter(p => names.includes(p.name));
+      if (filtered.length > 0) providers = filtered;
+    }
+
+    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const candidateProviders = providers.filter(
+      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+    );
+
+    if (candidateProviders.length < 2) {
+      console.error(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`);
+      process.exit(2);
+    }
+
+    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+
+    // --- Run deliberation silently ---
+    const startTime = Date.now();
+    const council = new CouncilV2(adapters, candidateProviders, profile, {
+      streaming: false,
+      rapid: opts.rapid ?? false,
+      devilsAdvocate: false,
+      adaptive: (opts.adaptive as AdaptivePreset) || undefined,
+      onEvent() { /* silent */ },
+    });
+
+    let result: Awaited<ReturnType<typeof council.deliberate>>;
+    try {
+      result = await council.deliberate(content);
+    } catch (err) {
+      console.error(`Deliberation error: ${err instanceof Error ? err.message : err}`);
+      process.exit(2);
+    }
+    const duration = Date.now() - startTime;
+
+    // --- Read evidence report if available ---
+    let evidenceGrade = 'N/A';
+    let evidencePercent = 0;
+    try {
+      const evPath = pathJoin(result.sessionPath, 'evidence-report.json');
+      if (existsSync(evPath)) {
+        const evData = JSON.parse(await readFile(evPath, 'utf-8')) as Array<{ evidenceScore: number }>;
+        if (evData.length > 0) {
+          evidencePercent = Math.round(evData.reduce((s, r) => s + r.evidenceScore, 0) / evData.length * 100);
+          if (evidencePercent >= 80) evidenceGrade = 'A';
+          else if (evidencePercent >= 60) evidenceGrade = 'B';
+          else if (evidencePercent >= 40) evidenceGrade = 'C';
+          else if (evidencePercent >= 20) evidenceGrade = 'D';
+          else evidenceGrade = 'F';
+        }
+      }
+    } catch { /* no evidence */ }
+
+    const confidence = result.synthesis.confidenceScore;
+    const consensus = result.synthesis.consensusScore;
+    const threshold = parseFloat(opts.confidenceThreshold as string) || 0;
+    const approved = threshold === 0 || confidence >= threshold;
+
+    // --- Build CIResult ---
+    interface CIResult {
+      approved: boolean;
+      confidence: number;
+      consensus: number;
+      evidenceGrade: string;
+      riskMatrix: Array<{ area: string; risk: string; details: string }>;
+      suggestions: Array<{ file: string; line?: number; before?: string; after?: string; rationale: string }>;
+      dissent: string;
+      synthesis: string;
+      providers: string[];
+      duration: number;
+      sessionId: string;
+    }
+
+    const ciResult: CIResult = {
+      approved,
+      confidence,
+      consensus,
+      evidenceGrade: `${evidenceGrade} (${evidencePercent}%)`,
+      riskMatrix: [],
+      suggestions: [],
+      dissent: result.synthesis.minorityReport ?? '',
+      synthesis: result.synthesis.content.replace(/^##\s*Synthesis\s*\n+/i, ''),
+      providers: candidateProviders.map(p => p.name),
+      duration,
+      sessionId: result.sessionId,
+    };
+
+    // --- Format output ---
+    const format = (opts.format as string) || 'github';
+
+    if (format === 'json') {
+      console.log(JSON.stringify(ciResult, null, 2));
+    } else if (format === 'markdown') {
+      let md = `# Quorum Code Review\n\n`;
+      md += `**Consensus:** ${consensus} | **Confidence:** ${confidence} | **Evidence:** ${ciResult.evidenceGrade}\n\n`;
+      md += `## Summary\n\n${ciResult.synthesis}\n`;
+      if (ciResult.dissent) md += `\n## Dissent\n\n${ciResult.dissent}\n`;
+      console.log(md);
+    } else {
+      // github format
+      let md = `## 🏛️ Quorum Code Review\n\n`;
+      md += `**Consensus:** ${consensus} | **Confidence:** ${confidence} | **Evidence:** ${ciResult.evidenceGrade}\n\n`;
+      md += `### Summary\n\n${ciResult.synthesis}\n`;
+      if (ciResult.dissent) {
+        md += `\n<details><summary>⚖️ Dissent</summary>\n\n${ciResult.dissent}\n\n</details>\n`;
+      }
+      md += `\n<details><summary>📋 Details</summary>\n\n`;
+      md += `- **Providers:** ${ciResult.providers.join(', ')}\n`;
+      md += `- **Duration:** ${(duration / 1000).toFixed(1)}s\n`;
+      md += `- **Session:** ${result.sessionId}\n`;
+      md += `\n</details>\n`;
+
+      if (format === 'github' && !opts.postComment) {
+        console.log(md);
+      }
+
+      // --- Post comment ---
+      if (opts.postComment && prNumber) {
+        try {
+          const { execFile: execFileCb } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const execFileAsync = promisify(execFileCb);
+          await execFileAsync('gh', ['pr', 'comment', prNumber, '--body', md]);
+        } catch (err) {
+          console.error(`Failed to post comment: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+
+      // --- Label PR ---
+      if (opts.label && prNumber) {
+        try {
+          const { execFile: execFileCb } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const execFileAsync = promisify(execFileCb);
+          let label: string;
+          if (confidence < 0.3) label = 'quorum:concerning';
+          else if (threshold > 0 && confidence < threshold) label = 'quorum:needs-discussion';
+          else label = 'quorum:approved';
+          await execFileAsync('gh', ['pr', 'edit', prNumber, '--add-label', label]);
+        } catch (err) {
+          console.error(`Failed to add label: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    }
+
+    // --- Exit code ---
+    if (!approved) {
+      process.exit(1);
+    }
   });
 
 // --- quorum providers ---
@@ -2796,6 +3109,205 @@ program
       }
       process.exit(0);
     });
+  });
+
+// --- quorum evidence ---
+program
+  .command('evidence')
+  .description('View evidence reports and cross-references for a session')
+  .argument('<session>', 'Session path or "last" for most recent')
+  .option('--provider <name>', 'Filter to one provider')
+  .option('--tier <tier>', 'Filter by source tier (A, B, C, D, F)')
+  .option('--json', 'Output raw JSON')
+  .action(async (sessionArg: string, opts) => {
+    // Resolve session path
+    let sessionPath = sessionArg;
+    if (sessionPath === 'last') {
+      const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
+      const indexPath = pathJoin(sessionsDir, 'index.json');
+      if (existsSync(indexPath)) {
+        try {
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          if (entries.length > 0) {
+            sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
+          } else {
+            sessionPath = await resolveLastSession(sessionsDir);
+          }
+        } catch {
+          sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+        }
+      } else {
+        sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+      }
+    }
+
+    // Load evidence report
+    const reportPath = pathJoin(sessionPath, 'evidence-report.json');
+    if (!existsSync(reportPath)) {
+      console.error(chalk.red(`No evidence report found at ${reportPath}`));
+      console.error(chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'));
+      process.exit(1);
+    }
+
+    type SourceTier = 'A' | 'B' | 'C' | 'D' | 'F';
+
+    interface EvidenceClaimData {
+      claim: string;
+      source?: string;
+      sourceTier: SourceTier;
+      quoteSpan?: string;
+      confidence: number;
+      claimHash: string;
+    }
+
+    interface EvidenceReportData {
+      provider: string;
+      totalClaims: number;
+      supportedClaims: number;
+      unsupportedClaims: number;
+      evidenceScore: number;
+      tierBreakdown: Record<SourceTier, number>;
+      weightedScore: number;
+      claims: EvidenceClaimData[];
+    }
+
+    interface CrossReferenceData {
+      claimText: string;
+      providers: string[];
+      corroborated: boolean;
+      contradicted: boolean;
+      contradictions?: string[];
+      bestSourceTier: SourceTier;
+    }
+
+    let reports: EvidenceReportData[] = JSON.parse(await readFile(reportPath, 'utf-8'));
+
+    // Load cross-references if available
+    let crossRefs: CrossReferenceData[] = [];
+    const crossRefPath = pathJoin(sessionPath, 'cross-references.json');
+    if (existsSync(crossRefPath)) {
+      crossRefs = JSON.parse(await readFile(crossRefPath, 'utf-8'));
+    }
+
+    // Filter by provider
+    if (opts.provider) {
+      const name = opts.provider as string;
+      reports = reports.filter(r => r.provider.toLowerCase() === name.toLowerCase());
+      if (reports.length === 0) {
+        console.error(chalk.red(`No report found for provider: ${name}`));
+        process.exit(1);
+      }
+    }
+
+    // Filter by tier
+    const tierFilter = opts.tier ? (opts.tier as string).toUpperCase() as SourceTier : undefined;
+    if (tierFilter && !['A', 'B', 'C', 'D', 'F'].includes(tierFilter)) {
+      console.error(chalk.red(`Invalid tier: ${opts.tier}. Must be A, B, C, D, or F.`));
+      process.exit(1);
+    }
+
+    // Grade calculation
+    function evidenceGrade(weightedScore: number): string {
+      if (weightedScore >= 0.8) return 'A';
+      if (weightedScore >= 0.6) return 'B';
+      if (weightedScore >= 0.4) return 'C';
+      if (weightedScore >= 0.2) return 'D';
+      return 'F';
+    }
+
+    // JSON output
+    if (opts.json) {
+      const output: { reports: EvidenceReportData[]; crossReferences: CrossReferenceData[] } = {
+        reports,
+        crossReferences: crossRefs,
+      };
+      console.log(JSON.stringify(output, null, 2));
+      return;
+    }
+
+    // Extract session ID from path
+    const sessionId = sessionPath.split('/').pop() ?? sessionPath;
+
+    console.log('');
+    console.log(chalk.bold(`📋 Evidence Report — Session ${sessionId}`));
+    console.log('');
+
+    // Summary table
+    const colProvider = 13;
+    const colScore = 7;
+    const colWeighted = 10;
+    const colClaims = 9;
+    const colTier = 18;
+    const colGrade = 10;
+
+    const pad = (s: string, n: number) => s.padEnd(n).slice(0, n);
+    const padC = (s: string, n: number) => {
+      const total = n - s.length;
+      const left = Math.floor(total / 2);
+      return ' '.repeat(Math.max(0, left)) + s + ' '.repeat(Math.max(0, total - left));
+    };
+
+    const hdr = `│ ${pad('Provider', colProvider)} │ ${padC('Score', colScore)} │ ${padC('Weighted', colWeighted)} │ ${padC('Claims', colClaims)} │ ${pad('Tier Breakdown', colTier)} │ ${padC('Grade', colGrade)} │`;
+    const divTop = `┌${'─'.repeat(colProvider + 2)}┬${'─'.repeat(colScore + 2)}┬${'─'.repeat(colWeighted + 2)}┬${'─'.repeat(colClaims + 2)}┬${'─'.repeat(colTier + 2)}┬${'─'.repeat(colGrade + 2)}┐`;
+    const divMid = `├${'─'.repeat(colProvider + 2)}┼${'─'.repeat(colScore + 2)}┼${'─'.repeat(colWeighted + 2)}┼${'─'.repeat(colClaims + 2)}┼${'─'.repeat(colTier + 2)}┼${'─'.repeat(colGrade + 2)}┤`;
+    const divBot = `└${'─'.repeat(colProvider + 2)}┴${'─'.repeat(colScore + 2)}┴${'─'.repeat(colWeighted + 2)}┴${'─'.repeat(colClaims + 2)}┴${'─'.repeat(colTier + 2)}┴${'─'.repeat(colGrade + 2)}┘`;
+
+    console.log(divTop);
+    console.log(hdr);
+    console.log(divMid);
+
+    for (const r of reports) {
+      const score = `${Math.round(r.evidenceScore * 100)}%`;
+      const weighted = `${Math.round(r.weightedScore * 100)}%`;
+      const claims = `${r.supportedClaims}/${r.totalClaims}`;
+      const tb = r.tierBreakdown;
+      const tierStr = ['A', 'B', 'C', 'D', 'F'].map(t => `${tb[t as SourceTier] ?? 0}${t}`).join(' ');
+      const grade = evidenceGrade(r.weightedScore);
+
+      const gradeColor = grade === 'A' ? chalk.green : grade === 'B' ? chalk.cyan : grade === 'C' ? chalk.yellow : grade === 'D' ? chalk.red : chalk.bgRed;
+
+      console.log(`│ ${pad(r.provider, colProvider)} │ ${padC(score, colScore)} │ ${padC(weighted, colWeighted)} │ ${padC(claims, colClaims)} │ ${pad(tierStr, colTier)} │ ${padC(gradeColor(grade), colGrade)} │`);
+    }
+
+    console.log(divBot);
+
+    // Cross-references
+    if (crossRefs.length > 0) {
+      console.log('');
+      console.log(chalk.bold('Cross-References:'));
+      for (const cr of crossRefs) {
+        if (cr.corroborated) {
+          console.log(`  ${chalk.green('✅')} "${cr.claimText}" — ${cr.providers.join(', ')} (tier ${cr.bestSourceTier})`);
+        } else if (cr.contradicted) {
+          const details = cr.contradictions?.join('; ') ?? '';
+          console.log(`  ${chalk.yellow('⚠️')}  "${cr.claimText}" — ${details || cr.providers.join(' vs ')}`);
+        }
+      }
+    }
+
+    // Provider detail
+    for (const r of reports) {
+      let claims = r.claims;
+      if (tierFilter) {
+        claims = claims.filter(c => c.sourceTier === tierFilter);
+      }
+      if (claims.length === 0) continue;
+
+      console.log('');
+      console.log(chalk.bold(`Provider Detail — ${r.provider}:`));
+
+      for (const c of claims) {
+        const icon = c.sourceTier === 'A' || c.sourceTier === 'B'
+          ? chalk.green('✅')
+          : c.sourceTier === 'C' || c.sourceTier === 'D'
+            ? chalk.yellow('⚠️')
+            : chalk.red('❌');
+        const sourceInfo = c.source ? ` [source: ${c.source}]` : '';
+        console.log(`  ${icon} [${c.sourceTier}] "${c.claim}"${chalk.dim(sourceInfo)}`);
+      }
+    }
+
+    console.log('');
   });
 
 program.parse();

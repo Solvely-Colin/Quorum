@@ -85,6 +85,7 @@ export interface AgentProfile {
   tools?: boolean;          // enable tool use in gather phase (default: false)
   allowShellTool?: boolean; // enable shell tool (default: false, requires tools: true)
   evidence?: 'off' | 'advisory' | 'strict';  // evidence-backed claims mode (default: 'off')
+  adaptive?: 'fast' | 'balanced' | 'critical' | 'off';
 }
 
 export interface ScoringWeights {

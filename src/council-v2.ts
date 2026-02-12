@@ -19,7 +19,8 @@ import { tallyWithMethod, type Ballot, type VotingResult } from './voting.js';
 import { generateHeatmap } from './heatmap.js';
 import { runHook, type HookEnv } from './hooks.js';
 import { executeTools } from './tools.js';
-import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, type EvidenceReport } from './evidence.js';
+import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, crossValidateClaims, type EvidenceReport, type CrossReference, tierWeight } from './evidence.js';
+import { AdaptiveController, recordOutcome, type AdaptivePreset, type AdaptiveDecision } from './adaptive.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -28,6 +29,7 @@ export interface CouncilV2Options {
   streaming?: boolean;
   timeoutOverride?: number;
   rapid?: boolean;
+  adaptive?: AdaptivePreset;
   devilsAdvocate?: boolean;
   priorContext?: string;
   weights?: Record<string, number>;
@@ -73,6 +75,8 @@ export class CouncilV2 {
   private currentPhase = '';
   private deliberationInput = '';
   private evidenceReports: EvidenceReport[] = [];
+  private crossRefs: CrossReference[] = [];
+  private adaptiveController: AdaptiveController | null = null;
 
   constructor(
     adapters: ProviderAdapter[],
@@ -116,6 +120,12 @@ export class CouncilV2 {
       this.phasePipeline = ALL_PHASES;
     }
     this.priorContext = options?.priorContext ?? null;
+
+    // Adaptive debate controller
+    const adaptivePreset = options?.adaptive ?? (profile as any).adaptive ?? 'off';
+    if (adaptivePreset !== 'off') {
+      this.adaptiveController = new AdaptiveController(adaptivePreset as AdaptivePreset);
+    }
   }
 
   async deliberate(input: string): Promise<V2Result> {
@@ -217,8 +227,22 @@ export class CouncilV2 {
       this.emit('devilsAdvocate', { provider: this.devilsAdvocateName });
     }
 
+    // Adaptive phase skipping
+    const adaptiveSkips = new Set<string>();
+    let extraDebateRounds = 0;
+
+    // Adaptive: evaluate after gather
+    if (this.adaptiveController) {
+      const remaining = this.phasePipeline.filter(p => p !== 'gather');
+      const decision = this.adaptiveController.evaluate('gather', gather.responses, remaining);
+      this.emit('adaptive', { phase: 'gather', decision });
+      if (decision.skipPhases) {
+        for (const sp of decision.skipPhases) adaptiveSkips.add(sp);
+      }
+    }
+
     // Helper: check if a phase is in the pipeline
-    const shouldRun = (phase: string) => this.phasePipeline.includes(phase);
+    const shouldRun = (phase: string) => this.phasePipeline.includes(phase) && !adaptiveSkips.has(phase);
 
     // Phase 2: PLAN — see everyone else's takes, plan strategy
     const plan = !shouldRun('plan') ? { phase: 'PLAN', timestamp: Date.now(), duration: 0, responses: {} as Record<string, string> } : await this.runPhase('02-plan', 'PLAN', async () => {
@@ -313,6 +337,63 @@ export class CouncilV2 {
       });
     });
 
+    // Adaptive: evaluate after debate
+    if (this.adaptiveController && shouldRun('debate')) {
+      const remaining = this.phasePipeline.filter(p =>
+        !['gather', 'plan', 'formulate', 'debate'].includes(p) && !adaptiveSkips.has(p)
+      );
+      const decision = this.adaptiveController.evaluate('debate', debate.responses, remaining);
+      this.emit('adaptive', { phase: 'debate', decision });
+      if (decision.skipPhases) {
+        for (const sp of decision.skipPhases) adaptiveSkips.add(sp);
+      }
+      // Extra debate rounds
+      if (decision.action === 'add-round') {
+        const maxExtra = 2;
+        while (extraDebateRounds < maxExtra) {
+          extraDebateRounds++;
+          const extraDebate = await this.runPhase(`04-debate-r${extraDebateRounds + 1}`, `DEBATE (Round ${extraDebateRounds + 1})`, async () => {
+            return this.parallel(async (adapter, i) => {
+              const otherPositions = Object.entries(debate.responses)
+                .filter(([k]) => k !== adapter.name)
+                .map(([k, v]) => `### [${k}]'s Position:\n${v}`)
+                .join('\n\n---\n\n');
+
+              const budget = this.budgetFor(i);
+              const fitted = fitToBudget([
+                { key: 'positions', text: otherPositions, priority: 'trimmable' },
+              ], budget);
+
+              const sys = this.prompt('debate',
+                `This is round ${extraDebateRounds + 1} of debate. Positions have not converged. Sharpen your critiques.`,
+                adapter.name
+              );
+              const prompt = [
+                `Original question: ${input}`,
+                `\n## Other council members' positions:\n${fitted.positions}`,
+                `\nCritique each position. Address each member directly:`,
+              ].join('\n');
+
+              return adapter.generate(prompt, sys);
+            });
+          });
+          // Update debate responses with latest round
+          Object.assign(debate.responses, extraDebate.responses);
+
+          // Re-evaluate
+          const reRemaining = this.phasePipeline.filter(p =>
+            !['gather', 'plan', 'formulate', 'debate'].includes(p) && !adaptiveSkips.has(p)
+          );
+          const reDecision = this.adaptiveController.evaluate(`debate-r${extraDebateRounds + 1}`, debate.responses, reRemaining);
+          this.emit('adaptive', { phase: `debate-r${extraDebateRounds + 1}`, decision: reDecision });
+          if (reDecision.skipPhases) {
+            for (const sp of reDecision.skipPhases) adaptiveSkips.add(sp);
+          }
+          if (reDecision.action !== 'add-round') break;
+        }
+      }
+    }
+
     // Phase 5: ADJUST — each member sees ALL critiques, revises (fallback: formulate output)
     const formulateFallbacks = { ...formulate.responses };
     const adjust = !shouldRun('adjust') ? { phase: 'ADJUST', timestamp: Date.now(), duration: 0, responses: { ...formulate.responses } } : await this.runPhase('05-adjust', 'ADJUST', async () => {
@@ -350,6 +431,18 @@ export class CouncilV2 {
       }, formulateFallbacks);
     });
 
+    // Adaptive: evaluate after adjust
+    if (this.adaptiveController && shouldRun('adjust')) {
+      const remaining = this.phasePipeline.filter(p =>
+        !['gather', 'plan', 'formulate', 'debate', 'adjust'].includes(p) && !adaptiveSkips.has(p)
+      );
+      const decision = this.adaptiveController.evaluate('adjust', adjust.responses, remaining);
+      this.emit('adaptive', { phase: 'adjust', decision });
+      if (decision.skipPhases) {
+        for (const sp of decision.skipPhases) adaptiveSkips.add(sp);
+      }
+    }
+
     // Evidence processing after formulate/adjust
     if (this.profile.evidence && this.profile.evidence !== 'off') {
       const latestResponses = shouldRun('adjust') ? adjust.responses : formulate.responses;
@@ -369,6 +462,18 @@ export class CouncilV2 {
         const { writeFile: wf } = await import('node:fs/promises');
         const { join } = await import('node:path');
         await wf(join(this.store.path, 'evidence-report.json'), JSON.stringify(this.evidenceReports, null, 2), 'utf-8');
+      } catch { /* non-fatal */ }
+    }
+
+    // Cross-validate claims across providers
+    if (this.profile.evidence && this.profile.evidence !== 'off' && this.evidenceReports.length >= 2) {
+      this.crossRefs = crossValidateClaims(this.evidenceReports);
+      this.emit('crossValidation', { crossRefs: this.crossRefs });
+      // Save cross-references
+      try {
+        const { writeFile: wf } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        await wf(join(this.store.path, 'cross-references.json'), JSON.stringify(this.crossRefs, null, 2), 'utf-8');
       } catch { /* non-fatal */ }
     }
 
@@ -436,7 +541,13 @@ export class CouncilV2 {
           `Explain your ranking. Be fair — you CAN rank your own position #1 if it's genuinely best, but justify it.`;
         if (this.profile.evidence && this.profile.evidence !== 'off' && this.evidenceReports.length > 0) {
           const evidenceSummary = this.evidenceReports
-            .map(r => `${r.provider}: ${Math.round(r.evidenceScore * 100)}% evidence-backed (${r.supportedClaims}/${r.totalClaims} claims supported)`)
+            .map(r => {
+              const tiers = Object.entries(r.tierBreakdown)
+                .filter(([_, count]) => count > 0)
+                .map(([tier, count]) => `${count}×tier-${tier}`)
+                .join(', ');
+              return `${r.provider}: ${Math.round(r.weightedScore * 100)}% weighted evidence (${tiers})`;
+            })
             .join('\n');
           voteSysText += `\n\nEvidence scores (consider these in your ranking — providers who backed up claims with sources should be weighted higher):\n${evidenceSummary}`;
         }
@@ -521,11 +632,34 @@ export class CouncilV2 {
         voteRankingsText;
     const synthSys = this.prompt('synthesize', synthSysDefault, synthAdapter.name);
 
+    // Build evidence cross-reference context for synthesis
+    let evidenceCrossRefContext = '';
+    if (this.profile.evidence && this.profile.evidence !== 'off' && this.crossRefs.length > 0) {
+      const corroborated = this.crossRefs.filter(cr => cr.corroborated);
+      const contradicted = this.crossRefs.filter(cr => cr.contradicted);
+      evidenceCrossRefContext = '\n\n## Evidence Cross-References\n';
+      if (corroborated.length > 0) {
+        evidenceCrossRefContext += '### Corroborated Claims (multiple providers agree):\n';
+        for (const cr of corroborated.slice(0, 10)) {
+          evidenceCrossRefContext += `- "${cr.claimText}" — supported by: ${cr.providers.join(', ')} (best source: tier ${cr.bestSourceTier})\n`;
+        }
+      }
+      if (contradicted.length > 0) {
+        evidenceCrossRefContext += '### Contradicted Claims (providers disagree):\n';
+        for (const cr of contradicted.slice(0, 10)) {
+          evidenceCrossRefContext += `- "${cr.claimText}" — providers: ${cr.providers.join(', ')}`;
+          if (cr.contradictions) evidenceCrossRefContext += ` — conflicts: ${cr.contradictions.join('; ')}`;
+          evidenceCrossRefContext += '\n';
+        }
+      }
+    }
+
     const synthPrompt = [
       `Original question: ${input}`,
       `\n## Final Positions:\n${allPositions}`,
       `\n## Rebuttals:\n${rebuttalsText}`,
       `\n## Council Votes:\n${voteText}`,
+      evidenceCrossRefContext,
       `\nProduce:\n## Synthesis\n[Best answer]\n\n## Minority Report\n[Dissenting views worth preserving]\n\n## Scores\nConsensus: [0.0-1.0]\nConfidence: [0.0-1.0]`,
     ].join('\n');
 
@@ -589,6 +723,31 @@ export class CouncilV2 {
       // Non-fatal
     }
 
+    // Record adaptive outcome for learning
+    if (this.adaptiveController) {
+      try {
+        await recordOutcome(
+          this.adaptiveController.getDecisions(),
+          synthesis.confidenceScore,
+          this.adapters.map(a => a.name),
+        );
+      } catch { /* non-fatal */ }
+
+      // Save adaptive decisions to session
+      try {
+        const { writeFile: wf } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        await wf(
+          join(this.store.path, 'adaptive-decisions.json'),
+          JSON.stringify({
+            decisions: this.adaptiveController.getDecisions(),
+            entropyHistory: this.adaptiveController.getEntropyHistory(),
+          }, null, 2),
+          'utf-8',
+        );
+      } catch { /* non-fatal */ }
+    }
+
     const duration = Date.now() - this.startedAt;
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthAdapter.name, synthesis });
 
@@ -604,8 +763,21 @@ export class CouncilV2 {
   // --- Rapid Mode ---
 
   private async deliberateRapid(input: string, gather: PhaseOutput): Promise<V2Result> {
+    // Adaptive: evaluate after gather in rapid mode
+    let skipDebateRapid = false;
+    if (this.adaptiveController) {
+      const remaining = this.phasePipeline.filter(p => p !== 'gather');
+      const decision = this.adaptiveController.evaluate('gather', gather.responses, remaining);
+      this.emit('adaptive', { phase: 'gather', decision });
+      if (decision.action === 'skip-to-synthesize') {
+        skipDebateRapid = true;
+      }
+    }
+
     // Debate: use gather responses directly (instead of formulate)
-    const debate = await this.runPhase('04-debate', 'DEBATE', async () => {
+    const debate = skipDebateRapid
+      ? { phase: 'DEBATE', timestamp: Date.now(), duration: 0, responses: {} as Record<string, string> }
+      : await this.runPhase('04-debate', 'DEBATE', async () => {
       return this.parallel(async (adapter, i) => {
         const otherPositions = Object.entries(gather.responses)
           .filter(([k]) => k !== adapter.name)
@@ -716,6 +888,30 @@ export class CouncilV2 {
       await this.writeSessionIndex(input, votes.winner, Date.now() - this.startedAt);
     } catch {
       // Non-fatal
+    }
+
+    // Record adaptive outcome for learning (rapid mode)
+    if (this.adaptiveController) {
+      try {
+        await recordOutcome(
+          this.adaptiveController.getDecisions(),
+          synthesis.confidenceScore,
+          this.adapters.map(a => a.name),
+        );
+      } catch { /* non-fatal */ }
+
+      try {
+        const { writeFile: wf } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        await wf(
+          join(this.store.path, 'adaptive-decisions.json'),
+          JSON.stringify({
+            decisions: this.adaptiveController.getDecisions(),
+            entropyHistory: this.adaptiveController.getEntropyHistory(),
+          }, null, 2),
+          'utf-8',
+        );
+      } catch { /* non-fatal */ }
     }
 
     const duration = Date.now() - this.startedAt;
@@ -992,7 +1188,14 @@ export class CouncilV2 {
               const targetName = letterToProvider[letter];
               if (targetName && !assigned.has(targetName)) {
                 const rank = entry.rank;
-                const scoreContribution = n - rank + 1;
+                let scoreContribution = n - rank + 1;
+                // Evidence weight in strict mode
+                if (this.profile.evidence === 'strict') {
+                  const evReport = this.evidenceReports.find(r => r.provider === targetName);
+                  if (evReport) {
+                    scoreContribution *= (0.5 + 0.5 * evReport.weightedScore);
+                  }
+                }
                 // Self-vote bias: 0.5x weight when voting for own position, stacks with provider weight
                 const selfDiscount = (voter === targetName) ? 0.5 : 1;
                 const providerWeight = this.weights[targetName] ?? 1;
@@ -1023,7 +1226,14 @@ export class CouncilV2 {
 
           const targetName = identifyPosition(line.slice(rankMatch[0].length));
           if (targetName && !assigned.has(targetName)) {
-            const scoreContribution = n - effectiveRank + 1;
+            let scoreContribution = n - effectiveRank + 1;
+            // Evidence weight in strict mode
+            if (this.profile.evidence === 'strict') {
+              const evReport = this.evidenceReports.find(r => r.provider === targetName);
+              if (evReport) {
+                scoreContribution *= (0.5 + 0.5 * evReport.weightedScore);
+              }
+            }
             // Self-vote bias: 0.5x weight when voting for own position, stacks with provider weight
             const selfDiscount = (voter === targetName) ? 0.5 : 1;
             const providerWeight = this.weights[targetName] ?? 1;
@@ -1046,10 +1256,15 @@ export class CouncilV2 {
             const idx = letter.charCodeAt(0) - 65;
             if (idx >= 0 && idx < n) {
               const name = this.adapters[idx].name;
+              let heuristicScore = n;
+              if (this.profile.evidence === 'strict') {
+                const evReport = this.evidenceReports.find(r => r.provider === name);
+                if (evReport) heuristicScore *= (0.5 + 0.5 * evReport.weightedScore);
+              }
               const selfDiscount = (voter === name) ? 0.5 : 1;
               const providerWeight = this.weights[name] ?? 1;
               const weight = selfDiscount * providerWeight;
-              scores[name] += n * weight;
+              scores[name] += heuristicScore * weight;
               details[name].ranks.push(1);
               assigned.add(name);
               break;
@@ -1061,10 +1276,15 @@ export class CouncilV2 {
           for (const adapter of this.adapters) {
             const nameRegex = new RegExp(`\\b${adapter.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b.*\\b(?:best|winner|top|first)\\b|\\b(?:best|winner|top|first)\\b.*\\b${adapter.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
             if (nameRegex.test(text)) {
+              let heuristicScore2 = n;
+              if (this.profile.evidence === 'strict') {
+                const evReport = this.evidenceReports.find(r => r.provider === adapter.name);
+                if (evReport) heuristicScore2 *= (0.5 + 0.5 * evReport.weightedScore);
+              }
               const selfDiscount = (voter === adapter.name) ? 0.5 : 1;
               const providerWeight = this.weights[adapter.name] ?? 1;
               const weight = selfDiscount * providerWeight;
-              scores[adapter.name] += n * weight;
+              scores[adapter.name] += heuristicScore2 * weight;
               details[adapter.name].ranks.push(1);
               assigned.add(adapter.name);
               break;

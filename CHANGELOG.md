@@ -4,6 +4,58 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.3.0] — 2026-02-12
+
+### 🧠 The "Trust + Intelligence" Release
+
+Three V2 features that make Quorum fundamentally smarter.
+
+#### #28 Evidence-Backed Claims Protocol (Deep)
+- **Sentence-level claim extraction** — every substantive assertion identified, not just tagged ones
+- **Source quality tiers:** A (URL, 1.0) → B (file path, 0.8) → C (data/stats, 0.7) → D (reasoning, 0.4) → F (unsupported, 0.0)
+- **Cross-provider claim validation** — detects corroborated claims (2+ providers agree) and contradictions
+- **Voting penalty (strict mode):** evidence `weightedScore` applies as 0.5x–1.0x multiplier to Borda scores
+- **Synthesis integration:** cross-reference matrix (corroborated/contradicted claims) injected into synthesis prompt
+- **`quorum evidence <session|last>`** — full evidence report with tier breakdown, grades (A–F), per-provider claim details
+  - Options: `--provider`, `--tier`, `--json`
+
+#### #31 Native PR/CI Integration (Deep)
+- **`quorum ci` command** — CI-optimized deliberation for pull requests
+  - `--pr <number>`, `--diff [ref]`, `--staged` input modes
+  - `--confidence-threshold <0-1>` — exit code 1 if below (CI gate)
+  - `--format json|markdown|github` — structured output formats
+  - `--post-comment` — auto-post review as PR comment via `gh`
+  - `--label` — add `quorum:approved` / `quorum:needs-discussion` / `quorum:concerning` labels
+  - `--max-files <n>` — skip if PR too large
+  - Exit codes: 0 = pass, 1 = below threshold, 2 = error
+- **GitHub Action** (`action.yml`) — drop-in composite action for any repo
+  - Inputs: providers, profile, confidence-threshold, evidence, post-comment, add-labels, max-files, focus
+  - Outputs: confidence, consensus, approved, evidence-grade, session-id, result-json
+- **Risk matrix extraction** — auto-categorizes findings into Security, Performance, Breaking Changes, Correctness, Style, Testing with severity levels
+- **Patch suggestion parsing** — detects code change suggestions from provider responses, deduplicates, formats as GitHub suggestions
+- **PR comment format** — collapsible sections for risk matrix, dissent, evidence, patch suggestions
+- **git.ts extensions:** `postPrComment()`, `addPrLabels()`, `removePrLabels()`, `getPrMetadata()`, `getPrChangedFiles()`, `ensureGhCli()`
+
+#### #32 Adaptive Debate Controller
+- **Disagreement entropy** — measures term divergence (Jaccard) + position entropy (Shannon) after each phase
+- **Dynamic phase control:**
+  - Low entropy after gather → skip to vote (providers already agree)
+  - Low entropy after debate → skip adjust/rebuttal
+  - High entropy after debate → add extra debate rounds (up to preset max)
+  - High entropy after adjust → force rebuttal
+- **4 presets:** `fast` (aggressive skip, 1 extra round), `balanced` (2 extra), `critical` (3 extra, never skips debate), `off`
+- **`--adaptive <preset>`** flag on `ask`, `review`, `ci`
+- **Multi-armed bandit learning** — tracks skip/add-round outcomes in `~/.quorum/adaptive-stats.json`, adjusts thresholds over time
+- **Profile YAML support:** `adaptive: balanced`
+- Adaptive decisions saved to session as `adaptive-decisions.json`
+
+#### New Files
+- `src/adaptive.ts` — entropy calculation, adaptive controller, bandit learning
+- `src/ci.ts` — risk matrix, patch suggestions, PR comment/markdown formatting
+- `action.yml` + `action/entrypoint.sh` + `action/README.md` — GitHub Action
+
+---
+
 ## [0.2.0] — 2026-02-12
 
 ### 🏛️ The "Consensus, Validated" Release

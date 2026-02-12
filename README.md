@@ -21,153 +21,251 @@ Quorum runs a **7-phase deliberation** across your configured AI providers:
 
 1. **GATHER** — Each provider generates an independent response in isolation
 2. **PLAN** — Each sees others' initial takes and plans their argument strategy
-3. **FORMULATE** — Each writes a formal position statement, informed by awareness of others
+3. **FORMULATE** — Each writes a formal position statement
 4. **DEBATE** — Room-style: every provider critiques ALL other positions simultaneously
 5. **ADJUST** — Each revises their position based on all critiques received
-6. **REBUTTAL** — Final round of rebuttals/concessions (skipped if consensus reached)
-7. **VOTE** — Each provider ranks all positions; votes are tallied with Borda count scoring
+6. **REBUTTAL** — Final rebuttals/concessions (auto-skipped if consensus reached)
+7. **VOTE** — Each provider ranks all positions; tallied via Borda count (or ranked-choice, approval, Condorcet)
 
-A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) merges the best thinking into a definitive answer with a minority report.
+A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) merges the best thinking into a definitive answer with a minority report and "What Would Change My Mind" section.
 
-## Setup
+## Quick Start
 
 ```bash
-# Install globally
 npm install -g quorum-ai
-# Or from source
-cd quorum-ai && npm install && npm run build && npm link
-
-# Auto-detect providers from environment
-quorum init
+quorum init                    # auto-detect providers
+quorum ask "Your question"     # full deliberation
 ```
-
-Quorum auto-detects providers from:
-- Environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, etc.)
-- Claude Code OAuth (macOS Keychain)
-- Gemini CLI
-- Ollama (local)
-- LM Studio (local)
 
 ## Usage
 
 ```bash
-# Ask the council (full deliberation)
+# Full deliberation
 quorum ask "What's the best approach for error handling in TypeScript?"
 
-# Single provider mode (no deliberation, with streaming)
-quorum ask -1 "Quick question" 
-quorum ask --single claude "Explain monads"
+# Rapid mode (3-phase: gather → debate → synthesize)
+quorum ask --rapid "Quick comparison of React vs Svelte"
 
-# Pipe input
-echo "Review this code" | quorum ask
+# Single provider (no deliberation)
+quorum ask -1 "Quick question"
 
-# Use a specific profile
-quorum ask --profile code-review "Review my auth implementation"
+# Evidence-backed claims (providers must cite sources)
+quorum ask --evidence strict "Is Rust faster than Go for web servers?"
 
-# Filter providers
-quorum ask -p claude,openai "Compare React vs Svelte"
+# Adaptive debate (auto-skip/extend based on disagreement)
+quorum ask --adaptive balanced "Should we use microservices?"
 
-# JSON output (for scripting)
-quorum ask --json "question"
+# Devil's advocate (one provider forced contrarian)
+quorum ask --devils-advocate "Is our architecture correct?"
 
-# Save full audit trail
-quorum ask --audit ./audit.json "question"
+# Decision matrix (structured scoring grid)
+quorum ask --profile decision "PostgreSQL vs MySQL vs SQLite for our use case"
+
+# Head-to-head
+quorum versus claude kimi "Tabs vs spaces"
+
+# Filter providers, custom profile, pipe input
+echo "Review this" | quorum ask -p claude,openai --profile code-review
+```
+
+## Code Review
+
+```bash
+# Review files
+quorum review src/auth.ts src/utils.ts
+
+# Review staged changes
+quorum review --staged
+
+# Review a PR
+quorum review --pr 42
+
+# Review diff against a branch
+quorum review --diff main
+```
+
+## CI/CD Integration
+
+```bash
+# CI-optimized (structured output, exit codes, auto-comment)
+quorum ci --pr 42 --confidence-threshold 0.7 --post-comment
+
+# JSON output for pipelines
+quorum ci --pr 42 --format json
+
+# With evidence and labeling
+quorum ci --pr 42 --evidence strict --label --format github
+```
+
+Exit codes: `0` = pass, `1` = below confidence threshold, `2` = error
+
+### GitHub Action
+
+```yaml
+# .github/workflows/quorum-review.yml
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: quorum-ai/quorum@v1
+        with:
+          providers: claude,kimi
+          confidence-threshold: '0.7'
+          evidence: advisory
+          post-comment: 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
+```
+
+PR comments include: synthesis, risk matrix, dissent summary, evidence report, and patch suggestions — all in collapsible sections.
+
+## Adaptive Debate
+
+The adaptive controller dynamically adjusts deliberation based on disagreement entropy:
+
+```bash
+quorum ask --adaptive fast "question"      # aggressive skipping
+quorum ask --adaptive balanced "question"  # default, up to 2 extra rounds
+quorum ask --adaptive critical "question"  # conservative, never skips debate
+```
+
+- **Low entropy after gather** → skip to vote (providers already agree)
+- **High entropy after debate** → add extra debate rounds
+- **Learns over time** via multi-armed bandit (stored in `~/.quorum/adaptive-stats.json`)
+
+## Evidence Protocol
+
+Providers tag claims with sources. Quorum scores and cross-validates them.
+
+```bash
+# Advisory mode (show scores, don't affect votes)
+quorum ask --evidence advisory "question"
+
+# Strict mode (unsupported claims penalized in voting)
+quorum ask --evidence strict "question"
+
+# Inspect evidence after a run
+quorum evidence last
+quorum evidence last --provider claude --tier A
+```
+
+Source quality tiers: **A** (URL) → **B** (file path) → **C** (data/stats) → **D** (reasoning) → **F** (unsupported)
+
+Cross-provider validation detects corroborated and contradicted claims across providers.
+
+## Session Tools
+
+```bash
+# History
+quorum history
+
+# Follow-up on a previous deliberation
+quorum follow-up last "But what about edge cases?"
+
+# Compare two sessions
+quorum diff <session1> <session2> --analyze
+
+# Meta-analysis
+quorum explain last
+
+# Re-run with different providers
+quorum rerun last --providers claude,deepseek --compare
+
+# Replay debate in real-time
+quorum replay last --speed slow
+
+# Export report
+quorum export last --format html --output report.html
+
+# Provider stats (win rates, patterns)
+quorum stats
+
+# Consensus heatmap
+quorum heatmap last
 ```
 
 ## Profiles
 
-Profiles control deliberation behavior. Built-in profiles:
-
-- **default** — Balanced deliberation
-- **brainstorm** — Creative, divergent thinking
-- **code-review** — Focused on code quality, bugs, security
-- **research** — Thorough, evidence-based analysis
-
-Custom profiles go in `~/.quorum/agents/myprofile.yaml` or `./agents/myprofile.yaml`:
+Built-in: `default`, `brainstorm`, `code-review`, `research`, `decision`, `panel`, `quick`, `thorough`
 
 ```yaml
-name: my-profile
+# ~/.quorum/agents/my-profile.yaml
+name: security-review
 rounds: 1
-focus: [security, performance]
-challengeStyle: adversarial  # adversarial | collaborative | socratic
-scoringWeights:
-  accuracy: 0.3
-  reasoning: 0.3
-  completeness: 0.2
-  novelty: 0.1
-  consensus: 0.1
-isolation: true
-blindReview: false
+focus: [security, authentication, authorization]
+challengeStyle: adversarial
+evidence: strict
+adaptive: balanced
+phases: [gather, debate, adjust, vote, synthesize]
+roles:
+  claude: "OWASP security expert"
+  kimi: "penetration tester"
+weights:
+  claude: 1.5
+votingMethod: condorcet
+hooks:
+  pre-gather: "./scripts/fetch-context.sh"
+  post-synthesis: "./scripts/notify-slack.sh"
 ```
 
-## Provider Configuration
+Project-local config via `.quorumrc` (walks cwd → homedir).
+
+## Advanced Features
+
+| Feature | Flag/Command | Description |
+|---------|-------------|-------------|
+| Weighted providers | `--weight claude=2,kimi=1` | Give providers more/less vote influence |
+| Custom voting | `votingMethod: condorcet` | Borda, ranked-choice, approval, Condorcet |
+| Watch mode | `quorum watch src/*.ts` | Re-run on file save |
+| Tool use | `--tools` | Providers can web search, read files |
+| Plugin hooks | `hooks:` in profile | Pre/post scripts per phase |
+| Dry run | `--dry-run` | Preview prompts without API calls |
+| Inline overrides | `--focus`, `--rounds`, etc. | Override profile fields from CLI |
+
+## Provider Setup
 
 ```bash
-# List providers
-quorum providers list
-
-# Add manually
+quorum providers list           # show configured
+quorum providers test           # test all
+quorum providers models         # browse available
 quorum providers add --name deepseek --type deepseek --model deepseek-chat --env DEEPSEEK_API_KEY
-
-# Remove
-quorum providers remove ollama
-
-# Test all providers
-quorum providers test
-
-# Browse available models
-quorum providers models
-quorum providers models anthropic
 ```
 
-Config is stored in `~/.quorum/config.yaml`. Per-provider timeout (default 120s) can be set in the config:
+Auto-detects: OpenAI, Anthropic, Google, Kimi, DeepSeek, Mistral, Ollama, LM Studio, Claude Code OAuth, Gemini CLI.
 
-```yaml
-providers:
-  - name: claude
-    provider: anthropic
-    model: claude-sonnet-4-20250514
-    timeout: 180
-    auth:
-      method: env
-      envVar: ANTHROPIC_API_KEY
-```
-
-## Sessions & History
-
-Every deliberation is saved to `~/.quorum/sessions/<id>/`.
-
-```bash
-# View a past session (all phases summarized)
-quorum session ~/.quorum/sessions/<id>
-
-# View a specific phase in detail
-quorum session ~/.quorum/sessions/<id> --phase debate
-quorum session ~/.quorum/sessions/<id> --phase synthesis
-
-# List past sessions
-quorum history
-quorum history -n 50
-```
+Config: `~/.quorum/config.yaml`
 
 ## Architecture
 
 ```
 src/
-├── cli.ts            # Commander-based CLI entry point
+├── cli.ts            # CLI (commander.js)
 ├── council-v2.ts     # 7-phase deliberation engine
-├── providers/
-│   └── base.ts       # Provider adapter (all through pi-ai)
+├── adaptive.ts       # Adaptive debate controller + bandit learning
+├── evidence.ts       # Evidence-backed claims protocol
+├── ci.ts             # CI output formatting, risk matrix, patch suggestions
+├── git.ts            # Git/GitHub integration (PR, comments, labels)
+├── voting.ts         # Pluggable voting algorithms
+├── heatmap.ts        # Consensus heatmap (Spearman correlation)
+├── hooks.ts          # Plugin/hook system
+├── tools.ts          # MCP/tool use (web search, file read, shell)
+├── export.ts         # Report export (markdown, HTML)
+├── providers/base.ts # Provider adapter (all through pi-ai)
 ├── session.ts        # File-backed session persistence
-├── config.ts         # YAML config + provider auto-detection
-├── context.ts        # Token budget management + truncation
-├── auth.ts           # OAuth device flow + keychain + credential resolution
-└── types.ts          # Core type definitions
+├── config.ts         # YAML config + auto-detection
+├── context.ts        # Token budget management
+├── auth.ts           # OAuth + keychain + credentials
+└── types.ts          # Core types
 ```
 
-All providers route through [`@mariozechner/pi-ai`](https://github.com/nichochar/pi-ai) for unified API access. The only exception is `gemini-cli`, which uses a child process shim due to OAuth scope differences.
-
-Context management keeps prompts within each provider's token limits — full-priority content is preserved while lower-priority content is proportionally trimmed.
+All providers route through [`@mariozechner/pi-ai`](https://github.com/nichochar/pi-ai) for unified API access.
 
 ## License
 

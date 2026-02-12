@@ -248,15 +248,266 @@ Project-local config (like `.eslintrc`):
 ### Phase 1 — Trust + Production (build first)
 | # | Feature | Description |
 |---|---------|-------------|
-| 28 | Evidence-Backed Claims Protocol | Claims require source metadata; voting penalizes unsupported assertions. Modes: `advisory`, `strict`. `quorum run --evidence strict` |
+| 28 | Evidence-Backed Claims Protocol | See detailed spec below |
 | 29 | Deterministic Replay + Signed Ledger | Persist all run artifacts (prompts, model versions, votes). Hash-chain ledger. `quorum replay <run-id>` for near-reproducible reruns. ADR-style decision records. |
 | 30 | Policy-as-Code Guardrails | Rego/Cedar-style policies: allowed tools, escalation thresholds, max cost, required evidence level, human approval gates. |
-| 31 | Native PR/CI Integration (Deep) | `/quorum` command in PRs/issues. CI confidence gates ("Security Council ≥ 0.8"). Returns patch suggestions, risk matrix, dissent summary. |
+| 31 | Native PR/CI Integration (Deep) | See detailed spec below |
+
+### #28 Evidence-Backed Claims Protocol — Detailed Spec
+
+**Priority:** Highest — this is what makes Quorum fundamentally different from "consensus = vibes"
+
+**Impact ranking (Colin):** #2 overall (after PR/CI), #1 for building on next
+
+#### 1. Structured Claim Extraction
+- NLP-style sentence splitting — every substantive assertion is a claim, tagged or not
+- Not just marker-adjacent text; full response parsing
+- Claims deduped by semantic similarity within a provider's response
+
+#### 2. Source Quality Tiers
+Not all sources are equal — scored by verifiability:
+| Tier | Type | Weight | Example |
+|------|------|--------|---------|
+| A | `url` (verifiable link) | 1.0 | `[source: https://docs.python.org/...]` |
+| B | `file` (local path) | 0.8 | `[source: src/config.ts:42]` |
+| C | `data` (stats with attribution) | 0.7 | `[source: "Node.js 2025 survey, 73% adoption"]` |
+| D | `reasoning` (logical argument) | 0.4 | `[source: reasoning]` |
+| F | unsupported | 0.0 | No tag |
+
+#### 3. Cross-Provider Claim Validation
+- Build a claim dedup matrix across all providers
+- If N providers independently cite the same fact → corroboration score
+- Contradictory claims flagged explicitly in evidence report
+- Feeds into synthesis: "X's claim about Y was corroborated by Z but contradicted by W"
+
+#### 4. Real Voting Penalty
+- Evidence scores apply as **multipliers** to Borda scores (not just a footnote)
+- `advisory` mode: evidence score shown but doesn't affect votes
+- `strict` mode: unsupported claims get 0.5x vote weight
+- Per-claim penalty: claims without sources weighted down in synthesis prompt
+
+#### 5. CLI Command: `quorum evidence <session|last>`
+- Claim breakdown per provider: supported vs unsupported
+- Source quality distribution (tier A/B/C/D/F)
+- Cross-reference matrix showing corroboration
+- Overall evidence score with letter grade
+
+#### 6. Synthesis Integration
+- Synthesizer receives full evidence matrix, not just percentages
+- Prompt includes: "Provider X's claim about Y was corroborated by Z (source tier A) but unsupported by W"
+- Minority report flags claims that are well-sourced but outvoted
+
+#### 7. Source Verification (optional, when `--tools` enabled)
+- Fetch URLs to verify they exist and support the claim
+- Mark verified vs unverified sources
+- Dead links → downgrade source tier to D
+
+#### Implementation Plan
+- **Sub-agent 1 (Core):** Claim extraction, source tiers, cross-validation, scoring engine
+- **Sub-agent 2 (Integration):** council-v2 voting penalty, synthesis prompt, evidence modes
+- **Sub-agent 3 (CLI):** `quorum evidence` command, report formatting, output
+
+---
+
+### #31 Native PR/CI Integration (Deep) — Detailed Spec
+
+**Priority:** #1 by impact — adoption driver, viral team spread
+
+**What exists (V1 #20):** `quorum review --staged`, `--diff [ref]`, `--pr <number>` — local CLI only
+
+#### 1. `quorum ci` Command (CI-optimized output)
+New command for non-interactive CI environments:
+```bash
+quorum ci --pr <number> [options]
+quorum ci --diff <ref> [options]
+quorum ci --staged [options]
+```
+Options:
+- `--confidence-threshold <0.0-1.0>` — exit code 1 if below threshold (gate)
+- `--format json|markdown|github` — output format (github = PR comment markdown)
+- `--post-comment` — automatically post result as PR comment via `gh`
+- `--label` — add labels to PR based on result (e.g., `quorum:approved`, `quorum:needs-discussion`)
+- `--evidence <mode>` — evidence mode (advisory/strict)
+- `--profile <name>` — agent profile (defaults to `code-review`)
+- `--max-files <n>` — skip if PR has more than N changed files
+- `--focus <areas>` — focus areas (security, performance, etc.)
+
+Exit codes: 0 = pass, 1 = below threshold, 2 = error
+
+#### 2. GitHub Action (`action.yml`)
+Reusable GitHub Action at repo root:
+```yaml
+# .github/workflows/quorum-review.yml
+- uses: quorum-ai/quorum@v1
+  with:
+    providers: claude,kimi
+    profile: code-review
+    confidence-threshold: 0.7
+    evidence: advisory
+    post-comment: true
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
+```
+
+Creates `action.yml` + `action/entrypoint.sh` that:
+- Installs quorum via npm
+- Runs `quorum ci --pr $PR_NUMBER --format github --post-comment`
+- Sets output variables: `confidence`, `consensus`, `winner`, `approved`
+
+#### 3. PR Comment Format
+```markdown
+## 🏛️ Quorum Code Review
+
+**Consensus:** 0.85 | **Confidence:** 0.78 | **Evidence:** B (62%)
+
+### Summary
+[Synthesis content — key findings]
+
+<details><summary>🔍 Risk Matrix</summary>
+
+| Area | Risk | Details |
+|------|------|---------|
+| Security | 🟡 Medium | SQL injection possible in query builder |
+| Performance | 🟢 Low | No hot-path changes |
+| Breaking Changes | 🔴 High | Public API signature changed |
+
+</details>
+
+<details><summary>⚖️ Dissent Summary</summary>
+[Minority report — what the losing providers argued]
+</details>
+
+<details><summary>📋 Evidence Report</summary>
+[Per-provider claim breakdown]
+</details>
+
+<details><summary>💡 Patch Suggestions</summary>
+
+```suggestion
+// file: src/query.ts, line 42
+- const query = `SELECT * FROM ${table}`;
++ const query = `SELECT * FROM ${sanitize(table)}`;
+```
+
+</details>
+```
+
+#### 4. Structured CI Output (`--format json`)
+```typescript
+interface CIResult {
+  approved: boolean;
+  confidence: number;
+  consensus: number;
+  evidenceGrade: string;
+  riskMatrix: Array<{ area: string; risk: 'low' | 'medium' | 'high' | 'critical'; details: string }>;
+  suggestions: Array<{ file: string; line: number; before: string; after: string; rationale: string }>;
+  dissent: string;
+  synthesis: string;
+  providers: string[];
+  duration: number;
+}
+```
+
+#### 5. Risk Matrix Generation
+Add to synthesis prompt when in CI mode:
+- Categorize findings into: Security, Performance, Breaking Changes, Correctness, Style, Testing
+- Score each: low/medium/high/critical
+- Extract from debate disagreements — if providers disagree on risk, flag as medium+
+
+#### 6. Patch Suggestions
+Parse provider responses for code suggestions:
+- Detect ````suggestion` blocks or "change X to Y" patterns
+- Normalize into GitHub suggestion format (file, line, before/after)
+- Deduplicate across providers (majority wins)
+
+#### Implementation Plan
+- **Sub-agent 1 (CI Command):** `quorum ci` in cli.ts — PR/diff input, structured output, exit codes, `--post-comment`
+- **Sub-agent 2 (GitHub Action):** `action.yml`, entrypoint, PR comment formatting, label management
+- **Sub-agent 3 (Risk + Suggestions):** Risk matrix extraction, patch suggestion parsing, CI-specific synthesis prompts
+- **Sub-agent 4 (git.ts extensions):** PR metadata (labels, reviewers, checks), comment posting via `gh api`
+
+---
 
 ### Phase 2 — Quality + Cost Engine
 | # | Feature | Description |
 |---|---------|-------------|
-| 32 | Adaptive Debate Controller | Dynamic round/model allocation based on disagreement entropy. Stop/expand logic. Presets: `fast`, `balanced`, `critical`. Multi-armed bandit optimization. |
+| 32 | Adaptive Debate Controller | See detailed spec below |
+
+### #32 Adaptive Debate Controller — Detailed Spec
+
+**Priority:** #3 by impact — immediate quality/cost ROI on every deliberation
+
+**Problem:** Fixed phase pipelines waste compute. Easy questions get 7 full phases. Hard questions might need extra debate rounds. No learning across sessions.
+
+#### 1. Disagreement Entropy (`src/adaptive.ts`)
+Measure how much providers disagree after each phase:
+- **Term divergence:** inverse of `measureConvergence()` (already exists)
+- **Position entropy:** Shannon entropy over key claim distribution
+- **Sentiment polarity spread:** if providers have opposing conclusions
+- Score 0.0 (total agreement) → 1.0 (total disagreement)
+
+#### 2. Adaptive Phase Controller
+After each phase, the controller decides: **continue**, **skip ahead**, or **add rounds**.
+```typescript
+interface AdaptiveDecision {
+  action: 'continue' | 'skip' | 'add-round' | 'escalate';
+  reason: string;
+  entropy: number;
+  phasesRemaining: string[];
+}
+```
+
+Rules:
+- **After gather:** if entropy < 0.2 → skip to vote+synthesize (they already agree)
+- **After debate:** if entropy < 0.3 → skip adjust/rebuttal, go to vote
+- **After debate:** if entropy > 0.8 → add another debate round (max 2 extra)
+- **After adjust:** if entropy still > 0.7 → add rebuttal (even if would be skipped)
+- Convergence threshold from profile still respected
+
+#### 3. Presets (profile YAML)
+```yaml
+adaptive: fast       # aggressive skipping, 1 extra round max
+adaptive: balanced   # default, up to 2 extra rounds
+adaptive: critical   # conservative, up to 3 extra rounds, never skips
+adaptive: off        # current behavior (no adaptation)
+```
+
+Also: `--adaptive <preset>` CLI flag override.
+
+#### 4. Multi-Armed Bandit (learning across sessions)
+Store outcome data in `~/.quorum/adaptive-stats.json`:
+```typescript
+interface AdaptiveStats {
+  phaseSkips: Record<string, { count: number; avgConfidence: number }>;
+  extraRounds: Record<string, { count: number; avgConfidence: number }>;
+  providerPairEntropy: Record<string, number>; // "claude+kimi" → avg entropy
+}
+```
+- Track: which skips led to high-confidence outcomes (good) vs low-confidence (bad)
+- Over time, tune skip thresholds per provider combination
+- Simple: just adjust thresholds by ±0.05 based on outcome history
+
+#### 5. Council-v2 Integration
+- Controller wraps the phase loop in `deliberate()`
+- After each `runPhase()`, call `controller.evaluate()` to get next action
+- Emit events: `adaptive:skip`, `adaptive:add-round`, `adaptive:escalate`
+- Store adaptive decisions in session for replay/analysis
+
+#### 6. CLI Output
+Show adaptive decisions inline:
+```
+⚡ ADAPTIVE: Entropy 0.18 after GATHER — skipping to VOTE (providers agree)
+⚡ ADAPTIVE: Entropy 0.82 after DEBATE — adding extra debate round (high disagreement)
+```
+
+#### Implementation Plan
+- **Sub-agent 1 (Core):** `src/adaptive.ts` — entropy calculation, decision engine, presets, stats persistence
+- **Sub-agent 2 (Integration):** Wire into `council-v2.ts` — phase loop wrapping, events, session storage
+- **Sub-agent 3 (CLI + Types):** `--adaptive` flag in cli.ts, `adaptive` field in AgentProfile type, profile YAML support
+
+---
+
 | 33 | Deliberation Memory Graph | Cross-run graph memory: tasks, role setups, vote splits, outcomes. Retrieval at run start. Contradiction detection vs prior decisions. |
 | 34 | Adversarial Red-Team Mode | Non-voting attacker agents. Domain attack packs (`code`, `security`, `legal`, `medical`). Outputs `resilience_score` + unresolved risk register. |
 

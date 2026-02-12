@@ -1,0 +1,75 @@
+name: 'Quorum Code Review'
+description: 'Multi-AI deliberation code review for pull requests'
+branding:
+  icon: 'users'
+  color: 'purple'
+
+inputs:
+  providers:
+    description: 'Comma-separated provider names (e.g., claude,kimi,openai)'
+    required: true
+  profile:
+    description: 'Agent profile name'
+    default: 'code-review'
+  confidence-threshold:
+    description: 'Minimum confidence score (0.0-1.0). Fails if below.'
+    default: '0'
+  evidence:
+    description: 'Evidence mode: off, advisory, strict'
+    default: 'off'
+  post-comment:
+    description: 'Post review as PR comment'
+    default: 'true'
+  add-labels:
+    description: 'Add labels to PR based on result'
+    default: 'false'
+  max-files:
+    description: 'Skip review if PR has more than N changed files'
+    default: '50'
+  focus:
+    description: 'Comma-separated focus areas'
+    default: ''
+  node-version:
+    description: 'Node.js version to use'
+    default: '20'
+  quorum-version:
+    description: 'Quorum npm package version'
+    default: 'latest'
+
+outputs:
+  confidence:
+    description: 'Confidence score from the review'
+  consensus:
+    description: 'Consensus score from the review'
+  approved:
+    description: 'Whether the review passed the confidence threshold'
+  evidence-grade:
+    description: 'Evidence grade (A-F)'
+  session-id:
+    description: 'Session ID for the review'
+  result-json:
+    description: 'Full result as JSON'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    - shell: bash
+      run: npm install -g quorum-ai@${{ inputs.quorum-version }}
+    - shell: bash
+      id: review
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        ${{ github.action_path }}/action/entrypoint.sh \
+          --providers "${{ inputs.providers }}" \
+          --profile "${{ inputs.profile }}" \
+          --confidence-threshold "${{ inputs.confidence-threshold }}" \
+          --evidence "${{ inputs.evidence }}" \
+          --post-comment "${{ inputs.post-comment }}" \
+          --add-labels "${{ inputs.add-labels }}" \
+          --max-files "${{ inputs.max-files }}" \
+          --focus "${{ inputs.focus }}"
