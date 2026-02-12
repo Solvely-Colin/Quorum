@@ -1,0 +1,14 @@
+name: Thorough Council
+rounds: 1
+focus: [accuracy, reasoning, completeness, edge cases]
+challengeStyle: adversarial
+convergenceThreshold: 0.7
+phases: [gather, plan, formulate, debate, adjust, rebuttal, vote, synthesize]
+scoringWeights:
+  accuracy: 0.25
+  reasoning: 0.3
+  completeness: 0.25
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false

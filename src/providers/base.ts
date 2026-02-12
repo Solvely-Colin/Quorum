@@ -1,0 +1,320 @@
+import type { ProviderAdapter, ProviderConfig } from '../types.js';
+import { resolveCredential } from '../auth.js';
+import { completeSimple, streamSimple, getModel, getModels } from '@mariozechner/pi-ai';
+import type { Api, Model, SimpleStreamOptions, KnownProvider, AssistantMessageEvent } from '@mariozechner/pi-ai';
+import { homedir } from 'node:os';
+
+// ============================================================================
+// Auto-credential resolution for CLI-authed providers
+// ============================================================================
+
+/**
+ * Read Claude Code's OAuth token from macOS Keychain.
+ * Returns sk-ant-oat-* token which pi-ai handles natively (Bearer auth).
+ */
+async function resolveClaudeOAuthToken(): Promise<string | null> {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const raw = execFileSync(
+      'security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      { encoding: 'utf-8', timeout: 5000 },
+    ).trim();
+    const data = JSON.parse(raw);
+    const oauth = data.claudeAiOauth ?? data;
+    if (!oauth.accessToken) return null;
+    // Check expiry (with 60s buffer)
+    if (oauth.expiresAt && Date.now() > oauth.expiresAt - 60_000) return null;
+    return oauth.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+// Note: Gemini CLI's OAuth token has cloud-platform scope (Vertex AI), not
+// generativelanguage scope (AI Studio). Can't use it with pi-ai's google provider.
+// If GOOGLE_API_KEY is set, the google provider works directly via pi-ai.
+// Otherwise, we fall back to the gemini-cli child process shim.
+
+// ============================================================================
+// Pi-ai model resolution
+// ============================================================================
+
+/**
+ * Map our simple provider config to a pi-ai Model descriptor.
+ * If the model exists in pi-ai's registry, use that. Otherwise build one.
+ */
+function resolveModel(config: ProviderConfig): Model<Api> {
+  // Check pi-ai's built-in model registry first
+  const piProvider = mapProvider(config.provider);
+  try {
+    const all = getModels(piProvider as KnownProvider);
+    const registered = all.find((m) => m.id === config.model);
+    if (registered) {
+      return {
+        ...registered,
+        baseUrl: config.baseUrl || registered.baseUrl,
+      } as Model<Api>;
+    }
+  } catch {
+    // Provider not in registry, build manually
+  }
+
+  // Build a model descriptor from config
+  const { api, provider, baseUrl } = resolveApiDetails(config);
+  return {
+    id: config.model,
+    name: config.name,
+    api,
+    provider,
+    baseUrl,
+    reasoning: false,
+    input: ['text'] as ('text' | 'image')[],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 4096,
+    headers: {},
+  } as Model<Api>;
+}
+
+/** Map our provider names to pi-ai provider keys */
+function mapProvider(p: ProviderConfig['provider']): string {
+  const map: Record<string, string> = {
+    'openai': 'openai',
+    'anthropic': 'anthropic',
+    'google': 'google',
+    'gemini-cli': 'google',    // resolved as CLI shim, not pi-ai
+    'kimi': 'kimi-coding',
+    'deepseek': 'openai',      // OpenAI-compatible
+    'mistral': 'openai',       // OpenAI-compatible
+    'ollama': 'openai',        // OpenAI-compatible
+    'custom': 'openai',        // OpenAI-compatible
+    'codex': 'openai-codex',
+  };
+  return map[p] ?? p;
+}
+
+/** Resolve the pi-ai api type + baseUrl for a provider */
+function resolveApiDetails(config: ProviderConfig): { api: Api; provider: string; baseUrl: string } {
+  switch (config.provider) {
+    case 'anthropic':
+      return { api: 'anthropic-messages', provider: 'anthropic', baseUrl: config.baseUrl || 'https://api.anthropic.com' };
+    case 'openai':
+      return { api: 'openai-responses', provider: 'openai', baseUrl: config.baseUrl || 'https://api.openai.com/v1' };
+    case 'google':
+      return { api: 'google-generative-ai', provider: 'google', baseUrl: config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta' };
+    case 'kimi':
+      return {
+        api: 'anthropic-messages',
+        provider: 'kimi-coding',
+        baseUrl: config.baseUrl || (config.apiKey?.startsWith('sk-kimi-') ? 'https://api.kimi.com/coding' : 'https://api.moonshot.cn/v1'),
+      };
+    case 'codex':
+      return { api: 'openai-codex-responses', provider: 'openai-codex', baseUrl: config.baseUrl || 'https://chatgpt.com/backend-api' };
+    case 'deepseek':
+      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'https://api.deepseek.com/v1' };
+    case 'mistral':
+      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'https://api.mistral.ai/v1' };
+    case 'ollama':
+      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'http://localhost:11434/v1' };
+    case 'custom':
+      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || '' };
+    default:
+      return { api: 'openai-completions', provider: config.provider, baseUrl: config.baseUrl || '' };
+  }
+}
+
+// ============================================================================
+// Provider creation — all through pi-ai, no CLI shims
+// ============================================================================
+
+/**
+ * Resolve the API key for a provider, with auto-detection of CLI-authed tokens.
+ * Priority: explicit config → env var → CLI OAuth tokens (keychain/creds files)
+ */
+async function resolveApiKey(config: ProviderConfig): Promise<string> {
+  // 1. Explicit credential from auth config
+  const credential = await resolveCredential(config);
+  if (credential) return credential;
+
+  // 2. Legacy apiKey field
+  if (config.apiKey) return config.apiKey;
+
+  // 3. Environment variables
+  const envKey = process.env[`${config.provider.toUpperCase()}_API_KEY`];
+  if (envKey) return envKey;
+
+  // 4. Provider-specific env vars
+  if (config.provider === 'codex' && process.env.CODEX_ACCESS_TOKEN) {
+    return process.env.CODEX_ACCESS_TOKEN;
+  }
+
+  // 5. Auto-detect CLI OAuth tokens
+  if (config.provider === 'anthropic') {
+    const token = await resolveClaudeOAuthToken();
+    if (token) return token; // pi-ai detects sk-ant-oat-* and uses Bearer auth
+  }
+
+  if (config.provider === 'google' || config.provider === 'gemini-cli') {
+    if (process.env.GOOGLE_API_KEY) return process.env.GOOGLE_API_KEY;
+    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+  }
+
+  // 6. Local providers don't need a key
+  if (config.provider === 'ollama' || config.provider === 'custom') {
+    return 'ollama'; // placeholder, not validated
+  }
+
+  // 7. Fallback
+  return '';
+}
+
+/**
+ * Create a provider adapter from config.
+ * Gemini CLI uses a child-process shim (OAuth scope mismatch with AI Studio).
+ * Everything else goes through pi-ai's unified API.
+ */
+export async function createProvider(config: ProviderConfig): Promise<ProviderAdapter> {
+  // Gemini CLI shim — only used as fallback when no GOOGLE_API_KEY is available.
+  // The CLI's OAuth token has cloud-platform scope (Vertex AI), not AI Studio scope.
+  if (config.provider === 'gemini-cli') {
+    // Always use CLI shim when explicitly configured as gemini-cli.
+    // The CLI uses Vertex AI OAuth which has separate quota from AI Studio API keys.
+    return createGeminiCli(config);
+  }
+
+  const apiKey = await resolveApiKey(config);
+  const resolved = { ...config, apiKey };
+  const model = resolveModel(resolved);
+  const timeoutMs = (resolved.timeout ?? 120) * 1000;
+
+  const buildOpts = (): SimpleStreamOptions => ({
+    apiKey,
+    maxTokens: 4096,
+    ...(!['codex', 'google'].includes(resolved.provider) ? { reasoning: 'low' } : {}),
+  });
+
+  const buildContext = (prompt: string, systemPrompt?: string) => ({
+    systemPrompt,
+    messages: [{ role: 'user' as const, content: [{ type: 'text' as const, text: prompt }], timestamp: Date.now() }],
+  });
+
+  const extractText = (result: { errorMessage?: string; content: Array<{ type: string; text?: string }> }): string => {
+    if (result.errorMessage) {
+      throw new Error(`${resolved.provider}/${resolved.model}: ${result.errorMessage.slice(0, 200)}`);
+    }
+    for (const block of result.content) {
+      if (block.type === 'text' && block.text) return block.text;
+    }
+    for (const block of result.content) {
+      if (block.type === 'thinking' && (block as any).thinking) return (block as any).thinking;
+    }
+    return '';
+  };
+
+  const withTimeout = <T>(promise: Promise<T>, label: string): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+      ),
+    ]);
+  };
+
+  return {
+    name: resolved.name,
+    config: resolved,
+    async generate(prompt: string, systemPrompt?: string) {
+      const result = await withTimeout(
+        completeSimple(model, buildContext(prompt, systemPrompt), buildOpts()),
+        `${resolved.name}`,
+      );
+      return extractText(result as any);
+    },
+    async generateStream(prompt: string, systemPrompt: string | undefined, onDelta: (delta: string) => void) {
+      const ac = new AbortController();
+      const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
+      const stream = streamSimple(model, buildContext(prompt, systemPrompt), buildOpts());
+      let text = '';
+      try {
+        const abortPromise = new Promise<never>((_, reject) => {
+          ac.signal.addEventListener('abort', () => {
+            // Close the underlying stream connection
+            (stream as AsyncIterable<AssistantMessageEvent> & { [Symbol.asyncIterator](): AsyncIterator<AssistantMessageEvent> })[Symbol.asyncIterator]().return?.();
+            reject(new Error(`${resolved.name} stream timed out after ${timeoutMs / 1000}s`));
+          }, { once: true });
+        });
+        const iterate = async () => {
+          for await (const event of stream as AsyncIterable<AssistantMessageEvent>) {
+            if (ac.signal.aborted) break;
+            if (event.type === 'text_delta') {
+              text += event.delta;
+              onDelta(event.delta);
+            } else if (event.type === 'error') {
+              throw new Error(`${resolved.name} stream error`);
+            }
+          }
+        };
+        await Promise.race([iterate(), abortPromise]);
+      } catch (err) {
+        // If we have partial text and it was a timeout, return what we have
+        if (text && ac.signal.aborted) {
+          return text;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if (!text) {
+        const result = await stream.result();
+        return extractText(result as any);
+      }
+      return text;
+    },
+  };
+}
+
+// ============================================================================
+// Gemini CLI Shim (child process)
+// The Gemini CLI's OAuth token has cloud-platform scope (Vertex AI only).
+// Pi-ai's google provider needs generativelanguage scope (AI Studio).
+// Until we add Vertex AI support or get a GOOGLE_API_KEY, shell out to `gemini -p`.
+// ============================================================================
+
+async function createGeminiCli(config: ProviderConfig): Promise<ProviderAdapter> {
+  const timeoutMs = (config.timeout ?? 120) * 1000;
+  return {
+    name: config.name,
+    config,
+    async generate(prompt: string, systemPrompt?: string) {
+      const input = systemPrompt ? `<system>${systemPrompt}</system>\n\n${prompt}` : prompt;
+      const args = ['-p', input, '--sandbox'];
+      if (config.model) args.push('-m', config.model);
+
+      const { spawn } = await import('node:child_process');
+      return new Promise<string>((resolve, reject) => {
+        let settled = false;
+        const proc = spawn('gemini', args, { env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
+        let stdout = '', stderr = '';
+        proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+        proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+        proc.on('close', (code) => {
+          if (settled) return;
+          settled = true;
+          code === 0 ? resolve(stdout.trim()) : reject(new Error(`gemini-cli exited ${code}: ${stderr}`));
+        });
+        proc.on('error', (err) => {
+          if (settled) return;
+          settled = true;
+          reject(err);
+        });
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          proc.kill();
+          reject(new Error(`gemini-cli timeout (${timeoutMs / 1000}s)`));
+        }, timeoutMs);
+        proc.on('close', () => clearTimeout(timer));
+      });
+    },
+  };
+}

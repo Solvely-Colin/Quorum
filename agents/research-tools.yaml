@@ -1,0 +1,14 @@
+name: Research with Tools
+rounds: 1
+focus: [accuracy, completeness, evidence]
+challengeStyle: collaborative
+tools: true
+allowShellTool: false
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.2
+  completeness: 0.3
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false

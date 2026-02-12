@@ -1,0 +1,14 @@
+name: Decision Matrix
+rounds: 1
+focus: [cost, complexity, scalability, maintainability, time-to-implement]
+challengeStyle: socratic
+convergenceThreshold: 0.8
+decisionMatrix: true
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.3
+  completeness: 0.2
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false

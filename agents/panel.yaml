@@ -1,0 +1,19 @@
+name: Expert Panel
+rounds: 1
+focus: [thoroughness, diverse perspectives, practical recommendations]
+challengeStyle: collaborative
+convergenceThreshold: 0.85
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.3
+  completeness: 0.2
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false
+roles:
+  claude: "senior architect — focus on system design, scalability, and maintainability"
+  gemini: "security researcher — focus on vulnerabilities, attack vectors, and hardening"
+  kimi: "performance engineer — focus on efficiency, bottlenecks, and optimization"
+  codex: "pragmatic developer — focus on implementation feasibility and developer experience"
+  ollama: "junior developer — ask clarifying questions, flag complexity, advocate for simplicity"

@@ -1,0 +1,14 @@
+name: Quick Council
+rounds: 1
+focus: [accuracy, clarity]
+challengeStyle: collaborative
+convergenceThreshold: 0.9
+phases: [gather, debate, synthesize]
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.3
+  completeness: 0.2
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false
