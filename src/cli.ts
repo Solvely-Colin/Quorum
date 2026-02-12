@@ -163,6 +163,7 @@ program
   .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
+  .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -424,6 +425,7 @@ program
       devilsAdvocate: opts.devilsAdvocate ?? profile.devilsAdvocate ?? false,
       weights: profile.weights,
       noHooks: opts.hooks === false,
+      noMemory: opts.memory === false,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
@@ -491,6 +493,15 @@ program
             break;
           case 'synthesizer':
             console.log(chalk.dim(`  ℹ Synthesizer: ${d.provider} (${d.reason})`));
+            break;
+          case 'memory':
+            console.log(chalk.dim(`  🧠 Found ${(d as any).count} relevant prior deliberation(s)`));
+            break;
+          case 'contradictions':
+            console.log(chalk.yellow('\n  ⚠ Contradictions with prior deliberations:'));
+            for (const c of (d as any).contradictions) {
+              console.log(chalk.yellow(`    → ${c}`));
+            }
             break;
           case 'votes': {
             const v = d as unknown as { rankings: Array<{ provider: string; score: number }>; winner: string; controversial: boolean };
@@ -652,6 +663,7 @@ program
   .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
+  .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
   .action(async (files: string[], opts) => {
     let content = '';
     let gitContextStr = '';
@@ -757,6 +769,7 @@ program
     if (opts.topology) { askArgs.push('--topology', opts.topology as string); }
     if (opts.topologyHub) { askArgs.push('--topology-hub', opts.topologyHub as string); }
     if (opts.topologyModerator) { askArgs.push('--topology-moderator', opts.topologyModerator as string); }
+    if (opts.memory === false) { askArgs.push('--no-memory'); }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
   });
@@ -785,6 +798,7 @@ program
   .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
+  .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
   .action(async (opts) => {
     // --- Resolve diff content ---
     let content = '';
@@ -919,6 +933,7 @@ program
       streaming: false,
       rapid: opts.rapid ?? false,
       devilsAdvocate: false,
+      noMemory: opts.memory === false,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
@@ -1912,6 +1927,134 @@ program
     }
     console.log('');
     console.log(chalk.dim('Usage: quorum ask --red-team --attack-pack security,code "question"'));
+  });
+
+// --- quorum memory ---
+const memoryCmd = program.command('memory').description('Manage deliberation memory graph');
+
+memoryCmd
+  .command('list')
+  .description('List all stored memories')
+  .action(async () => {
+    try {
+      const { loadMemoryGraph } = await import('./memory-graph.js');
+      const graph = await loadMemoryGraph();
+      if (graph.nodes.length === 0) {
+        console.log(chalk.dim('No memories stored.'));
+        return;
+      }
+      console.log('');
+      console.log(chalk.bold('📚 Stored Memories'));
+      console.log('');
+      console.log(`${chalk.dim('Date')}       | ${chalk.dim('Consensus')} | ${chalk.dim('Winner')}   | ${chalk.dim('Question')}`);
+      for (const node of graph.nodes) {
+        const date = new Date(node.timestamp).toISOString().slice(0, 10);
+        const consensus = node.consensusScore?.toFixed(2) ?? '—';
+        const winner = node.winner?.slice(0, 8).padEnd(8) ?? '—';
+        const question = node.input.slice(0, 50) + (node.input.length > 50 ? '...' : '');
+        console.log(`${date} | ${consensus.padEnd(9)} | ${winner} | ${question}`);
+      }
+      console.log('');
+    } catch (err) {
+      console.error(chalk.red(`Error loading memories: ${err instanceof Error ? err.message : err}`));
+    }
+  });
+
+memoryCmd
+  .command('search')
+  .description('Search memories by keyword')
+  .argument('<query>', 'Search query')
+  .action(async (query: string) => {
+    try {
+      const { findRelevantMemories } = await import('./memory-graph.js');
+      const memories = await findRelevantMemories(query, 10);
+      if (memories.length === 0) {
+        console.log(chalk.dim('No matching memories found.'));
+        return;
+      }
+      console.log('');
+      console.log(chalk.bold(`🔍 Search Results (${memories.length})`));
+      console.log('');
+      for (const m of memories) {
+        const date = new Date(m.timestamp).toISOString().slice(0, 10);
+        console.log(`  ${chalk.dim(date)} ${chalk.bold(m.input.slice(0, 60))}${m.input.length > 60 ? '...' : ''}`);
+        console.log(`     Consensus: ${m.consensusScore?.toFixed(2) ?? '—'} | Winner: ${m.winner ?? '—'}`);
+        console.log('');
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error searching memories: ${err instanceof Error ? err.message : err}`));
+    }
+  });
+
+memoryCmd
+  .command('clear')
+  .description('Clear the memory graph')
+  .option('--force', 'Skip confirmation')
+  .action(async (opts) => {
+    if (!opts.force) {
+      const inquirer = await import('inquirer');
+      const { confirm } = await inquirer.default.prompt([{
+        type: 'confirm',
+        name: 'confirm',
+        message: 'Are you sure you want to clear all memories?',
+        default: false,
+      }]);
+      if (!confirm) {
+        console.log(chalk.dim('Cancelled.'));
+        return;
+      }
+    }
+    try {
+      const { clearMemoryGraph } = await import('./memory-graph.js');
+      await clearMemoryGraph();
+      console.log(chalk.green('✅ Memory graph cleared.'));
+    } catch (err) {
+      console.error(chalk.red(`Error clearing memories: ${err instanceof Error ? err.message : err}`));
+    }
+  });
+
+memoryCmd
+  .command('stats')
+  .description('Show memory graph statistics')
+  .action(async () => {
+    try {
+      const { loadMemoryGraph } = await import('./memory-graph.js');
+      const graph = await loadMemoryGraph();
+      if (graph.nodes.length === 0) {
+        console.log(chalk.dim('No memories stored.'));
+        return;
+      }
+      const timestamps = graph.nodes.map(n => n.timestamp).sort((a, b) => a - b);
+      const earliest = new Date(timestamps[0]).toISOString().slice(0, 10);
+      const latest = new Date(timestamps[timestamps.length - 1]).toISOString().slice(0, 10);
+      // Extract tags from all nodes
+      const tagCounts: Record<string, number> = {};
+      for (const node of graph.nodes) {
+        if (node.tags) {
+          for (const tag of node.tags) {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          }
+        }
+      }
+      const topTags = Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      console.log('');
+      console.log(chalk.bold('📊 Memory Graph Stats'));
+      console.log('');
+      console.log(`  Total memories: ${chalk.bold(String(graph.nodes.length))}`);
+      console.log(`  Date range: ${chalk.dim(earliest)} → ${chalk.dim(latest)}`);
+      if (topTags.length > 0) {
+        console.log('');
+        console.log(chalk.dim('  Top topics:'));
+        for (const [tag, count] of topTags) {
+          console.log(`    ${tag}: ${count}`);
+        }
+      }
+      console.log('');
+    } catch (err) {
+      console.error(chalk.red(`Error loading stats: ${err instanceof Error ? err.message : err}`));
+    }
   });
 
 // --- Helpers ---

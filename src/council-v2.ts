@@ -23,6 +23,7 @@ import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, cr
 import { AdaptiveController, recordOutcome, type AdaptivePreset, type AdaptiveDecision } from './adaptive.js';
 import { loadAttackPack, buildRedTeamPrompt, parseRedTeamResponse, scoreResilience, formatRedTeamReport, type RedTeamResult, type AttackPack } from './redteam.js';
 import { buildTopologyPlan, validateTopologyConfig, type TopologyName, type TopologyConfig, type TopologyPlan, type TopologyPhase, type PhaseContext } from './topology.js';
+import { addMemoryNode, findRelevantMemories, detectContradictions, formatMemoryContext } from './memory-graph.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -36,6 +37,7 @@ export interface CouncilV2Options {
   priorContext?: string;
   weights?: Record<string, number>;
   noHooks?: boolean;
+  noMemory?: boolean;
   redTeam?: boolean;
   attackPacks?: string[];
   customAttacks?: string[];
@@ -91,6 +93,7 @@ export class CouncilV2 {
   private topology: TopologyName = 'mesh';
   private topologyConfig: TopologyConfig = {};
   private topologyPlan: TopologyPlan | null = null;
+  private noMemory: boolean = false;
 
   constructor(
     adapters: ProviderAdapter[],
@@ -113,6 +116,7 @@ export class CouncilV2 {
     this.weights = options?.weights ?? profile.weights ?? {};
     this.hooks = profile.hooks ?? {};
     this.noHooks = options?.noHooks ?? false;
+    this.noMemory = options?.noMemory ?? false;
     this.redTeam = options?.redTeam ?? profile.redTeam ?? false;
     this.attackPacks = options?.attackPacks ?? profile.attackPacks ?? [];
     this.customAttacks = options?.customAttacks ?? profile.customAttacks ?? [];
@@ -170,6 +174,18 @@ export class CouncilV2 {
     const names = this.adapters.map(a => a.name);
     this.emit('initialized', { providers: names, sessionPath: this.store.path });
 
+    // Memory graph: retrieve relevant prior deliberations
+    let memoryContext = '';
+    if (!this.noMemory) {
+      try {
+        const memories = await findRelevantMemories(input, 5);
+        if (memories.length > 0) {
+          memoryContext = formatMemoryContext(memories);
+          this.emit('memory', { count: memories.length, memories: memories.map(m => ({ input: m.input.slice(0, 80), date: new Date(m.timestamp).toISOString().slice(0, 10), consensus: m.consensusScore })) });
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Topology-based deliberation (non-mesh)
     if (this.topology !== 'mesh') {
       const validationError = validateTopologyConfig(this.topology, names, this.topologyConfig);
@@ -192,6 +208,9 @@ export class CouncilV2 {
         }
         if (this.priorContext) {
           gatherSys += `\n\nThe council previously deliberated and reached this conclusion:\n\n${this.priorContext}\n\nNow consider this follow-up:`;
+        }
+        if (memoryContext) {
+          gatherSys += `\n\n${memoryContext}`;
         }
         if (this.profile.evidence && this.profile.evidence !== 'off') {
           gatherSys += `\n\n${EVIDENCE_INSTRUCTION}`;
@@ -788,6 +807,17 @@ export class CouncilV2 {
     const confidenceMatch = synthContent.match(/Confidence[:\s]*\*?\*?([\d.]+)/i);
     const minorityMatch = synthContent.match(/##\s*Minority Report\n([\s\S]*?)(?=\n##\s|$)/i);
 
+    // Memory graph: contradiction detection after synthesis
+    if (!this.noMemory && memoryContext) {
+      try {
+        const memories = await findRelevantMemories(input, 5);
+        const contradictions = detectContradictions(input, synthContent, memories);
+        if (contradictions.length > 0) {
+          this.emit('contradictions', { contradictions });
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // "What Would Change My Mind" — one additional call
     this.emit('phase', { phase: 'WHAT_WOULD_CHANGE' });
     const wwcmStart = Date.now();
@@ -859,6 +889,13 @@ export class CouncilV2 {
     const duration = Date.now() - this.startedAt;
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthAdapter.name, synthesis });
 
+    // Memory graph: store this deliberation
+    if (!this.noMemory) {
+      try {
+        await addMemoryNode({ sessionId: this.store.path.split('/').pop()!, synthesis, votes, duration, input } as any);
+      } catch { /* non-fatal */ }
+    }
+
     return {
       sessionId: this.store.path.split('/').pop()!,
       sessionPath: this.store.path,
@@ -872,7 +909,20 @@ export class CouncilV2 {
 
   private async deliberateTopology(input: string): Promise<V2Result> {
     const names = this.adapters.map(a => a.name);
-    const plan = buildTopologyPlan(this.topology, names, input, this.topologyConfig);
+
+    // Memory graph: retrieve relevant prior deliberations
+    let memoryContext = '';
+    if (!this.noMemory) {
+      try {
+        const memories = await findRelevantMemories(input, 5);
+        if (memories.length > 0) {
+          memoryContext = formatMemoryContext(memories);
+          this.emit('memory', { count: memories.length, memories: memories.map(m => ({ input: m.input.slice(0, 80), date: new Date(m.timestamp).toISOString().slice(0, 10), consensus: m.consensusScore })) });
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    const plan = buildTopologyPlan(this.topology, names, input, this.topologyConfig, memoryContext);
     this.topologyPlan = plan;
 
     this.emit('topology', { topology: plan.topology, description: plan.description, phases: plan.phases.length });
@@ -1044,6 +1094,17 @@ export class CouncilV2 {
 
     try { await this.store.writeSynthesis({ ...synthesis, votes }); } catch { /* non-fatal */ }
 
+    // Memory graph: contradiction detection after synthesis
+    if (!this.noMemory && memoryContext) {
+      try {
+        const memories = await findRelevantMemories(input, 5);
+        const contradictions = detectContradictions(input, synthContent, memories);
+        if (contradictions.length > 0) {
+          this.emit('contradictions', { contradictions });
+        }
+      } catch { /* non-fatal */ }
+    }
+
     // Save topology plan to session
     try {
       const { writeFile: wf } = await import('node:fs/promises');
@@ -1061,6 +1122,13 @@ export class CouncilV2 {
 
     const duration = Date.now() - this.startedAt;
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthProvider.name, synthesis });
+
+    // Memory graph: store this deliberation
+    if (!this.noMemory) {
+      try {
+        await addMemoryNode({ sessionId: this.store.path.split('/').pop()!, synthesis, votes, duration, input } as any);
+      } catch { /* non-fatal */ }
+    }
 
     return {
       sessionId: this.store.path.split('/').pop()!,
@@ -1227,6 +1295,13 @@ export class CouncilV2 {
 
     const duration = Date.now() - this.startedAt;
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthAdapter.name, synthesis });
+
+    // Memory graph: store this deliberation
+    if (!this.noMemory) {
+      try {
+        await addMemoryNode({ sessionId: this.store.path.split('/').pop()!, synthesis, votes, duration, input } as any);
+      } catch { /* non-fatal */ }
+    }
 
     return {
       sessionId: this.store.path.split('/').pop()!,

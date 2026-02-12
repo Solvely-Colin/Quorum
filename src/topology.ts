@@ -103,18 +103,19 @@ export function buildTopologyPlan(
   providers: string[],
   input: string,
   config?: TopologyConfig,
+  memoryContext?: string,
 ): TopologyPlan {
   const error = validateTopologyConfig(topology, providers, config);
   if (error) throw new Error(error);
 
   switch (topology) {
-    case 'mesh': return buildMesh(providers, input);
-    case 'star': return buildStar(providers, input, config);
-    case 'tournament': return buildTournament(providers, input, config);
-    case 'map_reduce': return buildMapReduce(providers, input, config);
-    case 'adversarial_tree': return buildAdversarialTree(providers, input);
-    case 'pipeline': return buildPipeline(providers, input);
-    case 'panel': return buildPanel(providers, input, config);
+    case 'mesh': return buildMesh(providers, input, memoryContext);
+    case 'star': return buildStar(providers, input, config, memoryContext);
+    case 'tournament': return buildTournament(providers, input, config, memoryContext);
+    case 'map_reduce': return buildMapReduce(providers, input, config, memoryContext);
+    case 'adversarial_tree': return buildAdversarialTree(providers, input, memoryContext);
+    case 'pipeline': return buildPipeline(providers, input, memoryContext);
+    case 'panel': return buildPanel(providers, input, config, memoryContext);
   }
 }
 
@@ -134,7 +135,11 @@ function fullVisibility(participants: string[], allProviders: string[]): Record<
 
 // ── mesh ────────────────────────────────────────────────────────────────────────
 
-function buildMesh(providers: string[], _input: string): TopologyPlan {
+function buildMesh(providers: string[], _input: string, memoryContext?: string): TopologyPlan {
+  const baseSystemPrompt = memoryContext
+    ? `You are an expert analyst. Provide your independent assessment.\n\n${memoryContext}`
+    : 'You are an expert analyst. Provide your independent assessment.';
+
   return {
     topology: 'mesh',
     phases: [
@@ -142,7 +147,7 @@ function buildMesh(providers: string[], _input: string): TopologyPlan {
         name: 'Gather',
         participants: [...providers],
         visibility: noVisibility(providers),
-        systemPrompt: () => 'You are an expert analyst. Provide your independent assessment.',
+        systemPrompt: () => baseSystemPrompt,
         userPrompt: (ctx) => ctx.input,
         parallel: true,
       },
@@ -181,9 +186,12 @@ function buildMesh(providers: string[], _input: string): TopologyPlan {
 
 // ── star ────────────────────────────────────────────────────────────────────────
 
-function buildStar(providers: string[], _input: string, config?: TopologyConfig): TopologyPlan {
+function buildStar(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
   const hub = config?.hub ?? providers[0];
   const spokes = providers.filter(p => p !== hub);
+  const baseSystemPrompt = memoryContext
+    ? `You are an expert analyst. Provide your independent assessment.\n\n${memoryContext}`
+    : 'You are an expert analyst. Provide your independent assessment.';
 
   return {
     topology: 'star',
@@ -192,7 +200,7 @@ function buildStar(providers: string[], _input: string, config?: TopologyConfig)
         name: 'Gather',
         participants: spokes.length > 0 ? spokes : [hub],
         visibility: noVisibility(spokes.length > 0 ? spokes : [hub]),
-        systemPrompt: () => 'You are an expert analyst. Provide your independent assessment.',
+        systemPrompt: () => baseSystemPrompt,
         userPrompt: (ctx) => ctx.input,
         parallel: true,
       },
@@ -227,9 +235,12 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildTournament(providers: string[], _input: string, config?: TopologyConfig): TopologyPlan {
+function buildTournament(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
   const seed = config?.bracketSeed ?? 'random';
   const seeded = seed === 'random' ? shuffleArray(providers) : [...providers];
+  const baseSystemPrompt = memoryContext
+    ? `You are competing in a debate tournament. Present your strongest position.\n\n${memoryContext}`
+    : 'You are competing in a debate tournament. Present your strongest position.';
 
   // Build pairs: ranked pairs 1st vs last, etc.
   const pairs: [string, string][] = [];
@@ -260,7 +271,7 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
       name: `Round 1: ${a} vs ${b} — Position`,
       participants: [a, b],
       visibility: noVisibility([a, b]),
-      systemPrompt: () => 'You are competing in a debate tournament. Present your strongest position.',
+      systemPrompt: () => baseSystemPrompt,
       userPrompt: (ctx) => ctx.input,
       parallel: true,
     });
@@ -313,9 +324,12 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
 
 // ── map_reduce ──────────────────────────────────────────────────────────────────
 
-function buildMapReduce(providers: string[], _input: string, config?: TopologyConfig): TopologyPlan {
+function buildMapReduce(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
   const numSubQuestions = config?.subQuestions ?? 3;
   const decomposer = providers[0];
+  const decomposePrompt = memoryContext
+    ? `You are a question decomposer. Break the given question into exactly ${numSubQuestions} independent sub-questions that, when answered together, fully address the original question. Output each sub-question on its own line, numbered 1-${numSubQuestions}.\n\n${memoryContext}`
+    : `You are a question decomposer. Break the given question into exactly ${numSubQuestions} independent sub-questions that, when answered together, fully address the original question. Output each sub-question on its own line, numbered 1-${numSubQuestions}.`;
 
   return {
     topology: 'map_reduce',
@@ -324,8 +338,7 @@ function buildMapReduce(providers: string[], _input: string, config?: TopologyCo
         name: 'Decompose',
         participants: [decomposer],
         visibility: noVisibility([decomposer]),
-        systemPrompt: () =>
-          `You are a question decomposer. Break the given question into exactly ${numSubQuestions} independent sub-questions that, when answered together, fully address the original question. Output each sub-question on its own line, numbered 1-${numSubQuestions}.`,
+        systemPrompt: () => decomposePrompt,
         userPrompt: (ctx) => ctx.input,
         parallel: false,
       },
@@ -365,16 +378,19 @@ function buildMapReduce(providers: string[], _input: string, config?: TopologyCo
 
 // ── adversarial_tree ────────────────────────────────────────────────────────────
 
-function buildAdversarialTree(providers: string[], _input: string): TopologyPlan {
+function buildAdversarialTree(providers: string[], _input: string, memoryContext?: string): TopologyPlan {
   const phases: TopologyPhase[] = [];
   const thesis = providers[0];
+  const thesisPrompt = memoryContext
+    ? `You are presenting a thesis. State your position clearly and comprehensively with supporting arguments.\n\n${memoryContext}`
+    : 'You are presenting a thesis. State your position clearly and comprehensively with supporting arguments.';
 
   // Phase 1: Thesis
   phases.push({
     name: 'Thesis',
     participants: [thesis],
     visibility: noVisibility([thesis]),
-    systemPrompt: () => 'You are presenting a thesis. State your position clearly and comprehensively with supporting arguments.',
+    systemPrompt: () => thesisPrompt,
     userPrompt: (ctx) => ctx.input,
     parallel: false,
   });
@@ -429,8 +445,11 @@ function buildAdversarialTree(providers: string[], _input: string): TopologyPlan
 
 // ── pipeline ────────────────────────────────────────────────────────────────────
 
-function buildPipeline(providers: string[], _input: string): TopologyPlan {
+function buildPipeline(providers: string[], _input: string, memoryContext?: string): TopologyPlan {
   const phases: TopologyPhase[] = [];
+  const firstPrompt = memoryContext
+    ? `You are the first in a chain of experts. Provide your best, most thorough answer.\n\n${memoryContext}`
+    : 'You are the first in a chain of experts. Provide your best, most thorough answer.';
 
   for (let i = 0; i < providers.length; i++) {
     const provider = providers[i];
@@ -442,7 +461,7 @@ function buildPipeline(providers: string[], _input: string): TopologyPlan {
         name: `Step ${i + 1}: ${provider}`,
         participants: [provider],
         visibility: noVisibility([provider]),
-        systemPrompt: () => 'You are the first in a chain of experts. Provide your best, most thorough answer.',
+        systemPrompt: () => firstPrompt,
         userPrompt: (ctx) => ctx.input,
         parallel: false,
       });
@@ -474,9 +493,12 @@ function buildPipeline(providers: string[], _input: string): TopologyPlan {
 
 // ── panel ───────────────────────────────────────────────────────────────────────
 
-function buildPanel(providers: string[], _input: string, config?: TopologyConfig): TopologyPlan {
+function buildPanel(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
   const moderator = config?.moderator ?? providers[0];
   const panelists = providers.filter(p => p !== moderator);
+  const panelistPrompt = memoryContext
+    ? `You are a panelist in an expert discussion. Provide your opening statement with your perspective and key arguments.\n\n${memoryContext}`
+    : 'You are a panelist in an expert discussion. Provide your opening statement with your perspective and key arguments.';
 
   return {
     topology: 'panel',
@@ -485,7 +507,7 @@ function buildPanel(providers: string[], _input: string, config?: TopologyConfig
         name: 'Opening Statements',
         participants: [...panelists],
         visibility: noVisibility(panelists),
-        systemPrompt: () => 'You are a panelist in an expert discussion. Provide your opening statement with your perspective and key arguments.',
+        systemPrompt: () => panelistPrompt,
         userPrompt: (ctx) => ctx.input,
         parallel: true,
       },
