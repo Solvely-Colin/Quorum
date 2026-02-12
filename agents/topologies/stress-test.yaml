@@ -1,0 +1,15 @@
+name: stress-test
+topology: adversarial_tree
+focus: [robustness, edge-cases, counterarguments]
+challengeStyle: adversarial
+redTeam: true
+attackPacks: [general]
+rounds: 1
+scoringWeights:
+  accuracy: 0.2
+  reasoning: 0.3
+  completeness: 0.2
+  novelty: 0.2
+  consensus: 0.1
+isolation: true
+blindReview: false

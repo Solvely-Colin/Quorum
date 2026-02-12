@@ -599,6 +599,142 @@ customAttacks:
 ### Phase 3 — Moat + Platform
 | # | Feature | Description |
 |---|---------|-------------|
-| 35 | Cognitive Topology DSL | Declarative debate structures: `star`, `mesh`, `tournament`, `map_reduce`, `adversarial_tree`. Template marketplace for common jobs. |
+| 35 | Cognitive Topology DSL | See detailed spec below |
+
+### #35 Cognitive Topology DSL — Detailed Spec
+
+**Priority:** #5 by impact — long-term moat, makes Quorum structurally unique
+
+**Problem:** Current deliberation is always "room-style" (all-vs-all). Different tasks need different debate structures. A security review shouldn't flow the same as a brainstorm.
+
+#### 1. Built-in Topologies
+
+**`mesh`** (current default) — all providers see and critique all others
+```
+A ←→ B ←→ C
+↕         ↕
+D ←→ E ←→ F
+```
+
+**`star`** — one central synthesizer, others report to it. Fast, low-cost.
+```
+    B
+    ↑
+E ← A → C
+    ↓
+    D
+```
+- Hub (A) gathers from all spokes, synthesizes directly
+- Good for: quick polls, simple questions, cost-sensitive
+
+**`tournament`** — head-to-head brackets, winner advances
+```
+A vs B → winner₁
+C vs D → winner₂
+winner₁ vs winner₂ → champion
+```
+- Pairs debate, loser eliminated, winners face off
+- Good for: "which is best?" decisions, competitive evaluation
+
+**`map_reduce`** — split question into sub-questions, each provider handles one, then reduce
+```
+Q → [Q1, Q2, Q3] → A(Q1), B(Q2), C(Q3) → synthesize
+```
+- Question decomposition phase, parallel independent work, merge
+- Good for: complex multi-part questions, research tasks
+
+**`adversarial_tree`** — binary tree of attack/defend
+```
+        A (thesis)
+       / \
+   B (attack)  C (defend)
+     / \         / \
+  D(atk) E(def) F(atk) G(def)
+```
+- Root states thesis, children alternate attack/defend
+- Good for: stress-testing claims, legal arguments
+
+**`pipeline`** — sequential chain, each provider builds on the last
+```
+A → B → C → D → synthesize
+```
+- Each provider sees only the previous provider's output
+- Good for: iterative refinement, translation chains, progressive enhancement
+
+**`panel`** — moderated discussion with a designated moderator
+```
+M (moderator)
+↕ ↕ ↕
+A  B  C
+```
+- Moderator sets agenda, collects positions, directs questions, summarizes
+- Good for: structured Q&A, interview-style exploration
+
+#### 2. Topology Definition (profile YAML)
+```yaml
+topology: tournament    # or mesh, star, map_reduce, adversarial_tree, pipeline, panel
+
+# Optional topology-specific config:
+topologyConfig:
+  hub: claude           # for star: which provider is hub
+  moderator: claude     # for panel
+  bracketSeed: random   # for tournament: random or ranked
+  subQuestions: 3       # for map_reduce: how many sub-questions
+```
+
+Also: `--topology <name>` CLI flag.
+
+#### 3. `src/topology.ts` — Topology Engine
+```typescript
+export type TopologyName = 'mesh' | 'star' | 'tournament' | 'map_reduce' | 'adversarial_tree' | 'pipeline' | 'panel';
+
+export interface TopologyConfig {
+  hub?: string;
+  moderator?: string;
+  bracketSeed?: 'random' | 'ranked';
+  subQuestions?: number;
+}
+
+export interface TopologyPhase {
+  name: string;
+  participants: string[];      // which providers participate
+  visibility: Record<string, string[]>; // who can see whose output
+  prompt: (ctx: PhaseContext) => string; // dynamic prompt builder
+}
+
+export interface TopologyPlan {
+  phases: TopologyPhase[];
+  synthesizer: string;         // who synthesizes
+  votingEnabled: boolean;      // some topologies skip voting
+}
+
+export function buildTopologyPlan(
+  topology: TopologyName,
+  providers: string[],
+  config?: TopologyConfig,
+): TopologyPlan;
+```
+
+#### 4. Integration with CouncilV2
+- When `topology` is set (and not `mesh`), the topology plan REPLACES the standard phase pipeline
+- Each `TopologyPhase` maps to a `runPhase()` call with custom visibility
+- The key change: instead of all providers seeing all responses, visibility is controlled per-phase
+- `mesh` topology = current behavior (backwards compatible)
+
+#### 5. Bundled Topology Templates
+YAML files in `agents/topologies/` for common use cases:
+- `quick-poll.yaml` — star topology, rapid, no debate
+- `deep-review.yaml` — mesh + red-team, full pipeline
+- `bracket-challenge.yaml` — tournament, competitive
+- `research-split.yaml` — map_reduce for complex questions
+- `stress-test.yaml` — adversarial_tree for claim testing
+
+#### Implementation Plan
+- **Sub-agent 1 (Core):** `src/topology.ts` — topology definitions, plan builder, phase generation for all 7 topologies
+- **Sub-agent 2 (Integration):** Wire into `council-v2.ts` — topology plan execution, visibility control, custom phase routing
+- **Sub-agent 3 (CLI + Templates):** `--topology` flag, types, bundled template YAMLs, `quorum topologies` list command
+
+---
+
 | 36 | Human-in-the-Loop Checkpoints | Mid-run decision gates. Live debugger showing argument graph, vote shifts, "why agent B changed mind." |
 | 37 | Eval Arena + Reputation Specialists | Continuous benchmark suite. Track role/agent performance by domain. Reputation-weighted influence. Judge models as meta-evaluators. |

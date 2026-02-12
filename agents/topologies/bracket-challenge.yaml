@@ -1,0 +1,15 @@
+name: bracket-challenge
+topology: tournament
+topologyConfig:
+  bracketSeed: random
+focus: [persuasion, evidence, reasoning]
+challengeStyle: adversarial
+rounds: 1
+scoringWeights:
+  accuracy: 0.2
+  reasoning: 0.4
+  completeness: 0.2
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false

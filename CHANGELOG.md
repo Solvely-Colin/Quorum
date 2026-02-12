@@ -4,6 +4,33 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.5.0] — 2026-02-12
+
+### 🔷 The "Topology" Release
+
+#### #35 Cognitive Topology DSL
+- **7 debate topologies** — each structures deliberation differently:
+  - **`mesh`** (default) — all-vs-all, current behavior
+  - **`star`** — hub-and-spoke, fast synthesis via central provider
+  - **`tournament`** — bracket elimination, head-to-head with judging
+  - **`map_reduce`** — split question into sub-questions, parallel answers, merge
+  - **`adversarial_tree`** — binary attack/defend tree for stress-testing
+  - **`pipeline`** — sequential refinement chain, each builds on previous
+  - **`panel`** — moderated discussion with targeted follow-up questions
+- **`--topology <name>`** flag on `ask`, `review`, `ci`
+- **`--topology-hub`**, **`--topology-moderator`** for topology-specific config
+- **Profile YAML:** `topology: tournament`, `topologyConfig: { bracketSeed: random }`
+- **`quorum topologies`** (alias `topo`) — list all topologies with descriptions
+- **5 bundled topology templates:** `quick-poll`, `deep-review`, `bracket-challenge`, `research-split`, `stress-test`
+- **Visibility control** — each topology controls which providers see which responses per phase
+- **Topology plan saved** to session as `topology-plan.json`
+
+#### New Files
+- `src/topology.ts` — topology engine, plan builder, 7 topology implementations
+- `agents/topologies/{quick-poll,deep-review,bracket-challenge,research-split,stress-test}.yaml`
+
+---
+
 ## [0.4.0] — 2026-02-12
 
 ### 🔴 The "Red Team" Release

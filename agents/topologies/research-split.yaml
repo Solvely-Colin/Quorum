@@ -1,0 +1,16 @@
+name: research-split
+topology: map_reduce
+topologyConfig:
+  subQuestions: 3
+focus: [thoroughness, accuracy, evidence]
+challengeStyle: collaborative
+evidence: advisory
+rounds: 1
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.2
+  completeness: 0.3
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false

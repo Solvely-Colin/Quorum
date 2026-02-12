@@ -22,6 +22,7 @@ import { executeTools } from './tools.js';
 import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, crossValidateClaims, type EvidenceReport, type CrossReference, tierWeight } from './evidence.js';
 import { AdaptiveController, recordOutcome, type AdaptivePreset, type AdaptiveDecision } from './adaptive.js';
 import { loadAttackPack, buildRedTeamPrompt, parseRedTeamResponse, scoreResilience, formatRedTeamReport, type RedTeamResult, type AttackPack } from './redteam.js';
+import { buildTopologyPlan, validateTopologyConfig, type TopologyName, type TopologyConfig, type TopologyPlan, type TopologyPhase, type PhaseContext } from './topology.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -38,6 +39,8 @@ export interface CouncilV2Options {
   redTeam?: boolean;
   attackPacks?: string[];
   customAttacks?: string[];
+  topology?: TopologyName;
+  topologyConfig?: TopologyConfig;
 }
 
 export interface V2Result {
@@ -85,6 +88,9 @@ export class CouncilV2 {
   private attackPacks: string[] = [];
   private customAttacks: string[] = [];
   private redTeamResult: RedTeamResult | null = null;
+  private topology: TopologyName = 'mesh';
+  private topologyConfig: TopologyConfig = {};
+  private topologyPlan: TopologyPlan | null = null;
 
   constructor(
     adapters: ProviderAdapter[],
@@ -110,6 +116,8 @@ export class CouncilV2 {
     this.redTeam = options?.redTeam ?? profile.redTeam ?? false;
     this.attackPacks = options?.attackPacks ?? profile.attackPacks ?? [];
     this.customAttacks = options?.customAttacks ?? profile.customAttacks ?? [];
+    this.topology = options?.topology ?? (profile as any).topology ?? 'mesh';
+    this.topologyConfig = options?.topologyConfig ?? (profile as any).topologyConfig ?? {};
 
     // Resolve phase pipeline
     const ALL_PHASES = ['gather', 'plan', 'formulate', 'debate', 'adjust', 'rebuttal', 'vote', 'synthesize'];
@@ -161,6 +169,15 @@ export class CouncilV2 {
 
     const names = this.adapters.map(a => a.name);
     this.emit('initialized', { providers: names, sessionPath: this.store.path });
+
+    // Topology-based deliberation (non-mesh)
+    if (this.topology !== 'mesh') {
+      const validationError = validateTopologyConfig(this.topology, names, this.topologyConfig);
+      if (validationError) {
+        throw new Error(`Topology validation failed: ${validationError}`);
+      }
+      return this.deliberateTopology(input);
+    }
 
     // Phase 1: GATHER — independent responses (no fallback, first phase)
     const gather = await this.runPhase('01-gather', 'GATHER', async () => {
@@ -839,6 +856,209 @@ export class CouncilV2 {
 
     const duration = Date.now() - this.startedAt;
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthAdapter.name, synthesis });
+
+    return {
+      sessionId: this.store.path.split('/').pop()!,
+      sessionPath: this.store.path,
+      synthesis,
+      votes,
+      duration,
+    };
+  }
+
+  // --- Topology Mode ---
+
+  private async deliberateTopology(input: string): Promise<V2Result> {
+    const names = this.adapters.map(a => a.name);
+    const plan = buildTopologyPlan(this.topology, names, input, this.topologyConfig);
+    this.topologyPlan = plan;
+
+    this.emit('topology', { topology: plan.topology, description: plan.description, phases: plan.phases.length });
+
+    // Execute each topology phase
+    const allResponses: Record<string, Record<string, string>> = {}; // phaseName → provider → response
+    let lastResponses: Record<string, string> = {};
+
+    for (let i = 0; i < plan.phases.length; i++) {
+      const phase = plan.phases[i];
+
+      const phaseOutput = await this.runPhase(
+        `${String(i + 1).padStart(2, '0')}-${phase.name.toLowerCase().replace(/\s+/g, '-')}`,
+        phase.name.toUpperCase(),
+        async () => {
+          if (phase.parallel) {
+            // Run all participants in parallel
+            const results = await Promise.all(
+              phase.participants.map(async (providerName) => {
+                const adapter = this.adapters.find(a => a.name === providerName);
+                if (!adapter) return [providerName, `[${providerName} not found]`] as const;
+
+                // Build visible responses for this provider
+                const visibleProviders = phase.visibility[providerName] ?? [];
+                const visibleResponses: Record<string, string> = {};
+                for (const vp of visibleProviders) {
+                  // Search all previous phase responses for this provider
+                  for (const phaseResps of Object.values(allResponses)) {
+                    if (phaseResps[vp]) visibleResponses[vp] = phaseResps[vp];
+                  }
+                }
+
+                const ctx: PhaseContext = {
+                  input,
+                  providerName,
+                  allProviders: names,
+                  previousResponses: lastResponses,
+                  visibleResponses,
+                  phaseIndex: i,
+                  metadata: {},
+                };
+
+                const sys = phase.systemPrompt(ctx);
+                const prompt = phase.userPrompt(ctx);
+
+                try {
+                  const response = await adapter.generate(prompt, sys);
+                  this.emit('response', { provider: providerName, phase: phase.name });
+                  return [providerName, response] as const;
+                } catch (err) {
+                  this.emit('warn', { message: `${providerName} failed in ${phase.name}: ${err instanceof Error ? err.message : String(err)}` });
+                  return [providerName, `[${providerName} failed]`] as const;
+                }
+              })
+            );
+            return Object.fromEntries(results);
+          } else {
+            // Sequential execution
+            const results: Record<string, string> = {};
+            for (const providerName of phase.participants) {
+              const adapter = this.adapters.find(a => a.name === providerName);
+              if (!adapter) { results[providerName] = `[${providerName} not found]`; continue; }
+
+              const visibleProviders = phase.visibility[providerName] ?? [];
+              const visibleResponses: Record<string, string> = {};
+              for (const vp of visibleProviders) {
+                for (const phaseResps of Object.values(allResponses)) {
+                  if (phaseResps[vp]) visibleResponses[vp] = phaseResps[vp];
+                }
+                // Also check results from THIS phase (sequential means earlier participants are visible)
+                if (results[vp]) visibleResponses[vp] = results[vp];
+              }
+
+              const ctx: PhaseContext = {
+                input,
+                providerName,
+                allProviders: names,
+                previousResponses: { ...lastResponses, ...results },
+                visibleResponses,
+                phaseIndex: i,
+                metadata: {},
+              };
+
+              const sys = phase.systemPrompt(ctx);
+              const prompt = phase.userPrompt(ctx);
+
+              try {
+                const response = await adapter.generate(prompt, sys);
+                this.emit('response', { provider: providerName, phase: phase.name });
+                results[providerName] = response;
+              } catch (err) {
+                this.emit('warn', { message: `${providerName} failed in ${phase.name}: ${err instanceof Error ? err.message : String(err)}` });
+                results[providerName] = `[${providerName} failed]`;
+              }
+            }
+            return results;
+          }
+        }
+      );
+
+      allResponses[phase.name] = phaseOutput.responses;
+      lastResponses = { ...lastResponses, ...phaseOutput.responses };
+    }
+
+    // Voting (if enabled by topology)
+    let votes: VoteResult;
+    if (plan.votingEnabled) {
+      // Run standard vote phase using lastResponses as positions
+      const voteOutput = await this.runPhase('vote', 'VOTE', async () => {
+        return this.parallel(async (adapter, i) => {
+          const labels = this.adapters.map((_, idx) => String.fromCharCode(65 + idx));
+          const positionSummaries = this.adapters
+            .map((a, idx) => `## Position ${labels[idx]}\n${lastResponses[a.name] ?? '[no response]'}`)
+            .join('\n\n---\n\n');
+
+          const sys = `Vote on the best position. Rank ALL positions from best to worst. Explain your ranking.`;
+          const prompt = `Original question: ${input}\n\n${positionSummaries}\n\nRank all positions. Provide JSON rankings and numbered lines.`;
+          return adapter.generate(prompt, sys);
+        });
+      });
+      votes = this.tallyVotes(voteOutput.responses);
+    } else {
+      votes = {
+        rankings: this.adapters.map((a, i) => ({ provider: a.name, score: this.adapters.length - i })),
+        winner: this.adapters[0].name,
+        controversial: false,
+        details: {},
+      };
+    }
+    this.emit('votes', votes);
+
+    // Synthesis
+    this.emit('phase', { phase: 'SYNTHESIZE' });
+    const synthProvider = plan.synthesizer === 'auto'
+      ? this.pickSynthesizer(votes)
+      : this.adapters.find(a => a.name === plan.synthesizer) ?? this.adapters[0];
+
+    const allPositionText = Object.entries(lastResponses)
+      .map(([k, v]) => `[${k}]:\n${v}`)
+      .join('\n\n---\n\n');
+
+    const synthSys = `You are the synthesizer for a ${plan.description}. Merge the best thinking into a definitive answer.`;
+    const synthPrompt = `Original question: ${input}\n\n## Responses:\n${allPositionText}\n\nProduce:\n## Synthesis\n[Best answer]\n\n## Minority Report\n[Dissenting views]\n\n## Scores\nConsensus: [0.0-1.0]\nConfidence: [0.0-1.0]`;
+
+    this.currentPhase = 'SYNTHESIZE';
+    let synthContent: string;
+    if (this.streaming) {
+      try { synthContent = await this.generateStreaming(synthProvider, synthPrompt, synthSys); }
+      catch { synthContent = await this.generateWithRetry(synthProvider, synthPrompt, synthSys); }
+    } else {
+      synthContent = await this.generateWithRetry(synthProvider, synthPrompt, synthSys);
+    }
+
+    const consensusMatch = synthContent.match(/Consensus[:\s]*\*?\*?([\d.]+)/i);
+    const confidenceMatch = synthContent.match(/Confidence[:\s]*\*?\*?([\d.]+)/i);
+    const minorityMatch = synthContent.match(/##\s*Minority Report\n([\s\S]*?)(?=\n##\s|$)/i);
+
+    const synthesis = {
+      content: synthContent,
+      synthesizer: synthProvider.name,
+      consensusScore: consensusMatch ? parseFloat(consensusMatch[1]) : 0.5,
+      confidenceScore: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5,
+      controversial: votes.controversial,
+      minorityReport: minorityMatch?.[1]?.trim(),
+      contributions: Object.fromEntries(
+        this.adapters.map(a => [a.name, [(lastResponses[a.name] ?? '').slice(0, 200)]]),
+      ),
+    };
+
+    try { await this.store.writeSynthesis({ ...synthesis, votes }); } catch { /* non-fatal */ }
+
+    // Save topology plan to session
+    try {
+      const { writeFile: wf } = await import('node:fs/promises');
+      const { join } = await import('node:path');
+      await wf(join(this.store.path, 'topology-plan.json'), JSON.stringify({
+        topology: plan.topology,
+        description: plan.description,
+        phases: plan.phases.map(p => ({ name: p.name, participants: p.participants, parallel: p.parallel })),
+        votingEnabled: plan.votingEnabled,
+        synthesizer: plan.synthesizer,
+      }, null, 2), 'utf-8');
+    } catch { /* non-fatal */ }
+
+    try { await this.writeSessionIndex(input, votes.winner, Date.now() - this.startedAt); } catch { /* non-fatal */ }
+
+    const duration = Date.now() - this.startedAt;
+    this.emit('complete', { duration, winner: votes.winner, synthesizer: synthProvider.name, synthesis });
 
     return {
       sessionId: this.store.path.split('/').pop()!,

@@ -44,6 +44,7 @@ import { listOAuthProfiles, removeOAuthProfile, startDeviceFlow, AUTH_PATH } fro
 import { PROVIDER_LIMITS, estimateTokens, availableInput } from './context.js';
 import { getGitDiff, getPrDiff, getGitContext } from './git.js';
 import { formatRedTeamReport, listAttackPacks, loadAttackPack, type RedTeamResult } from './redteam.js';
+import { listTopologies } from './topology.js';
 
 const program = new Command();
 
@@ -159,6 +160,9 @@ program
   .option('--red-team', 'Enable adversarial red-team analysis')
   .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
   .option('--custom-attacks <attacks>', 'Comma-separated custom attack prompts')
+  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option('--topology-hub <provider>', 'Hub provider for star topology')
+  .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -424,6 +428,11 @@ program
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
       customAttacks: opts.customAttacks ? (opts.customAttacks as string).split(',').map((s: string) => s.trim()) : undefined,
+      topology: opts.topology as any || undefined,
+      topologyConfig: {
+        ...(opts.topologyHub ? { hub: opts.topologyHub as string } : {}),
+        ...(opts.topologyModerator ? { moderator: opts.topologyModerator as string } : {}),
+      },
       onEvent(event, data) {
         if (isJSON) return;
         const d = data as Record<string, unknown>;
@@ -470,6 +479,11 @@ program
             const { result } = d as { result: RedTeamResult };
             console.log('');
             console.log(formatRedTeamReport(result));
+            break;
+          }
+          case 'topology': {
+            const { topology, description, phases } = d as { topology: string; description: string; phases: number };
+            console.log(chalk.cyan(`\n🔷 Topology: ${topology} — ${description} (${phases} phases)`));
             break;
           }
           case 'devilsAdvocate':
@@ -635,6 +649,9 @@ program
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .option('--red-team', 'Enable adversarial red-team analysis')
   .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
+  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option('--topology-hub <provider>', 'Hub provider for star topology')
+  .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .action(async (files: string[], opts) => {
     let content = '';
     let gitContextStr = '';
@@ -737,6 +754,9 @@ program
     if (opts.adaptive) { askArgs.push('--adaptive', opts.adaptive as string); }
     if (opts.redTeam) { askArgs.push('--red-team'); }
     if (opts.attackPack) { askArgs.push('--attack-pack', opts.attackPack as string); }
+    if (opts.topology) { askArgs.push('--topology', opts.topology as string); }
+    if (opts.topologyHub) { askArgs.push('--topology-hub', opts.topologyHub as string); }
+    if (opts.topologyModerator) { askArgs.push('--topology-moderator', opts.topologyModerator as string); }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
   });
@@ -762,6 +782,9 @@ program
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .option('--red-team', 'Enable adversarial red-team analysis')
   .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
+  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option('--topology-hub <provider>', 'Hub provider for star topology')
+  .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .action(async (opts) => {
     // --- Resolve diff content ---
     let content = '';
@@ -899,6 +922,11 @@ program
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
+      topology: opts.topology as any || undefined,
+      topologyConfig: {
+        ...(opts.topologyHub ? { hub: opts.topologyHub as string } : {}),
+        ...(opts.topologyModerator ? { moderator: opts.topologyModerator as string } : {}),
+      },
       onEvent() { /* silent */ },
     });
 
@@ -3344,6 +3372,22 @@ program
     }
 
     console.log('');
+  });
+
+// --- quorum topologies ---
+program
+  .command('topologies')
+  .alias('topo')
+  .description('List available debate topologies')
+  .action(async () => {
+    const topos = listTopologies();
+    console.log(chalk.bold('\nAvailable topologies:\n'));
+    for (const t of topos) {
+      console.log(`  ${chalk.cyan('🔷')} ${chalk.bold(t.name.padEnd(20))} ${t.description}`);
+      console.log(chalk.dim(`     Best for: ${t.bestFor}`));
+    }
+    console.log('');
+    console.log(chalk.dim('Usage: quorum ask --topology tournament "question"'));
   });
 
 program.parse();

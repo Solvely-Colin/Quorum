@@ -89,6 +89,13 @@ export interface AgentProfile {
   redTeam?: boolean;
   attackPacks?: string[];          // e.g. ['security', 'code']
   customAttacks?: string[];        // custom attack prompts
+  topology?: 'mesh' | 'star' | 'tournament' | 'map_reduce' | 'adversarial_tree' | 'pipeline' | 'panel';
+  topologyConfig?: {
+    hub?: string;
+    moderator?: string;
+    bracketSeed?: 'random' | 'ranked';
+    subQuestions?: number;
+  };
 }
 
 export interface ScoringWeights {

@@ -1,0 +1,17 @@
+name: deep-review
+topology: mesh
+focus: [correctness, security, performance, maintainability]
+challengeStyle: adversarial
+redTeam: true
+attackPacks: [code, security]
+evidence: advisory
+adaptive: balanced
+rounds: 1
+scoringWeights:
+  accuracy: 0.3
+  reasoning: 0.3
+  completeness: 0.2
+  novelty: 0.1
+  consensus: 0.1
+isolation: true
+blindReview: false
