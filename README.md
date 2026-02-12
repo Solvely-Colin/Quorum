@@ -1,4 +1,12 @@
-# Quorum
+```
+ ██████╗ ██╗   ██╗ ██████╗ ██████╗ ██╗   ██╗███╗   ███╗
+██╔═══██╗██║   ██║██╔═══██╗██╔══██╗██║   ██║████╗ ████║
+██║   ██║██║   ██║██║   ██║██████╔╝██║   ██║██╔████╔██║
+██║▄▄ ██║██║   ██║██║   ██║██╔══██╗██║   ██║██║╚██╔╝██║
+╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║╚██████╔╝██║ ╚═╝ ██║
+ ╚══▀▀═╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝
+                                        Consensus, validated.
+```
 
 Multi-AI deliberation framework. Ask a question, get answers from multiple AI providers that debate, critique, and refine each other's positions — then synthesize the best answer.
 
