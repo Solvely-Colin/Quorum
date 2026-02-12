@@ -551,6 +551,7 @@ export class CouncilV2 {
     // RED TEAM PHASE — non-voting adversarial analysis
     if (this.redTeam) {
       this.emit('phase', { phase: 'RED_TEAM' });
+      const rtStart = Date.now();
 
       // Load attack packs
       const packs: AttackPack[] = [];
@@ -608,7 +609,7 @@ export class CouncilV2 {
         this.emit('warn', { message: `Red team failed: ${err instanceof Error ? err.message : String(err)}` });
       }
 
-      this.emit('phase:done', { phase: 'RED_TEAM' });
+      this.emit('phase:done', { phase: 'RED_TEAM', duration: Date.now() - rtStart });
     }
 
     // Phase 7: VOTE
@@ -789,6 +790,7 @@ export class CouncilV2 {
 
     // "What Would Change My Mind" — one additional call
     this.emit('phase', { phase: 'WHAT_WOULD_CHANGE' });
+    const wwcmStart = Date.now();
     const wwcmPrompt = [
       `The council reached the following conclusion:\n\n${synthContent}`,
       `\nGiven the council's conclusion above, what specific evidence, arguments, or scenarios would cause you to overturn or significantly revise this conclusion? Be concrete and specific.`,
@@ -801,7 +803,7 @@ export class CouncilV2 {
     } catch (err) {
       this.emit('warn', { message: `What-would-change failed: ${err instanceof Error ? err.message : String(err)}` });
     }
-    this.emit('phase:done', { phase: 'WHAT_WOULD_CHANGE' });
+    this.emit('phase:done', { phase: 'WHAT_WOULD_CHANGE', duration: Date.now() - wwcmStart });
 
     const synthesis: Synthesis = {
       content: synthContent,

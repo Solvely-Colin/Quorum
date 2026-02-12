@@ -50,10 +50,20 @@ function resolveModel(config: ProviderConfig): Model<Api> {
     const all = getModels(piProvider as KnownProvider);
     const registered = all.find((m) => m.id === config.model);
     if (registered) {
-      return {
+      const resolved = {
         ...registered,
         baseUrl: config.baseUrl || registered.baseUrl,
       } as Model<Api>;
+      // Kimi's anthropic-compatible endpoint doesn't support Anthropic-specific
+      // beta headers (fine-grained-tool-streaming, interleaved-thinking, etc.).
+      // These cause hangs/undefined behavior. Override to suppress them.
+      if (config.provider === 'kimi') {
+        (resolved as any).headers = {
+          'anthropic-beta': 'none',
+          'anthropic-dangerous-direct-browser-access': 'false',
+        };
+      }
+      return resolved;
     }
   } catch {
     // Provider not in registry, build manually
@@ -190,7 +200,7 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
   const buildOpts = (): SimpleStreamOptions => ({
     apiKey,
     maxTokens: 4096,
-    ...(!['codex', 'google'].includes(resolved.provider) ? { reasoning: 'low' } : {}),
+    ...(!['codex', 'google', 'kimi'].includes(resolved.provider) ? { reasoning: 'low' } : {}),
   });
 
   const buildContext = (prompt: string, systemPrompt?: string) => ({
@@ -244,14 +254,25 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
           }, { once: true });
         });
         const iterate = async () => {
-          for await (const event of stream as AsyncIterable<AssistantMessageEvent>) {
-            if (ac.signal.aborted) break;
-            if (event.type === 'text_delta') {
-              text += event.delta;
-              onDelta(event.delta);
-            } else if (event.type === 'error') {
-              throw new Error(`${resolved.name} stream error`);
+          let lastChunkTime = Date.now();
+          const idleCheckInterval = setInterval(() => {
+            if (Date.now() - lastChunkTime > 30000) {
+              ac.abort();
             }
+          }, 5000);
+          try {
+            for await (const event of stream as AsyncIterable<AssistantMessageEvent>) {
+              if (ac.signal.aborted) break;
+              if (event.type === 'text_delta') {
+                lastChunkTime = Date.now();
+                text += event.delta;
+                onDelta(event.delta);
+              } else if (event.type === 'error') {
+                throw new Error(`${resolved.name} stream error`);
+              }
+            }
+          } finally {
+            clearInterval(idleCheckInterval);
           }
         };
         await Promise.race([iterate(), abortPromise]);

@@ -127,11 +127,33 @@ Examine ALL positions. Miss nothing.`;
 
 type Severity = 'low' | 'medium' | 'high' | 'critical';
 
+// Pattern 1: [SEVERITY] Category: Description (original)
 const SEVERITY_PATTERN =
   /\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?[\s:*]*([^:\n]+?):\s*(.+)/i;
 
+// Pattern 2: **SEVERITY** Category: Description (bold)
 const BOLD_SEVERITY_PATTERN =
   /\*\*(CRITICAL|HIGH|MEDIUM|LOW)\*\*[\s:]*([^:\n]+?):\s*(.+)/i;
+
+// Pattern 3: ### SEVERITY: Category — Description (markdown header)
+const HEADER_SEVERITY_PATTERN =
+  /#{1,6}\s*(CRITICAL|HIGH|MEDIUM|LOW)[\s:]*[-—:]\s*([^\n—-]+?)[\s—-]+(.+)/i;
+
+// Pattern 4: - **SEVERITY** — Category: Description (list item with bold, em dash)
+const LIST_BOLD_DASH_PATTERN =
+  /[-*]\s*\*?\*?(CRITICAL|HIGH|MEDIUM|LOW)\*?\*?\s*[—\-–|]+\s*([^:\n]+?):\s*(.+)/i;
+
+// Pattern 5: ** [SEVERITY] ** Category: Description (bold brackets)
+const BOLD_BRACKET_PATTERN =
+  /\*?\*?\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?\*?\*?\s*[-—:]\s*([^:\n]+?):\s*(.+)/i;
+
+// Pattern 6: 🔴 SEVERITY | Category: Description (emoji prefixed)
+const EMOJI_SEVERITY_PATTERN =
+  /(?:🔴|🟠|🟡|🟢|⚠️|❗|‼️)?\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*[|—\-–:]\s*([^:\n]+?):\s*(.+)/i;
+
+// Pattern 7: Category (SEVERITY): Description (severity in parentheses)
+const PAREN_SEVERITY_PATTERN =
+  /([^:\n]+?)\s*\(?\*?\*?(CRITICAL|HIGH|MEDIUM|LOW)\*?\*?\)?:\s*(.+)/i;
 
 function parseSeverity(raw: string): Severity {
   switch (raw.toUpperCase()) {
@@ -166,26 +188,89 @@ function detectProvider(
   return undefined;
 }
 
+function stripMarkdown(line: string): string {
+  // Remove bold/italic markdown
+  return line
+    .replace(/\*\*+/g, '')
+    .replace(/__+/g, '')
+    .replace(/##+/g, '')
+    .trim();
+}
+
 export function parseRedTeamResponse(
   response: string,
   providerPositions: Record<string, string>,
 ): RedTeamAttack[] {
   const providers = Object.keys(providerPositions);
   const attacks: RedTeamAttack[] = [];
+  const seen = new Set<string>(); // For deduplication
   const lines = response.split('\n');
 
   for (const line of lines) {
-    const trimmed = line.replace(/^\s*\d+[.)]\s*/, '').trim();
+    // Skip empty/whitespace-only lines
+    const trimmed = line.replace(/^\s*[-*]?\s*\d+[.)]?\s*/, '').trim();
     if (!trimmed) continue;
 
-    let match = SEVERITY_PATTERN.exec(trimmed) ?? BOLD_SEVERITY_PATTERN.exec(trimmed);
-    if (!match) continue;
+    // Strip markdown for cleaner matching
+    const cleanLine = stripMarkdown(trimmed);
 
-    const [, severityRaw, category, description] = match;
-    const fullText = `${category} ${description}`;
+    let match:
+      | RegExpExecArray
+      | null = null;
+    let severityRaw: string | undefined;
+    let category: string | undefined;
+    let description: string | undefined;
+
+    // Try all patterns in order of specificity
+    const patterns = [
+      HEADER_SEVERITY_PATTERN,
+      LIST_BOLD_DASH_PATTERN,
+      BOLD_BRACKET_PATTERN,
+      EMOJI_SEVERITY_PATTERN,
+      BOLD_SEVERITY_PATTERN,
+      SEVERITY_PATTERN,
+      PAREN_SEVERITY_PATTERN,
+    ];
+
+    for (const pattern of patterns) {
+      match = pattern.exec(cleanLine) ?? pattern.exec(trimmed);
+      if (match) {
+        // PAREN_SEVERITY_PATTERN has category first, then severity
+        if (pattern === PAREN_SEVERITY_PATTERN) {
+          [, category, severityRaw, description] = match;
+        } else {
+          [, severityRaw, category, description] = match;
+        }
+        break;
+      }
+    }
+
+    // If no pattern matched but line contains severity, use whole line as description
+    if (!match) {
+      const severityAnywhere = /(CRITICAL|HIGH|MEDIUM|LOW)/i.exec(cleanLine);
+      if (severityAnywhere) {
+        severityRaw = severityAnywhere[1];
+        category = 'general';
+        description = cleanLine;
+      } else {
+        continue;
+      }
+    }
+
+    if (!severityRaw || !category || !description) continue;
+
+    const catTrimmed = category.trim();
+    const descTrimmed = description.trim();
+    const fullText = `${catTrimmed} ${descTrimmed}`;
+
+    // Deduplicate by category + description
+    const dedupeKey = `${catTrimmed.toLowerCase()}|${descTrimmed.toLowerCase()}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
     attacks.push({
-      category: category.trim(),
-      description: description.trim(),
+      category: catTrimmed,
+      description: descTrimmed,
       severity: parseSeverity(severityRaw),
       targetProvider: detectProvider(fullText, providers),
       addressed: false,
