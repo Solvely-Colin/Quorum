@@ -84,6 +84,7 @@ export interface AgentProfile {
   hooks?: Record<string, string>;  // e.g. "pre-gather" → shell command
   tools?: boolean;          // enable tool use in gather phase (default: false)
   allowShellTool?: boolean; // enable shell tool (default: false, requires tools: true)
+  evidence?: 'off' | 'advisory' | 'strict';  // evidence-backed claims mode (default: 'off')
 }
 
 export interface ScoringWeights {

@@ -19,6 +19,7 @@ import { tallyWithMethod, type Ballot, type VotingResult } from './voting.js';
 import { generateHeatmap } from './heatmap.js';
 import { runHook, type HookEnv } from './hooks.js';
 import { executeTools } from './tools.js';
+import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, type EvidenceReport } from './evidence.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -71,6 +72,7 @@ export class CouncilV2 {
   private startedAt = 0;
   private currentPhase = '';
   private deliberationInput = '';
+  private evidenceReports: EvidenceReport[] = [];
 
   constructor(
     adapters: ProviderAdapter[],
@@ -153,6 +155,9 @@ export class CouncilV2 {
         if (this.priorContext) {
           gatherSys += `\n\nThe council previously deliberated and reached this conclusion:\n\n${this.priorContext}\n\nNow consider this follow-up:`;
         }
+        if (this.profile.evidence && this.profile.evidence !== 'off') {
+          gatherSys += `\n\n${EVIDENCE_INSTRUCTION}`;
+        }
         if (this.profile.tools) {
           const toolList = ['web_search', 'read_file'];
           if (this.profile.allowShellTool) toolList.push('shell');
@@ -184,6 +189,27 @@ export class CouncilV2 {
         return response;
       });
     });
+
+    // Evidence processing after gather
+    if (this.profile.evidence && this.profile.evidence !== 'off') {
+      for (const [provider, response] of Object.entries(gather.responses)) {
+        const report = generateEvidenceReport(provider, response);
+        this.evidenceReports.push(report);
+        this.emit('evidence', { provider, report });
+
+        // Strict mode: warn on low evidence scores
+        if (this.profile.evidence === 'strict' && report.evidenceScore < 0.3) {
+          const pct = Math.round(report.evidenceScore * 100);
+          gather.responses[provider] = `${response}\n\n⚠️ Low evidence score (${pct}%) — most claims unsupported`;
+        }
+      }
+      // Store evidence reports
+      try {
+        const { writeFile: wf } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        await wf(join(this.store.path, 'evidence-report.json'), JSON.stringify(this.evidenceReports, null, 2), 'utf-8');
+      } catch { /* non-fatal */ }
+    }
 
     // Devil's advocate: assign after gather
     if (this.devilsAdvocate) {
@@ -236,11 +262,12 @@ export class CouncilV2 {
           { key: 'otherSummaries', text: otherGathers, priority: 'trimmable' },
         ], budget);
 
-        const sys = this.prompt('formulate',
-          `Write your full, formal position statement. Be thorough and persuasive.\n` +
-          `You have your initial research, your argument plan, and awareness of others' positions.`,
-          adapter.name
-        );
+        let formulateSysText = `Write your full, formal position statement. Be thorough and persuasive.\n` +
+          `You have your initial research, your argument plan, and awareness of others' positions.`;
+        if (this.profile.evidence && this.profile.evidence !== 'off') {
+          formulateSysText += `\n\n${EVIDENCE_INSTRUCTION}`;
+        }
+        const sys = this.prompt('formulate', formulateSysText, adapter.name);
         const prompt = [
           `Original question: ${input}`,
           `\n## Your initial research:\n${fitted.myGather}`,
@@ -306,12 +333,13 @@ export class CouncilV2 {
           { key: 'critiques', text: critiquesReceived, priority: 'trimmable' },
         ], budget);
 
-        const sys = this.prompt('adjust',
-          `The entire council has critiqued your position. Multiple members have weighed in.\n` +
+        let adjustSysText = `The entire council has critiqued your position. Multiple members have weighed in.\n` +
           `Read all their critiques carefully. Revise where valid, defend where you're right.\n` +
-          `Be honest — drop weak points, strengthen good ones. Show you've listened.`,
-          adapter.name
-        );
+          `Be honest — drop weak points, strengthen good ones. Show you've listened.`;
+        if (this.profile.evidence && this.profile.evidence !== 'off') {
+          adjustSysText += `\n\n${EVIDENCE_INSTRUCTION}`;
+        }
+        const sys = this.prompt('adjust', adjustSysText, adapter.name);
         const prompt = [
           `Your original position:\n${fitted.position}`,
           `\n## Critiques from the council:\n${fitted.critiques}`,
@@ -321,6 +349,28 @@ export class CouncilV2 {
         return adapter.generate(prompt, sys);
       }, formulateFallbacks);
     });
+
+    // Evidence processing after formulate/adjust
+    if (this.profile.evidence && this.profile.evidence !== 'off') {
+      const latestResponses = shouldRun('adjust') ? adjust.responses : formulate.responses;
+      for (const [provider, response] of Object.entries(latestResponses)) {
+        const report = generateEvidenceReport(provider, response);
+        // Update existing report or add new one
+        const existingIdx = this.evidenceReports.findIndex(r => r.provider === provider);
+        if (existingIdx >= 0) {
+          this.evidenceReports[existingIdx] = report;
+        } else {
+          this.evidenceReports.push(report);
+        }
+        this.emit('evidence', { provider, report });
+      }
+      // Update stored reports
+      try {
+        const { writeFile: wf } = await import('node:fs/promises');
+        const { join } = await import('node:path');
+        await wf(join(this.store.path, 'evidence-report.json'), JSON.stringify(this.evidenceReports, null, 2), 'utf-8');
+      } catch { /* non-fatal */ }
+    }
 
     // Consensus check — skip rebuttal if positions converged or not in pipeline
     const convergence = this.measureConvergence(adjust.responses);
@@ -382,11 +432,15 @@ export class CouncilV2 {
           { key: 'positions', text: positionSummaries, priority: 'trimmable' },
         ], budget);
 
-        const sys = this.prompt('vote',
-          `Vote on the best position. Rank ALL positions from best to worst.\n` +
-          `Explain your ranking. Be fair — you CAN rank your own position #1 if it's genuinely best, but justify it.`,
-          adapter.name
-        );
+        let voteSysText = `Vote on the best position. Rank ALL positions from best to worst.\n` +
+          `Explain your ranking. Be fair — you CAN rank your own position #1 if it's genuinely best, but justify it.`;
+        if (this.profile.evidence && this.profile.evidence !== 'off' && this.evidenceReports.length > 0) {
+          const evidenceSummary = this.evidenceReports
+            .map(r => `${r.provider}: ${Math.round(r.evidenceScore * 100)}% evidence-backed (${r.supportedClaims}/${r.totalClaims} claims supported)`)
+            .join('\n');
+          voteSysText += `\n\nEvidence scores (consider these in your ranking — providers who backed up claims with sources should be weighted higher):\n${evidenceSummary}`;
+        }
+        const sys = this.prompt('vote', voteSysText, adapter.name);
         const prompt = [
           `Original question: ${input}`,
           `\nThere are ${this.adapters.length} positions to rank (${labels.join(', ')}):`,

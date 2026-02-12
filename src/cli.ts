@@ -152,6 +152,7 @@ program
   .option('--no-hooks', 'Skip all pre/post hooks defined in the profile')
   .option('--tools', 'Enable tool use in gather phase (web search, file reading)')
   .option('--allow-shell', 'Enable shell tool (requires --tools)')
+  .option('--evidence <mode>', 'Evidence-backed claims mode: off, advisory, strict')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -287,6 +288,16 @@ program
     if (opts.allowShell) {
       profile.tools = true;
       profile.allowShellTool = true;
+    }
+
+    // Evidence mode override
+    if (opts.evidence) {
+      const mode = opts.evidence as string;
+      if (!['off', 'advisory', 'strict'].includes(mode)) {
+        console.error(chalk.red(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`));
+        process.exit(1);
+      }
+      profile.evidence = mode as 'off' | 'advisory' | 'strict';
     }
 
     // Parse --weight flag into weights record
@@ -430,6 +441,11 @@ program
             console.log(chalk.dim(`  🔧 ${d.provider} → ${d.tool}(${toolInput})`));
             break;
           }
+          case 'evidence': {
+            const report = d.report as { provider: string; supportedClaims: number; unsupportedClaims: number; totalClaims: number; evidenceScore: number };
+            console.log(chalk.dim(`  📋 ${report.provider}: ${report.supportedClaims}/${report.totalClaims} claims supported (${Math.round(report.evidenceScore * 100)}%)`));
+            break;
+          }
           case 'devilsAdvocate':
             console.log(chalk.magenta(`  😈 Devil's advocate: ${d.provider}`));
             break;
@@ -526,6 +542,18 @@ program
           `Confidence: ${result.synthesis.confidenceScore}`,
         ].join(' | ');
         console.log(chalk.dim(meta));
+        // Evidence summary
+        if (profile.evidence && profile.evidence !== 'off') {
+          try {
+            const { readFile: rf } = await import('node:fs/promises');
+            const { join: pjoin } = await import('node:path');
+            const reportData = JSON.parse(await rf(pjoin(result.sessionPath, 'evidence-report.json'), 'utf-8')) as Array<{ provider: string; evidenceScore: number }>;
+            if (reportData.length > 0) {
+              const summary = reportData.map((r: { provider: string; evidenceScore: number }) => `${r.provider} ${Math.round(r.evidenceScore * 100)}%`).join(', ');
+              console.log(chalk.dim(`Evidence scores: ${summary}`));
+            }
+          } catch { /* no evidence report */ }
+        }
         console.log(chalk.dim(`Session: ${result.sessionPath}`));
         console.log('');
       }

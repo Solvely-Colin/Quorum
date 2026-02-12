@@ -1,0 +1,13 @@
+name: Evidence-Based Council
+rounds: 1
+focus: [accuracy, evidence, reasoning]
+challengeStyle: adversarial
+evidence: strict
+scoringWeights:
+  accuracy: 0.35
+  reasoning: 0.25
+  completeness: 0.20
+  novelty: 0.10
+  consensus: 0.10
+isolation: true
+blindReview: false
