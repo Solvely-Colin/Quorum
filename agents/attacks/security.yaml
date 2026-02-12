@@ -1,0 +1,39 @@
+name: security
+description: "Security-focused attack vectors inspired by OWASP Top 10 and common vulnerability patterns"
+vectors:
+  - category: injection
+    prompt: "Check for SQL, NoSQL, and OS command injection via unsanitized input; stored/reflected/DOM XSS through unescaped output; SSRF via user-controlled URLs; and LDAP injection in directory queries."
+    severity: critical
+  - category: broken-authentication
+    prompt: "Check for weak password policies, missing multi-factor authentication on sensitive operations, session fixation vulnerabilities, and exposure to credential stuffing attacks."
+    severity: critical
+  - category: broken-access-control
+    prompt: "Check for privilege escalation paths, insecure direct object references (IDOR), missing function-level access control on admin endpoints, and CORS misconfiguration allowing unauthorized origins."
+    severity: critical
+  - category: cryptographic-failures
+    prompt: "Check for weak or deprecated algorithms (MD5, SHA1, DES), hardcoded keys or secrets in source code, missing encryption at rest or in transit, and poor key rotation/management practices."
+    severity: critical
+  - category: security-misconfiguration
+    prompt: "Check for default credentials left unchanged, unnecessary features or services enabled, missing security headers (CSP, HSTS, X-Frame-Options), and verbose error messages exposing internals."
+    severity: high
+  - category: vulnerable-components
+    prompt: "Check for outdated libraries with known CVEs, dependencies pulled from untrusted registries, and supply chain attack vectors through compromised transitive dependencies."
+    severity: high
+  - category: authentication-session
+    prompt: "Check for missing or excessive token expiration times, session tokens transmitted insecurely, tokens stored in localStorage vulnerable to XSS, and missing session invalidation on logout."
+    severity: high
+  - category: data-exposure
+    prompt: "Check for PII leaked in API responses, excessive data returned beyond what the client needs, debug information or stack traces exposed in production, and sensitive data in URL parameters."
+    severity: high
+  - category: rate-limiting
+    prompt: "Check for missing rate limits on authentication endpoints, lack of brute force protection, and endpoints vulnerable to denial-of-service through resource-expensive operations."
+    severity: high
+  - category: input-validation
+    prompt: "Check for missing server-side input sanitization, type confusion attacks through polymorphic input, and buffer overflow potential in native code or fixed-size allocations."
+    severity: medium
+  - category: logging-monitoring
+    prompt: "Check for missing audit logs on authentication and authorization events, absence of intrusion detection mechanisms, and alert configurations prone to fatigue or suppression."
+    severity: medium
+  - category: api-security
+    prompt: "Check for unauthenticated API endpoints, mass assignment vulnerabilities allowing clients to set privileged fields, and excessive data exposure through overly permissive serialization."
+    severity: medium

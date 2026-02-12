@@ -1,0 +1,30 @@
+name: medical
+description: "Medical and health claims attack vectors targeting evidence quality, patient safety, and clinical validity"
+vectors:
+  - category: evidence-quality
+    prompt: "Check the quality of cited evidence: inadequate sample sizes, weak study designs (observational vs RCT), signs of p-hacking or data dredging, and publication bias toward positive results."
+    severity: critical
+  - category: contraindications
+    prompt: "Check for unaddressed drug interactions, allergy cross-reactivity risks, comorbidity complications, and missing age/weight/pregnancy dosage considerations."
+    severity: critical
+  - category: patient-safety
+    prompt: "Check for underreported adverse effects, missing monitoring requirements during treatment, dangerous discontinuation risks, and inadequate warnings about serious side effects."
+    severity: critical
+  - category: off-label-claims
+    prompt: "Check for recommendations of unapproved uses, dosage extrapolation from different conditions or populations, and generalization of results beyond the studied demographic."
+    severity: high
+  - category: bias-in-studies
+    prompt: "Check for funding source conflicts of interest, selection bias in study enrollment, selective outcome reporting, and healthy user bias that inflates treatment effectiveness."
+    severity: high
+  - category: statistical-misinterpretation
+    prompt: "Check for confusion between correlation and causation, reporting relative risk without absolute risk context, base rate neglect, and misuse of statistical significance."
+    severity: high
+  - category: regulatory-status
+    prompt: "Check whether claims accurately reflect FDA approval status, current clinical trial phase, emergency use authorization limitations, and off-formulary status."
+    severity: medium
+  - category: informed-consent
+    prompt: "Check for adequate disclosure of risks and benefits, whether alternatives are presented fairly, and whether information is accessible to patients without medical training."
+    severity: medium
+  - category: reproducibility
+    prompt: "Check whether conclusions rely on single-study findings, whether key results have failed replication, and whether meta-analyses show conflicting results across studies."
+    severity: medium

@@ -509,7 +509,92 @@ Show adaptive decisions inline:
 ---
 
 | 33 | Deliberation Memory Graph | Cross-run graph memory: tasks, role setups, vote splits, outcomes. Retrieval at run start. Contradiction detection vs prior decisions. |
-| 34 | Adversarial Red-Team Mode | Non-voting attacker agents. Domain attack packs (`code`, `security`, `legal`, `medical`). Outputs `resilience_score` + unresolved risk register. |
+| 34 | Adversarial Red-Team Mode | See detailed spec below |
+
+### #34 Adversarial Red-Team Mode — Detailed Spec
+
+**Priority:** #4 by impact — unique, marketable, catches blind spots no other tool finds
+
+**Concept:** Non-voting attacker agents that stress-test the council's conclusions. They participate in debate but DON'T vote — pure adversarial pressure.
+
+#### 1. `--red-team` CLI Flag
+```bash
+quorum ask --red-team "Should we migrate to microservices?"
+quorum ask --red-team --attack-pack security "Review our auth flow"
+quorum ask --red-team custom "Find every flaw in this argument"
+```
+
+#### 2. Attack Packs (domain-specific attack strategies)
+Bundled YAML files in `agents/attacks/`:
+- **`general.yaml`** — logical fallacies, hidden assumptions, missing evidence, scope creep, survivorship bias
+- **`code.yaml`** — edge cases, race conditions, error paths, injection, resource leaks, backwards compat
+- **`security.yaml`** — OWASP top 10, privilege escalation, data exfiltration, supply chain, timing attacks
+- **`legal.yaml`** — liability, compliance gaps, IP issues, regulatory risk, jurisdictional conflicts
+- **`medical.yaml`** — contraindications, sample size issues, publication bias, off-label risks
+
+#### 3. Red Team Agent Behavior
+- Runs AFTER the main deliberation's adjust phase (sees all revised positions)
+- Gets a special system prompt: "You are a red team agent. Your ONLY job is to find flaws, risks, and blind spots. Do not be constructive. Do not suggest fixes. Just break things."
+- Each attack pack adds domain-specific attack vectors to the prompt
+- Red team agents are clearly labeled in output (🔴 prefix)
+- Their critiques feed into synthesis but they do NOT vote
+
+#### 4. Resilience Score
+```typescript
+interface RedTeamResult {
+  attacks: RedTeamAttack[];
+  resilienceScore: number;      // 0-1: how well did positions survive?
+  unresolvedRisks: string[];    // attacks no provider addressed
+  mitigatedRisks: string[];     // attacks that were already covered
+  blindSpots: string[];         // things nobody considered
+}
+
+interface RedTeamAttack {
+  category: string;           // from attack pack
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  targetProvider?: string;    // who they're attacking
+  addressed: boolean;         // was this already covered?
+  addressedBy?: string[];     // which providers covered it
+}
+```
+
+#### 5. Output
+```
+🔴 RED TEAM REPORT
+Resilience: 72% | Attacks: 8 | Unresolved: 3
+
+Unresolved Risks:
+  🔴 [CRITICAL] No rate limiting on auth endpoint — nobody addressed this
+  🔴 [HIGH] Session tokens don't expire — mentioned but not resolved
+  🟡 [MEDIUM] Error messages leak stack traces — partially addressed by claude
+
+Mitigated (already covered):
+  ✅ SQL injection — addressed by claude, kimi
+  ✅ CSRF protection — addressed by kimi
+```
+
+#### 6. Synthesis Integration
+- Red team results appended to synthesis prompt as "adversarial findings"
+- Synthesizer must address unresolved risks in the final answer
+- Minority report includes red team blind spots
+
+#### 7. Profile YAML
+```yaml
+redTeam: true
+attackPacks: [security, code]
+# Or custom attacks:
+customAttacks:
+  - "Check for GDPR compliance gaps"
+  - "Find single points of failure"
+```
+
+#### Implementation Plan
+- **Sub-agent 1 (Core):** `src/redteam.ts` — attack execution, resilience scoring, attack parsing, result types
+- **Sub-agent 2 (Attack Packs):** `agents/attacks/*.yaml` — all 5 domain packs with structured attack vectors
+- **Sub-agent 3 (Integration):** Wire into `council-v2.ts` + `cli.ts` + `types.ts` — flag, phase insertion, output
+
+---
 
 ### Phase 3 — Moat + Platform
 | # | Feature | Description |

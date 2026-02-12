@@ -21,6 +21,7 @@ import { runHook, type HookEnv } from './hooks.js';
 import { executeTools } from './tools.js';
 import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, crossValidateClaims, type EvidenceReport, type CrossReference, tierWeight } from './evidence.js';
 import { AdaptiveController, recordOutcome, type AdaptivePreset, type AdaptiveDecision } from './adaptive.js';
+import { loadAttackPack, buildRedTeamPrompt, parseRedTeamResponse, scoreResilience, formatRedTeamReport, type RedTeamResult, type AttackPack } from './redteam.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -34,6 +35,9 @@ export interface CouncilV2Options {
   priorContext?: string;
   weights?: Record<string, number>;
   noHooks?: boolean;
+  redTeam?: boolean;
+  attackPacks?: string[];
+  customAttacks?: string[];
 }
 
 export interface V2Result {
@@ -77,6 +81,10 @@ export class CouncilV2 {
   private evidenceReports: EvidenceReport[] = [];
   private crossRefs: CrossReference[] = [];
   private adaptiveController: AdaptiveController | null = null;
+  private redTeam: boolean = false;
+  private attackPacks: string[] = [];
+  private customAttacks: string[] = [];
+  private redTeamResult: RedTeamResult | null = null;
 
   constructor(
     adapters: ProviderAdapter[],
@@ -99,6 +107,9 @@ export class CouncilV2 {
     this.weights = options?.weights ?? profile.weights ?? {};
     this.hooks = profile.hooks ?? {};
     this.noHooks = options?.noHooks ?? false;
+    this.redTeam = options?.redTeam ?? profile.redTeam ?? false;
+    this.attackPacks = options?.attackPacks ?? profile.attackPacks ?? [];
+    this.customAttacks = options?.customAttacks ?? profile.customAttacks ?? [];
 
     // Resolve phase pipeline
     const ALL_PHASES = ['gather', 'plan', 'formulate', 'debate', 'adjust', 'rebuttal', 'vote', 'synthesize'];
@@ -520,6 +531,69 @@ export class CouncilV2 {
         });
       });
 
+    // RED TEAM PHASE — non-voting adversarial analysis
+    if (this.redTeam) {
+      this.emit('phase', { phase: 'RED_TEAM' });
+
+      // Load attack packs
+      const packs: AttackPack[] = [];
+      const packNames = this.attackPacks.length > 0 ? this.attackPacks : ['general'];
+      for (const packName of packNames) {
+        try {
+          const pack = await loadAttackPack(packName);
+          packs.push(pack);
+        } catch (err) {
+          this.emit('warn', { message: `Failed to load attack pack "${packName}": ${err instanceof Error ? err.message : String(err)}` });
+        }
+      }
+
+      // Build red team prompt
+      const rtPrompt = buildRedTeamPrompt(packs, this.customAttacks.length > 0 ? this.customAttacks : undefined);
+
+      // Collect all current positions (use adjust if available, else formulate, else gather)
+      const currentPositions = shouldRun('adjust') && !adaptiveSkips.has('adjust')
+        ? adjust.responses
+        : shouldRun('formulate') && !adaptiveSkips.has('formulate')
+        ? formulate.responses
+        : gather.responses;
+
+      const positionsSummary = Object.entries(currentPositions)
+        .map(([name, pos]) => `### [${name}]'s Position:\n${pos}`)
+        .join('\n\n---\n\n');
+
+      // Use the FIRST available adapter for red team (it doesn't vote anyway)
+      const rtAdapter = this.adapters[0];
+      const rtInput = [
+        `Original question: ${input}`,
+        `\n## Council Positions:\n${positionsSummary}`,
+        `\nAttack ALL positions. Find every flaw, risk, and blind spot:`,
+      ].join('\n');
+
+      try {
+        const rtResponse = await this.generateWithRetry(rtAdapter, rtInput, rtPrompt);
+        this.emit('response', { provider: `${rtAdapter.name} (red-team)`, phase: 'red_team' });
+
+        // Parse and score
+        const attacks = parseRedTeamResponse(rtResponse, currentPositions);
+        this.redTeamResult = scoreResilience(attacks, currentPositions);
+        this.redTeamResult.rawResponse = rtResponse;
+        this.redTeamResult.attackPacks = packNames;
+
+        this.emit('redTeam', { result: this.redTeamResult });
+
+        // Save to session
+        try {
+          const { writeFile: wf } = await import('node:fs/promises');
+          const { join } = await import('node:path');
+          await wf(join(this.store.path, 'redteam-result.json'), JSON.stringify(this.redTeamResult, null, 2), 'utf-8');
+        } catch { /* non-fatal */ }
+      } catch (err) {
+        this.emit('warn', { message: `Red team failed: ${err instanceof Error ? err.message : String(err)}` });
+      }
+
+      this.emit('phase:done', { phase: 'RED_TEAM' });
+    }
+
     // Phase 7: VOTE
     const vote = !shouldRun('vote') ? { phase: 'VOTE', timestamp: Date.now(), duration: 0, responses: {} as Record<string, string> } : await this.runPhase('07-vote', 'VOTE', async () => {
       const labels = this.adapters.map((_, idx) => String.fromCharCode(65 + idx));
@@ -654,13 +728,28 @@ export class CouncilV2 {
       }
     }
 
+    // Red team context for synthesis
+    let redTeamSynthContext = '';
+    if (this.redTeamResult && this.redTeamResult.unresolvedRisks.length > 0) {
+      redTeamSynthContext = `\n## 🔴 Red Team Findings (unresolved risks — you MUST address these)\n` +
+        this.redTeamResult.unresolvedRisks.map(r => `- ${r}`).join('\n') +
+        `\n\nResilience score: ${Math.round(this.redTeamResult.resilienceScore * 100)}%`;
+    }
+
+    let produceInstruction = `\nProduce:\n## Synthesis\n[Best answer]\n\n## Minority Report\n[Dissenting views worth preserving]`;
+    if (this.redTeamResult?.blindSpots?.length) {
+      produceInstruction += `\n\n## Red Team Blind Spots\n[Address these blind spots identified by adversarial analysis:\n${this.redTeamResult.blindSpots.map(b => `- ${b}`).join('\n')}]`;
+    }
+    produceInstruction += `\n\n## Scores\nConsensus: [0.0-1.0]\nConfidence: [0.0-1.0]`;
+
     const synthPrompt = [
       `Original question: ${input}`,
       `\n## Final Positions:\n${allPositions}`,
       `\n## Rebuttals:\n${rebuttalsText}`,
       `\n## Council Votes:\n${voteText}`,
       evidenceCrossRefContext,
-      `\nProduce:\n## Synthesis\n[Best answer]\n\n## Minority Report\n[Dissenting views worth preserving]\n\n## Scores\nConsensus: [0.0-1.0]\nConfidence: [0.0-1.0]`,
+      redTeamSynthContext,
+      produceInstruction,
     ].join('\n');
 
     this.currentPhase = 'SYNTHESIZE';

@@ -4,6 +4,29 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.4.0] — 2026-02-12
+
+### 🔴 The "Red Team" Release
+
+#### #34 Adversarial Red-Team Mode
+- **Non-voting attacker agents** that stress-test the council's conclusions after debate
+- **5 bundled attack packs** (52 vectors): `general`, `code`, `security`, `legal`, `medical`
+- **Resilience scoring** — measures how well positions survive adversarial analysis (0–100%)
+- **Structured output:** unresolved risks, mitigated risks, blind spots
+- **Synthesis integration:** unresolved risks and blind spots injected into synthesis prompt — synthesizer must address them
+- **`--red-team`** flag on `ask`, `review`, `ci`
+- **`--attack-pack <packs>`** — comma-separated pack selection (default: `general`)
+- **`--custom-attacks <attacks>`** — ad-hoc attack prompts
+- **`quorum attacks`** — list available attack packs with vector counts
+- **Profile YAML:** `redTeam: true`, `attackPacks: [security, code]`, `customAttacks: [...]`
+- Attack packs searched in: project local → user global → bundled
+
+#### New Files
+- `src/redteam.ts` — attack engine, resilience scoring, report formatting
+- `agents/attacks/{general,code,security,legal,medical}.yaml` — attack pack definitions
+
+---
+
 ## [0.3.0] — 2026-02-12
 
 ### 🧠 The "Trust + Intelligence" Release

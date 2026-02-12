@@ -43,6 +43,7 @@ import { homedir } from 'node:os';
 import { listOAuthProfiles, removeOAuthProfile, startDeviceFlow, AUTH_PATH } from './auth.js';
 import { PROVIDER_LIMITS, estimateTokens, availableInput } from './context.js';
 import { getGitDiff, getPrDiff, getGitContext } from './git.js';
+import { formatRedTeamReport, listAttackPacks, loadAttackPack, type RedTeamResult } from './redteam.js';
 
 const program = new Command();
 
@@ -155,6 +156,9 @@ program
   .option('--allow-shell', 'Enable shell tool (requires --tools)')
   .option('--evidence <mode>', 'Evidence-backed claims mode: off, advisory, strict')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
+  .option('--red-team', 'Enable adversarial red-team analysis')
+  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
+  .option('--custom-attacks <attacks>', 'Comma-separated custom attack prompts')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -417,6 +421,9 @@ program
       weights: profile.weights,
       noHooks: opts.hooks === false,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
+      redTeam: opts.redTeam || undefined,
+      attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
+      customAttacks: opts.customAttacks ? (opts.customAttacks as string).split(',').map((s: string) => s.trim()) : undefined,
       onEvent(event, data) {
         if (isJSON) return;
         const d = data as Record<string, unknown>;
@@ -457,6 +464,12 @@ program
             } else {
               console.log(chalk.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`));
             }
+            break;
+          }
+          case 'redTeam': {
+            const { result } = d as { result: RedTeamResult };
+            console.log('');
+            console.log(formatRedTeamReport(result));
             break;
           }
           case 'devilsAdvocate':
@@ -620,6 +633,8 @@ program
   .option('--convergence <threshold>', 'Override convergenceThreshold (0.0-1.0)')
   .option('--rounds <n>', 'Override number of rounds')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
+  .option('--red-team', 'Enable adversarial red-team analysis')
+  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
   .action(async (files: string[], opts) => {
     let content = '';
     let gitContextStr = '';
@@ -720,6 +735,8 @@ program
     if (opts.convergence) { askArgs.push('--convergence', opts.convergence as string); }
     if (opts.rounds) { askArgs.push('--rounds', opts.rounds as string); }
     if (opts.adaptive) { askArgs.push('--adaptive', opts.adaptive as string); }
+    if (opts.redTeam) { askArgs.push('--red-team'); }
+    if (opts.attackPack) { askArgs.push('--attack-pack', opts.attackPack as string); }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
   });
@@ -743,6 +760,8 @@ program
   .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
   .option('-r, --rapid', 'Rapid mode — skip plan, formulate, adjust, rebuttal, vote phases')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
+  .option('--red-team', 'Enable adversarial red-team analysis')
+  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
   .action(async (opts) => {
     // --- Resolve diff content ---
     let content = '';
@@ -878,6 +897,8 @@ program
       rapid: opts.rapid ?? false,
       devilsAdvocate: false,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
+      redTeam: opts.redTeam || undefined,
+      attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
       onEvent() { /* silent */ },
     });
 
@@ -1848,6 +1869,21 @@ program
     } else {
       console.log(chalk.dim('Not enough data to generate heatmap.'));
     }
+  });
+
+// --- quorum attacks ---
+program
+  .command('attacks')
+  .description('List available red team attack packs')
+  .action(async () => {
+    const packs = await listAttackPacks();
+    console.log(chalk.bold('\nAvailable attack packs:\n'));
+    for (const name of packs) {
+      const pack = await loadAttackPack(name);
+      console.log(`  ${chalk.red('🔴')} ${chalk.bold(name)} — ${pack.description} (${pack.vectors.length} vectors)`);
+    }
+    console.log('');
+    console.log(chalk.dim('Usage: quorum ask --red-team --attack-pack security,code "question"'));
   });
 
 // --- Helpers ---

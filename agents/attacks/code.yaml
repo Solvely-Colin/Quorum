@@ -1,0 +1,42 @@
+name: code
+description: "Code review attack vectors targeting bugs, vulnerabilities, and maintainability issues"
+vectors:
+  - category: race-conditions
+    prompt: "Check for shared mutable state accessed without synchronization, async operations with assumed ordering, and missing locks around critical sections."
+    severity: critical
+  - category: injection
+    prompt: "Check for SQL injection via string concatenation, OS command injection through unsanitized input, path traversal using user-supplied filenames, and template injection in dynamic rendering."
+    severity: critical
+  - category: edge-cases
+    prompt: "Test behavior with null/undefined inputs, empty strings/arrays, integer overflow/max values, unicode edge cases, and concurrent access to shared resources."
+    severity: high
+  - category: error-handling
+    prompt: "Identify uncaught exceptions, missing error paths in async code, empty catch blocks that silently swallow failures, and error conditions that leave state inconsistent."
+    severity: high
+  - category: resource-leaks
+    prompt: "Check for unclosed database connections, file handles not released in error paths, memory retained by forgotten event listeners, and streams not properly drained or destroyed."
+    severity: high
+  - category: backwards-compatibility
+    prompt: "Verify changes don't break public API contracts, alter default values consumers depend on, remove exported features, or change serialization formats."
+    severity: high
+  - category: concurrency
+    prompt: "Check for potential deadlocks from lock ordering, livelocks in retry loops, thread starvation under load, and non-thread-safe data structure usage."
+    severity: high
+  - category: type-safety
+    prompt: "Identify implicit type coercions that change behavior, use of 'any' types bypassing checks, and unchecked type casts that could fail at runtime."
+    severity: medium
+  - category: performance
+    prompt: "Flag O(n²) or worse algorithms on unbounded input, unnecessary object copies in hot paths, missing caching for repeated expensive calls, and N+1 query patterns."
+    severity: medium
+  - category: testing-gaps
+    prompt: "Identify missing unit tests for new logic, untested error/exception paths, absence of integration tests for cross-boundary interactions, and missing regression tests for bug fixes."
+    severity: medium
+  - category: dependencies
+    prompt: "Check for outdated dependencies with known vulnerabilities, unnecessary transitive dependencies bloating the bundle, and version conflicts between packages."
+    severity: medium
+  - category: configuration
+    prompt: "Flag hardcoded values that should be configurable, missing default values for optional config, and environment variables leaked into logs or error messages."
+    severity: medium
+  - category: logging
+    prompt: "Check for missing audit trails on sensitive operations, excessive debug logging left in production code, and PII or secrets accidentally included in log output."
+    severity: low

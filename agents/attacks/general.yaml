@@ -1,0 +1,33 @@
+name: general
+description: "General-purpose adversarial analysis targeting logical errors, cognitive biases, and reasoning gaps"
+vectors:
+  - category: logical-fallacies
+    prompt: "Check for strawman arguments, false dichotomies, appeals to authority, circular reasoning, and hasty generalizations that undermine the logical foundation of the response."
+    severity: critical
+  - category: hidden-assumptions
+    prompt: "Identify unstated premises, taken-for-granted conditions, and implicit biases that the response relies on without explicitly acknowledging or justifying."
+    severity: high
+  - category: missing-evidence
+    prompt: "Flag claims presented without supporting data, anecdotal reasoning used as proof, and cherry-picked examples that ignore contradicting evidence."
+    severity: high
+  - category: confirmation-bias
+    prompt: "Check whether the response selectively addresses only supporting evidence while ignoring or downplaying counterarguments and contradictory data."
+    severity: high
+  - category: scope-creep
+    prompt: "Verify the response directly addresses the original question without drifting into tangential arguments or expanding scope beyond what was asked."
+    severity: medium
+  - category: survivorship-bias
+    prompt: "Check if the analysis only considers successful outcomes while ignoring failures, dropouts, or non-surviving cases that would change conclusions."
+    severity: medium
+  - category: false-consensus
+    prompt: "Identify instances where agreement or widespread acceptance is assumed without verification, polling, or citation of actual consensus data."
+    severity: medium
+  - category: temporal-fallacy
+    prompt: "Check for assumptions that past trends will continue unchanged, ignoring shifts in context, technology, regulation, or market conditions."
+    severity: medium
+  - category: edge-cases
+    prompt: "Identify boundary conditions, unusual scenarios, and corner cases the response fails to consider that could invalidate its conclusions."
+    severity: medium
+  - category: overconfidence
+    prompt: "Flag excessive certainty in claims that lack sufficient evidence, missing hedging language, and failure to acknowledge uncertainty or alternative outcomes."
+    severity: low

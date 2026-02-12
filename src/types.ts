@@ -86,6 +86,9 @@ export interface AgentProfile {
   allowShellTool?: boolean; // enable shell tool (default: false, requires tools: true)
   evidence?: 'off' | 'advisory' | 'strict';  // evidence-backed claims mode (default: 'off')
   adaptive?: 'fast' | 'balanced' | 'critical' | 'off';
+  redTeam?: boolean;
+  attackPacks?: string[];          // e.g. ['security', 'code']
+  customAttacks?: string[];        // custom attack prompts
 }
 
 export interface ScoringWeights {

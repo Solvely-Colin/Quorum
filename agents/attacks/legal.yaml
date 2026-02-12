@@ -1,0 +1,27 @@
+name: legal
+description: "Legal and compliance attack vectors targeting liability, privacy, regulatory, and contractual risks"
+vectors:
+  - category: liability-exposure
+    prompt: "Check for gaps in terms of service, missing or weak limitation of liability clauses, inadequate indemnification provisions, and unclear warranty disclaimers."
+    severity: critical
+  - category: data-privacy
+    prompt: "Check for GDPR and CCPA compliance gaps, unclear data retention policies, missing right-to-deletion mechanisms, and consent collection that doesn't meet regulatory standards."
+    severity: critical
+  - category: intellectual-property
+    prompt: "Check for open source licensing conflicts (copyleft contamination), missing attribution requirements, patent infringement risks, and inadequate trade secret protections."
+    severity: high
+  - category: regulatory-compliance
+    prompt: "Check for violations of industry-specific regulations (HIPAA, PCI-DSS, SOX), missing compliance certifications, and failure to meet jurisdictional requirements where the service operates."
+    severity: high
+  - category: contract-risks
+    prompt: "Check for unrealistic SLA commitments, one-sided termination clauses, missing force majeure provisions, and auto-renewal terms that may be unenforceable in certain jurisdictions."
+    severity: high
+  - category: employment-law
+    prompt: "Check for contractor-vs-employee misclassification risks, overly broad non-compete clauses, and policies that could create discrimination or hostile environment liability."
+    severity: medium
+  - category: international-law
+    prompt: "Check for cross-border data transfer violations (Schrems II), sanctions compliance gaps, export control restrictions on cryptography or technology, and conflicting jurisdictional requirements."
+    severity: medium
+  - category: insurance-gaps
+    prompt: "Check for insufficient coverage limits relative to risk exposure, common exclusions that leave key scenarios uninsured, and missing breach notification requirements in insurance policies."
+    severity: medium
