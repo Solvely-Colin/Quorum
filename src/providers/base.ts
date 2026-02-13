@@ -255,16 +255,21 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
         });
         const iterate = async () => {
           let lastChunkTime = Date.now();
+          let gotFirstChunk = false;
           const idleCheckInterval = setInterval(() => {
-            if (Date.now() - lastChunkTime > 30000) {
+            const idleMs = Date.now() - lastChunkTime;
+            // 15s for first chunk (connection timeout), 30s after that (idle timeout)
+            const threshold = gotFirstChunk ? 30000 : 15000;
+            if (idleMs > threshold) {
               ac.abort();
             }
-          }, 5000);
+          }, 3000);
           try {
             for await (const event of stream as AsyncIterable<AssistantMessageEvent>) {
               if (ac.signal.aborted) break;
               if (event.type === 'text_delta') {
                 lastChunkTime = Date.now();
+                gotFirstChunk = true;
                 text += event.delta;
                 onDelta(event.delta);
               } else if (event.type === 'error') {
