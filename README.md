@@ -107,33 +107,6 @@ quorum ci --pr 42 --evidence strict --label --format github
 
 Exit codes: `0` = pass, `1` = below confidence threshold, `2` = error
 
-### GitHub Action
-
-```yaml
-# .github/workflows/quorum-review.yml
-on:
-  pull_request:
-    types: [opened, synchronize]
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: quorum-ai/quorum@v1
-        with:
-          providers: claude,kimi
-          confidence-threshold: '0.7'
-          evidence: advisory
-          post-comment: 'true'
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-```
-
-PR comments include: synthesis, risk matrix, dissent summary, evidence report, and patch suggestions — all in collapsible sections.
-
 ## Adaptive Debate
 
 The adaptive controller dynamically adjusts deliberation based on disagreement entropy:
