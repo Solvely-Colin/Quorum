@@ -1,0 +1,22 @@
+name: "default"
+version: 1
+rules:
+  - type: min_providers
+    value: 2
+    action: warn
+    message: "Recommend 2+ providers for balanced deliberation"
+
+  - type: min_consensus
+    value: 0.6
+    action: warn
+    message: "Low consensus — review recommended"
+
+  - type: min_confidence
+    value: 0.5
+    action: log
+    message: "Low confidence score"
+
+  - type: input_match
+    pattern: "password|secret|credential|api.key"
+    action: warn
+    message: "Sensitive content detected in input"

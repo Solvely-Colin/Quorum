@@ -1,0 +1,50 @@
+name: "strict"
+version: 1
+rules:
+  - type: min_providers
+    value: 3
+    action: block
+    message: "Production requires 3+ providers"
+
+  - type: min_consensus
+    value: 0.7
+    action: warn
+    message: "Low consensus — review recommended"
+
+  - type: min_confidence
+    value: 0.6
+    action: warn
+    message: "Confidence below threshold"
+
+  - type: require_evidence
+    when:
+      tags: [security, medical, legal, financial]
+    action: block
+    message: "Evidence mode required for sensitive topics"
+
+  - type: block_providers
+    providers: [ollama]
+    action: block
+    message: "Local models not allowed in production"
+
+  - type: require_red_team
+    when:
+      tags: [security, vulnerability]
+    action: block
+    message: "Red-team analysis required for security topics"
+
+  - type: human_approval
+    when:
+      controversial: true
+    action: pause
+    message: "Controversial result — human approval needed"
+
+  - type: max_duration
+    value: 300
+    action: warn
+    message: "Deliberation exceeded 5 minute limit"
+
+  - type: input_match
+    pattern: "password|secret|credential|api.key"
+    action: warn
+    message: "Sensitive content detected in input"

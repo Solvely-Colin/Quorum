@@ -45,6 +45,7 @@ import { PROVIDER_LIMITS, estimateTokens, availableInput } from './context.js';
 import { getGitDiff, getPrDiff, getGitContext } from './git.js';
 import { formatRedTeamReport, listAttackPacks, loadAttackPack, type RedTeamResult } from './redteam.js';
 import { listTopologies } from './topology.js';
+import { loadPolicies, validatePolicy, formatViolations } from './policy.js';
 
 const program = new Command();
 
@@ -164,6 +165,11 @@ program
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
+  .option('--reputation', 'Enable reputation-weighted voting from arena data')
+  .option('--hitl', 'Enable HITL checkpoints (default: after-vote, on-controversy)')
+  .option('--hitl-checkpoints <list>', 'Comma-separated HITL checkpoint list')
+  .option('--hitl-threshold <n>', 'HITL controversy threshold (default 0.5)')
+  .option('--policy <name>', 'Use only the named policy for guardrail checks')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -426,6 +432,15 @@ program
       weights: profile.weights,
       noHooks: opts.hooks === false,
       noMemory: opts.memory === false,
+      reputation: opts.reputation ?? false,
+      policyName: opts.policy as string || undefined,
+      hitl: opts.hitl ? {
+        enabled: true,
+        checkpoints: opts.hitlCheckpoints
+          ? (opts.hitlCheckpoints as string).split(',').map((s: string) => s.trim()) as any[]
+          : ['after-vote', 'on-controversy'],
+        controversyThreshold: opts.hitlThreshold ? parseFloat(opts.hitlThreshold as string) : 0.5,
+      } : undefined,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
@@ -532,6 +547,15 @@ program
             console.log(chalk.dim(`  🪝 ${d.name}${hookOutput}`));
             break;
           }
+          case 'hitl:pause':
+            // Interactive handler will display the checkpoint
+            break;
+          case 'hitl:resume':
+            console.log(chalk.cyan(`  ▶ HITL resumed (${d.action})`));
+            break;
+          case 'hitl:override':
+            console.log(chalk.yellow(`  🔄 HITL: Winner overridden to ${d.winner}`));
+            break;
           case 'warn':
             if (opts.verbose) {
               console.log(chalk.yellow(`\n  ⚠ ${d.message}`));
@@ -664,6 +688,7 @@ program
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
+  .option('--policy <name>', 'Use only the named policy for guardrail checks')
   .action(async (files: string[], opts) => {
     let content = '';
     let gitContextStr = '';
@@ -799,6 +824,7 @@ program
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
+  .option('--policy <name>', 'Use only the named policy for guardrail checks')
   .action(async (opts) => {
     // --- Resolve diff content ---
     let content = '';
@@ -934,6 +960,7 @@ program
       rapid: opts.rapid ?? false,
       devilsAdvocate: false,
       noMemory: opts.memory === false,
+      policyName: opts.policy as string || undefined,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
       attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
@@ -3531,6 +3558,343 @@ program
     }
     console.log('');
     console.log(chalk.dim('Usage: quorum ask --topology tournament "question"'));
+  });
+
+// --- quorum policy ---
+const policyCmd = program.command('policy').description('Manage policy-as-code guardrails');
+
+policyCmd
+  .command('list')
+  .description('List all loaded policies')
+  .action(async () => {
+    try {
+      const policies = await loadPolicies();
+      if (policies.length === 0) {
+        console.log(chalk.yellow('No policies found.'));
+        console.log(chalk.dim('Place YAML files in ~/.quorum/policies/ or agents/policies/'));
+        return;
+      }
+      for (const p of policies) {
+        console.log(`${chalk.bold(p.name)} ${chalk.dim(`v${p.version}`)} — ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`);
+        for (const r of p.rules) {
+          const actionColor = r.action === 'block' ? chalk.red : r.action === 'warn' ? chalk.yellow : r.action === 'pause' ? chalk.magenta : chalk.dim;
+          console.log(`  ${actionColor(r.action.padEnd(5))} ${r.type}${r.value !== undefined ? ` (${r.value})` : ''}${r.message ? ` — ${r.message}` : ''}`);
+        }
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error loading policies: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+policyCmd
+  .command('check <file>')
+  .description('Validate a policy YAML file')
+  .action(async (file: string) => {
+    try {
+      const { parse: parseYaml } = await import('yaml');
+      const raw = await readFile(file, 'utf-8');
+      const parsed = parseYaml(raw);
+      const errors = validatePolicy(parsed);
+      if (errors.length === 0) {
+        console.log(chalk.green(`✓ ${file} is valid`));
+        console.log(chalk.dim(`  Policy: ${parsed.name} v${parsed.version} — ${parsed.rules?.length ?? 0} rules`));
+      } else {
+        console.log(chalk.red(`✗ ${file} has errors:`));
+        for (const e of errors) console.log(chalk.red(`  - ${e}`));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+// --- quorum ledger ---
+const ledgerCmd = program
+  .command('ledger')
+  .description('Manage the deliberation ledger (hash-chain audit trail)');
+
+ledgerCmd
+  .command('list')
+  .description('List recent ledger entries')
+  .option('--limit <n>', 'Number of entries to show', '20')
+  .action(async (opts) => {
+    const { loadLedger } = await import('./ledger.js');
+    const ledger = await loadLedger();
+    const limit = parseInt(opts.limit as string, 10) || 20;
+    const entries = ledger.entries.slice(-limit);
+    if (entries.length === 0) {
+      console.log(chalk.dim('No ledger entries yet.'));
+      return;
+    }
+    console.log(chalk.bold(`\n📒 Ledger (${entries.length} of ${ledger.entries.length} entries)\n`));
+    for (const e of entries) {
+      const date = new Date(e.timestamp).toLocaleString();
+      const preview = e.input.length > 60 ? e.input.slice(0, 57) + '...' : e.input;
+      console.log(`  ${chalk.dim(date)} ${chalk.bold(e.id.slice(0, 8))} ${preview}`);
+      console.log(`    Winner: ${chalk.green(e.votes.winner)} | Consensus: ${e.synthesis.consensusScore.toFixed(2)} | ${chalk.dim(e.topology)}`);
+    }
+    console.log('');
+  });
+
+ledgerCmd
+  .command('verify')
+  .description('Verify ledger hash-chain integrity')
+  .action(async () => {
+    const { verifyLedgerIntegrity } = await import('./ledger.js');
+    const result = await verifyLedgerIntegrity();
+    if (result.valid) {
+      console.log(chalk.green(`✓ ${result.message}`));
+    } else {
+      console.log(chalk.red(`✗ ${result.message}`));
+      if (result.brokenAt !== undefined) {
+        console.log(chalk.red(`  Broken at entry index: ${result.brokenAt}`));
+      }
+      process.exit(1);
+    }
+  });
+
+ledgerCmd
+  .command('show')
+  .description('Show full details of a ledger entry')
+  .argument('<session-id>', 'Session ID or "last"')
+  .action(async (sessionId: string) => {
+    const { getLedgerEntry } = await import('./ledger.js');
+    const entry = await getLedgerEntry(sessionId);
+    if (!entry) {
+      console.error(chalk.red(`Entry not found: ${sessionId}`));
+      process.exit(1);
+    }
+    console.log(JSON.stringify(entry, null, 2));
+  });
+
+ledgerCmd
+  .command('export')
+  .description('Export a ledger entry')
+  .argument('<session-id>', 'Session ID or "last"')
+  .option('--format <fmt>', 'Export format: adr or json', 'adr')
+  .action(async (sessionId: string, opts) => {
+    const { getLedgerEntry, exportLedgerADR } = await import('./ledger.js');
+    const entry = await getLedgerEntry(sessionId);
+    if (!entry) {
+      console.error(chalk.red(`Entry not found: ${sessionId}`));
+      process.exit(1);
+    }
+    if (opts.format === 'json') {
+      console.log(JSON.stringify(entry, null, 2));
+    } else {
+      console.log(exportLedgerADR(entry));
+    }
+  });
+
+// --- quorum replay (deterministic) ---
+program
+  .command('re-run')
+  .description('Re-run a prior deliberation with original config (deterministic replay)')
+  .argument('<session-id>', 'Session ID or "last"')
+  .option('--dry-run', 'Show what would be replayed without executing')
+  .option('--diff', 'Show diff between original and new synthesis')
+  .option('--providers <list>', 'Override providers (comma-separated)')
+  .action(async (sessionId: string, opts) => {
+    const { getLedgerEntry } = await import('./ledger.js');
+    const entry = await getLedgerEntry(sessionId);
+    if (!entry) {
+      console.error(chalk.red(`Ledger entry not found: ${sessionId}`));
+      process.exit(1);
+    }
+
+    console.log(chalk.bold.cyan('\n🔄 Replay'));
+    console.log(chalk.dim(`Original session: ${entry.id}`));
+    console.log(chalk.dim(`Input: ${entry.input.slice(0, 200)}`));
+    console.log(chalk.dim(`Profile: ${entry.profile}`));
+    console.log(chalk.dim(`Topology: ${entry.topology}`));
+    console.log(chalk.dim(`Providers: ${entry.providers.map(p => `${p.name}(${p.model})`).join(', ')}`));
+    console.log('');
+
+    if (opts.dryRun) {
+      console.log(chalk.yellow('DRY RUN — would replay with the above config. Exiting.'));
+      return;
+    }
+
+    // Load config and profile
+    const config = await loadConfig();
+    const profile = await loadAgentProfile(entry.profile);
+
+    // Determine providers
+    let providerNames: string[] | undefined;
+    if (opts.providers) {
+      providerNames = (opts.providers as string).split(',').map((s: string) => s.trim());
+    }
+
+    const candidateProviders = providerNames
+      ? config.providers.filter(p => providerNames!.includes(p.name))
+      : config.providers.filter(p => entry.providers.some(ep => ep.name === p.name));
+
+    if (candidateProviders.length < 2) {
+      console.error(chalk.red('Need 2+ providers for replay.'));
+      process.exit(1);
+    }
+
+    if (!profile) {
+      console.error(chalk.red(`Profile not found: ${entry.profile}`));
+      process.exit(1);
+    }
+
+    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+
+    const council = new CouncilV2(adapters, candidateProviders, profile, {
+      streaming: true,
+      topology: entry.options.topology as any || undefined,
+      redTeam: entry.options.redTeam || undefined,
+      onEvent(event, data) {
+        const d = data as Record<string, unknown>;
+        if (event === 'phase') process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+        if (event === 'response') process.stdout.write(chalk.green('✓') + chalk.dim(String(d.provider)) + ' ');
+        if (event === 'phase:done') console.log(chalk.dim(`(${((d.duration as number) / 1000).toFixed(1)}s)`));
+        if (event === 'complete') console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+      },
+    });
+
+    const result = await council.deliberate(entry.input);
+
+    console.log(chalk.bold.green('\n═══ SYNTHESIS ═══\n'));
+    console.log(result.synthesis.content);
+    console.log(`\nWinner: ${chalk.bold(result.votes.winner)} | Consensus: ${result.synthesis.consensusScore.toFixed(2)}`);
+
+    if (opts.diff) {
+      console.log(chalk.bold.yellow('\n═══ DIFF ═══\n'));
+      console.log(chalk.red('--- Original'));
+      console.log(chalk.green('+++ Replay'));
+      console.log('');
+      const origLines = entry.synthesis.content.split('\n');
+      const newLines = result.synthesis.content.split('\n');
+      const maxLen = Math.max(origLines.length, newLines.length);
+      for (let i = 0; i < maxLen; i++) {
+        const orig = origLines[i] ?? '';
+        const newL = newLines[i] ?? '';
+        if (orig !== newL) {
+          if (orig) console.log(chalk.red(`- ${orig}`));
+          if (newL) console.log(chalk.green(`+ ${newL}`));
+        } else {
+          console.log(`  ${orig}`);
+        }
+      }
+    }
+  });
+
+// --- quorum arena ---
+const arenaCmd = program.command('arena').description('Eval arena and provider reputation system');
+
+arenaCmd
+  .command('leaderboard')
+  .description('Show provider reputation rankings')
+  .action(async () => {
+    const { getAllReputations, formatLeaderboard } = await import('./arena.js');
+    const reps = await getAllReputations();
+    console.log(formatLeaderboard(reps));
+  });
+
+arenaCmd
+  .command('show <provider>')
+  .description('Show detailed stats for a provider')
+  .action(async (provider: string) => {
+    const { getReputation, formatProviderCard } = await import('./arena.js');
+    const rep = await getReputation(provider);
+    if (!rep) {
+      console.log(chalk.yellow(`No data for provider: ${provider}`));
+      return;
+    }
+    console.log(formatProviderCard(rep));
+  });
+
+arenaCmd
+  .command('run <suite>')
+  .description('Run an eval suite (deliberate each case, record results)')
+  .option('-p, --providers <names>', 'Comma-separated provider names')
+  .option('--profile <name>', 'Agent profile', 'default')
+  .action(async (suiteName: string, opts) => {
+    const { loadEvalSuite, recordResult: arRecord } = await import('./arena.js');
+
+    let suite;
+    try {
+      suite = await loadEvalSuite(suiteName);
+    } catch (err) {
+      console.error(chalk.red(`${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+
+    const config = await loadConfig();
+    let providers = config.providers;
+    if (opts.providers) {
+      const names = (opts.providers as string).split(',').map(s => s.trim());
+      providers = config.providers.filter(p => names.includes(p.name));
+    }
+    if (providers.length < 2) {
+      console.error(chalk.red('Need 2+ providers.'));
+      process.exit(1);
+    }
+
+    const profile = await loadAgentProfile(opts.profile as string);
+    if (!profile) {
+      console.error(chalk.red(`Profile not found: ${opts.profile}`));
+      process.exit(1);
+    }
+
+    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const candidateProviders = providers.filter(
+      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+    );
+
+    console.log(chalk.bold.cyan(`\n🏟️  Arena: Running "${suite.name}" v${suite.version} (${suite.cases.length} cases)\n`));
+
+    for (const evalCase of suite.cases) {
+      console.log(chalk.bold(`  Case ${evalCase.id} [${evalCase.category}/${evalCase.difficulty}]`));
+      console.log(chalk.dim(`    ${evalCase.question.slice(0, 80)}...`));
+
+      try {
+        const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+        const council = new CouncilV2(adapters, candidateProviders, profile, {
+          streaming: false,
+          rapid: true,
+          noHooks: true,
+          noMemory: true,
+          onEvent() {},
+        });
+
+        const result = await council.deliberate(evalCase.question);
+
+        for (const adapter of adapters) {
+          const ranking = result.votes.rankings.find(r => r.provider === adapter.name);
+          await arRecord(
+            adapter.name,
+            evalCase.id,
+            adapter.name === result.votes.winner,
+            ranking?.score ?? 0,
+            result.synthesis.consensusScore,
+            evalCase.category,
+          );
+        }
+
+        console.log(chalk.green(`    Winner: ${result.votes.winner} (${(result.duration / 1000).toFixed(1)}s)`));
+      } catch (err) {
+        console.log(chalk.red(`    Failed: ${err instanceof Error ? err.message : err}`));
+      }
+    }
+
+    const { getAllReputations, formatLeaderboard } = await import('./arena.js');
+    const reps = await getAllReputations();
+    console.log(chalk.bold('\n📊 Updated Leaderboard:'));
+    console.log(formatLeaderboard(reps));
+  });
+
+arenaCmd
+  .command('reset')
+  .description('Clear all arena state')
+  .action(async () => {
+    const { saveArenaState } = await import('./arena.js');
+    await saveArenaState({ version: 1, results: [], reputations: {} });
+    console.log(chalk.green('✅ Arena state cleared.'));
   });
 
 program.parse();

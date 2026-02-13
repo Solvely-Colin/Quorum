@@ -23,7 +23,11 @@ import { generateEvidenceReport, EVIDENCE_INSTRUCTION, formatEvidenceSummary, cr
 import { AdaptiveController, recordOutcome, type AdaptivePreset, type AdaptiveDecision } from './adaptive.js';
 import { loadAttackPack, buildRedTeamPrompt, parseRedTeamResponse, scoreResilience, formatRedTeamReport, type RedTeamResult, type AttackPack } from './redteam.js';
 import { buildTopologyPlan, validateTopologyConfig, type TopologyName, type TopologyConfig, type TopologyPlan, type TopologyPhase, type PhaseContext } from './topology.js';
-import { addMemoryNode, findRelevantMemories, detectContradictions, formatMemoryContext } from './memory-graph.js';
+import { addMemoryNode, findRelevantMemories, detectContradictions, formatMemoryContext, extractTags } from './memory-graph.js';
+import { appendToLedger, type LedgerConfig } from './ledger.js';
+import { shouldPause, createInteractiveHandler, type HITLOptions, type HITLCheckpoint, type HITLResponse } from './hitl.js';
+import { recordResult as arenaRecordResult, getReputationWeights } from './arena.js';
+import { loadPolicies, evaluatePreDeliberation, evaluatePostDeliberation, shouldBlock as policyShouldBlock, shouldPause as policyShouldPause, formatViolations, type QuorumPolicy, type PolicyViolation } from './policy.js';
 
 export interface CouncilV2Options {
   onEvent?: (event: string, data: unknown) => void;
@@ -38,11 +42,14 @@ export interface CouncilV2Options {
   weights?: Record<string, number>;
   noHooks?: boolean;
   noMemory?: boolean;
+  policyName?: string;
+  reputation?: boolean;
   redTeam?: boolean;
   attackPacks?: string[];
   customAttacks?: string[];
   topology?: TopologyName;
   topologyConfig?: TopologyConfig;
+  hitl?: HITLOptions;
 }
 
 export interface V2Result {
@@ -94,6 +101,10 @@ export class CouncilV2 {
   private topologyConfig: TopologyConfig = {};
   private topologyPlan: TopologyPlan | null = null;
   private noMemory: boolean = false;
+  private reputation: boolean = false;
+  private hitl: HITLOptions | undefined;
+  private policyName: string | undefined;
+  private collectedPhases: Array<{ name: string; duration: number; responses: Record<string, string> }> = [];
 
   constructor(
     adapters: ProviderAdapter[],
@@ -117,6 +128,9 @@ export class CouncilV2 {
     this.hooks = profile.hooks ?? {};
     this.noHooks = options?.noHooks ?? false;
     this.noMemory = options?.noMemory ?? false;
+    this.reputation = options?.reputation ?? false;
+    this.hitl = options?.hitl;
+    this.policyName = options?.policyName;
     this.redTeam = options?.redTeam ?? profile.redTeam ?? false;
     this.attackPacks = options?.attackPacks ?? profile.attackPacks ?? [];
     this.customAttacks = options?.customAttacks ?? profile.customAttacks ?? [];
@@ -157,6 +171,37 @@ export class CouncilV2 {
 
     if (this.adapters.length < 2) {
       throw new Error(`Need 2+ providers for deliberation (${this.adapters.length} active after exclusions)`);
+    }
+
+    // Policy: pre-deliberation checks
+    try {
+      let policies = await loadPolicies();
+      if (this.policyName) {
+        policies = policies.filter(p => p.name === this.policyName);
+      }
+      const providerNames = this.adapters.map(a => a.name);
+      const allPreViolations: PolicyViolation[] = [];
+      for (const policy of policies) {
+        const violations = evaluatePreDeliberation(policy, input, providerNames, {
+          evidence: this.profile.evidence,
+        });
+        allPreViolations.push(...violations);
+      }
+      if (allPreViolations.length > 0) {
+        this.emit('policy:pre', { violations: allPreViolations });
+        for (const v of allPreViolations) {
+          this.emit('policy:violation', { ...v });
+        }
+        if (policyShouldPause(allPreViolations)) {
+          this.emit('policy:pause', { violations: allPreViolations.filter(v => v.action === 'pause') });
+        }
+        if (policyShouldBlock(allPreViolations)) {
+          throw new Error(`Policy violation (blocked): ${formatViolations(allPreViolations.filter(v => v.action === 'block'))}`);
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Policy violation')) throw err;
+      // Non-fatal policy loading errors
     }
 
     await this.store.init();
@@ -266,6 +311,15 @@ export class CouncilV2 {
         const { join } = await import('node:path');
         await wf(join(this.store.path, 'evidence-report.json'), JSON.stringify(this.evidenceReports, null, 2), 'utf-8');
       } catch { /* non-fatal */ }
+    }
+
+    // HITL: after-gather checkpoint
+    if (shouldPause('after-gather', this.hitl)) {
+      const hitlResponse = await this.runHITLCheckpoint('after-gather', gather.responses);
+      if (hitlResponse.action === 'abort') throw new Error('Deliberation aborted by human at after-gather checkpoint');
+      if (hitlResponse.action === 'inject' && hitlResponse.input) {
+        this.priorContext = (this.priorContext ?? '') + `\n\nHuman guidance (after gather): ${hitlResponse.input}`;
+      }
     }
 
     // Devil's advocate: assign after gather
@@ -383,6 +437,15 @@ export class CouncilV2 {
         return adapter.generate(prompt, sys);
       });
     });
+
+    // HITL: after-debate checkpoint
+    if (shouldRun('debate') && shouldPause('after-debate', this.hitl)) {
+      const hitlResponse = await this.runHITLCheckpoint('after-debate', debate.responses);
+      if (hitlResponse.action === 'abort') throw new Error('Deliberation aborted by human at after-debate checkpoint');
+      if (hitlResponse.action === 'inject' && hitlResponse.input) {
+        this.priorContext = (this.priorContext ?? '') + `\n\nHuman guidance (after debate): ${hitlResponse.input}`;
+      }
+    }
 
     // Adaptive: evaluate after debate
     if (this.adaptiveController && shouldRun('debate')) {
@@ -683,6 +746,17 @@ export class CouncilV2 {
       });
     });
 
+    // Apply reputation weights if enabled
+    if (this.reputation) {
+      try {
+        const repWeights = await getReputationWeights(this.adapters.map(a => a.name));
+        for (const [provider, w] of Object.entries(repWeights)) {
+          this.weights[provider] = (this.weights[provider] ?? 1) * w;
+        }
+        this.emit('reputation', { weights: repWeights });
+      } catch { /* non-fatal */ }
+    }
+
     // Tally votes (or create synthetic results if vote was skipped)
     const votes = shouldRun('vote')
       ? this.tallyVotes(vote.responses)
@@ -693,6 +767,27 @@ export class CouncilV2 {
           details: Object.fromEntries(this.adapters.map(a => [a.name, { ranks: [], rationale: 'vote phase skipped' }])),
         };
     this.emit('votes', votes);
+
+    // HITL: after-vote and on-controversy checkpoints
+    {
+      const voteConsensus = votes.rankings.length >= 2
+        ? Math.abs(votes.rankings[0].score - votes.rankings[1].score) / (votes.rankings[0].score || 1)
+        : 1;
+      const shouldCheckAfterVote = shouldPause('after-vote', this.hitl);
+      const shouldCheckControversy = shouldPause('on-controversy', this.hitl, voteConsensus);
+      if (shouldCheckAfterVote || shouldCheckControversy) {
+        const phase = shouldCheckControversy ? 'on-controversy' as const : 'after-vote' as const;
+        const hitlResponse = await this.runHITLCheckpoint(phase, adjust.responses, votes, voteConsensus);
+        if (hitlResponse.action === 'abort') throw new Error(`Deliberation aborted by human at ${phase} checkpoint`);
+        if (hitlResponse.overrideWinner) {
+          votes.winner = hitlResponse.overrideWinner;
+          this.emit('hitl:override', { winner: hitlResponse.overrideWinner });
+        }
+        if (hitlResponse.action === 'inject' && hitlResponse.input) {
+          this.priorContext = (this.priorContext ?? '') + `\n\nHuman guidance (${phase}): ${hitlResponse.input}`;
+        }
+      }
+    }
 
     // Generate consensus heatmap if we have enough voters
     if (shouldRun('vote') && this.adapters.length >= 3) {
@@ -887,6 +982,30 @@ export class CouncilV2 {
     }
 
     const duration = Date.now() - this.startedAt;
+
+    // Policy: post-deliberation checks
+    try {
+      let policies = await loadPolicies();
+      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      const postTags = extractTags(synthesis.content);
+      const allPostViolations: PolicyViolation[] = [];
+      for (const policy of policies) {
+        allPostViolations.push(...evaluatePostDeliberation(policy, {
+          consensusScore: synthesis.consensusScore,
+          confidenceScore: synthesis.confidenceScore,
+          controversial: synthesis.controversial,
+          content: synthesis.content,
+        }, postTags, { evidence: this.profile.evidence, redTeam: this.redTeam, duration: duration / 1000 }));
+      }
+      if (allPostViolations.length > 0) {
+        this.emit('policy:post', { violations: allPostViolations });
+        for (const v of allPostViolations) this.emit('policy:violation', { ...v });
+        if (policyShouldPause(allPostViolations)) {
+          this.emit('policy:pause', { violations: allPostViolations.filter(v => v.action === 'pause') });
+        }
+      }
+    } catch { /* non-fatal */ }
+
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthAdapter.name, synthesis });
 
     // Memory graph: store this deliberation
@@ -896,19 +1015,74 @@ export class CouncilV2 {
       } catch { /* non-fatal */ }
     }
 
-    return {
+    const v2Result: V2Result = {
       sessionId: this.store.path.split('/').pop()!,
       sessionPath: this.store.path,
       synthesis,
       votes,
       duration,
     };
+
+    // Arena: record results for reputation tracking
+    try {
+      const tags = extractTags(synthesis.content);
+      const dominantCategory = tags.length > 0 ? tags[0] : undefined;
+      const winnerName = votes.winner;
+      for (const adapter of this.adapters) {
+        await arenaRecordResult(
+          adapter.name,
+          v2Result.sessionId,
+          adapter.name === winnerName,
+          votes.rankings.find(r => r.provider === adapter.name)?.score ?? 0,
+          synthesis.consensusScore,
+          dominantCategory,
+        );
+      }
+    } catch { /* non-fatal */ }
+
+    // Ledger: append entry
+    try {
+      await appendToLedger(v2Result, {
+        input,
+        profile: this.profile,
+        providerConfigs: this.providerConfigs,
+        phases: this.collectedPhases,
+        topology: this.topology,
+        evidence: this.profile.evidence !== 'off' && this.profile.evidence !== undefined,
+        redTeam: this.redTeam,
+        adaptive: this.adaptiveController ? 'enabled' : 'off',
+      });
+    } catch { /* non-fatal */ }
+
+    return v2Result;
   }
 
   // --- Topology Mode ---
 
   private async deliberateTopology(input: string): Promise<V2Result> {
     const names = this.adapters.map(a => a.name);
+
+    // Policy: pre-deliberation checks (topology)
+    try {
+      let policies = await loadPolicies();
+      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      const allPreViolations: PolicyViolation[] = [];
+      for (const policy of policies) {
+        allPreViolations.push(...evaluatePreDeliberation(policy, input, names, { evidence: this.profile.evidence }));
+      }
+      if (allPreViolations.length > 0) {
+        this.emit('policy:pre', { violations: allPreViolations });
+        for (const v of allPreViolations) this.emit('policy:violation', { ...v });
+        if (policyShouldPause(allPreViolations)) {
+          this.emit('policy:pause', { violations: allPreViolations.filter(v => v.action === 'pause') });
+        }
+        if (policyShouldBlock(allPreViolations)) {
+          throw new Error(`Policy violation (blocked): ${formatViolations(allPreViolations.filter(v => v.action === 'block'))}`);
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Policy violation')) throw err;
+    }
 
     // Memory graph: retrieve relevant prior deliberations
     let memoryContext = '';
@@ -1121,6 +1295,30 @@ export class CouncilV2 {
     try { await this.writeSessionIndex(input, votes.winner, Date.now() - this.startedAt); } catch { /* non-fatal */ }
 
     const duration = Date.now() - this.startedAt;
+
+    // Policy: post-deliberation checks (topology)
+    try {
+      let policies = await loadPolicies();
+      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      const postTags = extractTags(synthesis.content);
+      const allPostViolations: PolicyViolation[] = [];
+      for (const policy of policies) {
+        allPostViolations.push(...evaluatePostDeliberation(policy, {
+          consensusScore: synthesis.consensusScore,
+          confidenceScore: synthesis.confidenceScore,
+          controversial: synthesis.controversial,
+          content: synthesis.content,
+        }, postTags, { evidence: this.profile.evidence, redTeam: this.redTeam, duration: duration / 1000 }));
+      }
+      if (allPostViolations.length > 0) {
+        this.emit('policy:post', { violations: allPostViolations });
+        for (const v of allPostViolations) this.emit('policy:violation', { ...v });
+        if (policyShouldPause(allPostViolations)) {
+          this.emit('policy:pause', { violations: allPostViolations.filter(v => v.action === 'pause') });
+        }
+      }
+    } catch { /* non-fatal */ }
+
     this.emit('complete', { duration, winner: votes.winner, synthesizer: synthProvider.name, synthesis });
 
     // Memory graph: store this deliberation
@@ -1130,13 +1328,29 @@ export class CouncilV2 {
       } catch { /* non-fatal */ }
     }
 
-    return {
+    const v2Result: V2Result = {
       sessionId: this.store.path.split('/').pop()!,
       sessionPath: this.store.path,
       synthesis,
       votes,
       duration,
     };
+
+    // Ledger: append entry
+    try {
+      await appendToLedger(v2Result, {
+        input,
+        profile: this.profile,
+        providerConfigs: this.providerConfigs,
+        phases: this.collectedPhases,
+        topology: this.topology,
+        evidence: this.profile.evidence !== 'off' && this.profile.evidence !== undefined,
+        redTeam: this.redTeam,
+        adaptive: this.adaptiveController ? 'enabled' : 'off',
+      });
+    } catch { /* non-fatal */ }
+
+    return v2Result;
   }
 
   // --- Rapid Mode ---
@@ -1303,13 +1517,57 @@ export class CouncilV2 {
       } catch { /* non-fatal */ }
     }
 
-    return {
+    const v2Result: V2Result = {
       sessionId: this.store.path.split('/').pop()!,
       sessionPath: this.store.path,
       synthesis,
       votes,
       duration,
     };
+
+    // Ledger: append entry
+    try {
+      await appendToLedger(v2Result, {
+        input,
+        profile: this.profile,
+        providerConfigs: this.providerConfigs,
+        phases: this.collectedPhases,
+        topology: this.topology,
+        evidence: this.profile.evidence !== 'off' && this.profile.evidence !== undefined,
+        redTeam: this.redTeam,
+        adaptive: this.adaptiveController ? 'enabled' : 'off',
+      });
+    } catch { /* non-fatal */ }
+
+    return v2Result;
+  }
+
+  // --- HITL ---
+
+  private async runHITLCheckpoint(
+    phase: HITLCheckpoint['phase'],
+    responses: Record<string, string>,
+    votes?: { winner: string; rankings: Array<{ provider: string; score: number }> },
+    consensusScore?: number,
+  ): Promise<HITLResponse> {
+    const checkpoint: HITLCheckpoint = {
+      phase,
+      responses,
+      votes,
+      consensusScore,
+      message: phase === 'on-controversy'
+        ? `Low consensus detected (${consensusScore?.toFixed(2)})`
+        : undefined,
+    };
+
+    this.emit('hitl:pause', { phase, checkpoint });
+
+    const handler = this.hitl?.handler ?? createInteractiveHandler();
+    const response = await handler(checkpoint);
+
+    this.emit('hitl:resume', { phase, action: response.action });
+
+    return response;
   }
 
   // --- Helpers ---
@@ -1422,6 +1680,9 @@ export class CouncilV2 {
       this.emit('warn', { message: `Failed to write phase ${phaseName}: ${err instanceof Error ? err.message : err}` });
     }
     this.emit('phase:done', { phase: phaseName, duration: output.duration });
+
+    // Collect phase for ledger
+    this.collectedPhases.push({ name: phaseName, duration: output.duration, responses: output.responses });
 
     // Post-hook — write phase output to temp file for QUORUM_PHASE_OUTPUT
     const { writeFileSync, unlinkSync } = await import('node:fs');
