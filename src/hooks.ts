@@ -18,11 +18,7 @@ const HOOK_TIMEOUT_MS = 30_000;
  * Run a hook command via /bin/sh -c. Returns stdout.
  * If the hook fails or times out, returns empty string (non-fatal).
  */
-export function runHook(
-  hookName: string,
-  command: string,
-  env: HookEnv,
-): Promise<string> {
+export function runHook(hookName: string, command: string, env: HookEnv): Promise<string> {
   return new Promise((resolve) => {
     const child = execFile(
       '/bin/sh',

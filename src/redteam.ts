@@ -90,10 +90,7 @@ export async function listAttackPacks(): Promise<string[]> {
 
 // ── Red Team Prompt Building ───────────────────────────────────────────────
 
-export function buildRedTeamPrompt(
-  packs: AttackPack[],
-  customAttacks?: string[],
-): string {
+export function buildRedTeamPrompt(packs: AttackPack[], customAttacks?: string[]): string {
   const vectorLines: string[] = [];
   for (const pack of packs) {
     vectorLines.push(`\n[${pack.name}] ${pack.description}`);
@@ -128,12 +125,10 @@ Examine ALL positions. Miss nothing.`;
 type Severity = 'low' | 'medium' | 'high' | 'critical';
 
 // Pattern 1: [SEVERITY] Category: Description (original)
-const SEVERITY_PATTERN =
-  /\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?[\s:*]*([^:\n]+?):\s*(.+)/i;
+const SEVERITY_PATTERN = /\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?[\s:*]*([^:\n]+?):\s*(.+)/i;
 
 // Pattern 2: **SEVERITY** Category: Description (bold)
-const BOLD_SEVERITY_PATTERN =
-  /\*\*(CRITICAL|HIGH|MEDIUM|LOW)\*\*[\s:]*([^:\n]+?):\s*(.+)/i;
+const BOLD_SEVERITY_PATTERN = /\*\*(CRITICAL|HIGH|MEDIUM|LOW)\*\*[\s:]*([^:\n]+?):\s*(.+)/i;
 
 // Pattern 3: ### SEVERITY: Category — Description (markdown header)
 const HEADER_SEVERITY_PATTERN =
@@ -152,8 +147,7 @@ const EMOJI_SEVERITY_PATTERN =
   /(?:🔴|🟠|🟡|🟢|⚠️|❗|‼️)?\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*[|—\-–:]\s*([^:\n]+?):\s*(.+)/i;
 
 // Pattern 7: Category (SEVERITY): Description (severity in parentheses)
-const PAREN_SEVERITY_PATTERN =
-  /([^:\n]+?)\s*\(?\*?\*?(CRITICAL|HIGH|MEDIUM|LOW)\*?\*?\)?:\s*(.+)/i;
+const PAREN_SEVERITY_PATTERN = /([^:\n]+?)\s*\(?\*?\*?(CRITICAL|HIGH|MEDIUM|LOW)\*?\*?\)?:\s*(.+)/i;
 
 function parseSeverity(raw: string): Severity {
   switch (raw.toUpperCase()) {
@@ -168,17 +162,12 @@ function parseSeverity(raw: string): Severity {
   }
 }
 
-function detectProvider(
-  text: string,
-  providers: string[],
-): string | undefined {
+function detectProvider(text: string, providers: string[]): string | undefined {
   const lower = text.toLowerCase();
   // Check for explicit "(targeting: provider)" pattern first
   const targetMatch = lower.match(/\(targeting:\s*(\w+)\)/);
   if (targetMatch) {
-    const matched = providers.find(
-      (p) => p.toLowerCase() === targetMatch[1].toLowerCase(),
-    );
+    const matched = providers.find((p) => p.toLowerCase() === targetMatch[1].toLowerCase());
     if (matched) return matched;
   }
   // Fall back to mention detection
@@ -190,11 +179,7 @@ function detectProvider(
 
 function stripMarkdown(line: string): string {
   // Remove bold/italic markdown
-  return line
-    .replace(/\*\*+/g, '')
-    .replace(/__+/g, '')
-    .replace(/##+/g, '')
-    .trim();
+  return line.replace(/\*\*+/g, '').replace(/__+/g, '').replace(/##+/g, '').trim();
 }
 
 export function parseRedTeamResponse(
@@ -214,9 +199,7 @@ export function parseRedTeamResponse(
     // Strip markdown for cleaner matching
     const cleanLine = stripMarkdown(trimmed);
 
-    let match:
-      | RegExpExecArray
-      | null = null;
+    let match: RegExpExecArray | null = null;
     let severityRaw: string | undefined;
     let category: string | undefined;
     let description: string | undefined;
@@ -290,10 +273,7 @@ function extractKeywords(text: string): string[] {
     .filter((w) => w.length > 3);
 }
 
-function mentionsSubstantively(
-  position: string,
-  attack: RedTeamAttack,
-): boolean {
+function mentionsSubstantively(position: string, attack: RedTeamAttack): boolean {
   const posLower = position.toLowerCase();
   const keywords = extractKeywords(`${attack.category} ${attack.description}`);
   // Require at least 2 keyword matches or 40% of keywords for substantive mention
@@ -384,9 +364,7 @@ export function formatRedTeamReport(result: RedTeamResult): string {
       const by = a.addressedBy?.length
         ? ` — partially addressed by ${a.addressedBy.join(', ')}`
         : ' — nobody addressed';
-      lines.push(
-        `  ${emoji} [${a.severity.toUpperCase()}] ${a.category}: ${a.description}${by}`,
-      );
+      lines.push(`  ${emoji} [${a.severity.toUpperCase()}] ${a.category}: ${a.description}${by}`);
     }
     lines.push('');
   }

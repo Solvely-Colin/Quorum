@@ -30,40 +30,81 @@ interface RiskCategory {
 }
 
 const RISK_CATEGORIES: RiskCategory[] = [
-  { area: 'Security', keywords: [/\bsecurit/i, /\bvulnerabilit/i, /\binjection/i, /\bxss\b/i, /\bcsrf\b/i, /\bauth/i] },
-  { area: 'Performance', keywords: [/\bperformance/i, /\bslow/i, /\bmemory leak/i, /\boptimiz/i, /\bhot[- ]?path/i] },
-  { area: 'Breaking Changes', keywords: [/\bbreaking/i, /\bbackwards?\s*incompatible/i, /\bpublic api/i, /\bdeprecate/i] },
-  { area: 'Correctness', keywords: [/\bbug/i, /\bcorrectness/i, /\bcrash/i, /\bdata loss/i, /\brace condition/i, /\bedge case/i, /\bcould fail/i] },
-  { area: 'Style', keywords: [/\bstyle/i, /\bnaming/i, /\bformatting/i, /\bconvention/i, /\blint/i] },
-  { area: 'Testing', keywords: [/\btesting/i, /\bcoverage/i, /\bmissing test/i, /\btest\b/i, /\buntested/i] },
+  {
+    area: 'Security',
+    keywords: [/\bsecurit/i, /\bvulnerabilit/i, /\binjection/i, /\bxss\b/i, /\bcsrf\b/i, /\bauth/i],
+  },
+  {
+    area: 'Performance',
+    keywords: [/\bperformance/i, /\bslow/i, /\bmemory leak/i, /\boptimiz/i, /\bhot[- ]?path/i],
+  },
+  {
+    area: 'Breaking Changes',
+    keywords: [/\bbreaking/i, /\bbackwards?\s*incompatible/i, /\bpublic api/i, /\bdeprecate/i],
+  },
+  {
+    area: 'Correctness',
+    keywords: [
+      /\bbug/i,
+      /\bcorrectness/i,
+      /\bcrash/i,
+      /\bdata loss/i,
+      /\brace condition/i,
+      /\bedge case/i,
+      /\bcould fail/i,
+    ],
+  },
+  {
+    area: 'Style',
+    keywords: [/\bstyle/i, /\bnaming/i, /\bformatting/i, /\bconvention/i, /\blint/i],
+  },
+  {
+    area: 'Testing',
+    keywords: [/\btesting/i, /\bcoverage/i, /\bmissing test/i, /\btest\b/i, /\buntested/i],
+  },
 ];
 
-const CRITICAL_PATTERNS = [/\bvulnerabilit/i, /\binjection/i, /\bcrash/i, /\bdata loss/i, /\bbreaking change to public api/i];
-const HIGH_PATTERNS = [/\bsecurit/i, /\brace condition/i, /\bmemory leak/i, /\bbackwards?\s*incompatible/i];
+const CRITICAL_PATTERNS = [
+  /\bvulnerabilit/i,
+  /\binjection/i,
+  /\bcrash/i,
+  /\bdata loss/i,
+  /\bbreaking change to public api/i,
+];
+const HIGH_PATTERNS = [
+  /\bsecurit/i,
+  /\brace condition/i,
+  /\bmemory leak/i,
+  /\bbackwards?\s*incompatible/i,
+];
 const MEDIUM_PATTERNS = [/\bperformance/i, /\bcould fail/i, /\bedge case/i, /\bmissing test/i];
-const LOW_PATTERNS = [/\bstyle/i, /\bnaming/i, /\bformatting/i, /\bminor/i];
+const _LOW_PATTERNS = [/\bstyle/i, /\bnaming/i, /\bformatting/i, /\bminor/i];
 
 function determineRiskLevel(text: string): RiskLevel {
   const lower = text.toLowerCase();
-  if (CRITICAL_PATTERNS.some(p => p.test(lower))) return 'critical';
-  if (HIGH_PATTERNS.some(p => p.test(lower))) return 'high';
-  if (MEDIUM_PATTERNS.some(p => p.test(lower))) return 'medium';
+  if (CRITICAL_PATTERNS.some((p) => p.test(lower))) return 'critical';
+  if (HIGH_PATTERNS.some((p) => p.test(lower))) return 'high';
+  if (MEDIUM_PATTERNS.some((p) => p.test(lower))) return 'medium';
   return 'low';
 }
 
 function escalateRisk(level: RiskLevel): RiskLevel {
   switch (level) {
-    case 'low': return 'medium';
-    case 'medium': return 'high';
-    case 'high': return 'critical';
-    case 'critical': return 'critical';
+    case 'low':
+      return 'medium';
+    case 'medium':
+      return 'high';
+    case 'high':
+      return 'critical';
+    case 'critical':
+      return 'critical';
   }
 }
 
 function extractRelevantSentence(text: string, keywords: RegExp[]): string {
   const sentences = text.split(/(?<=[.!?])\s+/);
   for (const sentence of sentences) {
-    if (keywords.some(k => k.test(sentence))) {
+    if (keywords.some((k) => k.test(sentence))) {
       const trimmed = sentence.trim();
       return trimmed.length > 200 ? trimmed.slice(0, 197) + '...' : trimmed;
     }
@@ -103,7 +144,7 @@ export function extractRiskMatrix(
   for (const [provider, texts] of responses) {
     const combinedText = texts.join('\n');
     for (const category of RISK_CATEGORIES) {
-      if (category.keywords.some(k => k.test(combinedText))) {
+      if (category.keywords.some((k) => k.test(combinedText))) {
         const providerName = provider === '_synthesis' ? undefined : provider;
         const existing = areaMap.get(category.area);
         const riskLevel = determineRiskLevel(combinedText);
@@ -158,10 +199,13 @@ export function extractRiskMatrix(
 
 // --- Patch Suggestion Extraction ---
 
-const FILE_PATH_RE = /(?:(?:file:\s*|in\s+)`?)([a-zA-Z0-9_\-./]+\.(?:ts|js|tsx|jsx|py|go|rs|java|rb|css|scss|html|vue|svelte))\b`?/gi;
+const _FILE_PATH_RE =
+  /(?:(?:file:\s*|in\s+)`?)([a-zA-Z0-9_\-./]+\.(?:ts|js|tsx|jsx|py|go|rs|java|rb|css|scss|html|vue|svelte))\b`?/gi;
 const LINE_NUMBER_RE = /(?:line\s+|L|:)(\d+)/i;
-const CHANGE_PATTERN_RE = /(?:change|replace|rename)\s+["`']?(.+?)["`']?\s+(?:to|with)\s+["`']?(.+?)["`']?\s*[.;,]?$/gim;
-const SHOULD_BE_RE = /["`']?(.+?)["`']?\s+should\s+be\s+["`']?(.+?)["`']?\s+instead\s+of\s+["`']?(.+?)["`']?/gim;
+const CHANGE_PATTERN_RE =
+  /(?:change|replace|rename)\s+["`']?(.+?)["`']?\s+(?:to|with)\s+["`']?(.+?)["`']?\s*[.;,]?$/gim;
+const _SHOULD_BE_RE =
+  /["`']?(.+?)["`']?\s+should\s+be\s+["`']?(.+?)["`']?\s+instead\s+of\s+["`']?(.+?)["`']?/gim;
 
 interface CodeBlock {
   lang: string;
@@ -193,7 +237,8 @@ function findNearbyFilePath(text: string, position: number): string | undefined 
   const windowEnd = Math.min(text.length, position + 50);
   const window = text.slice(windowStart, windowEnd);
 
-  const fileRe = /(?:(?:file:\s*|in\s+)`?)([a-zA-Z0-9_\-./]+\.(?:ts|js|tsx|jsx|py|go|rs|java|rb|css|scss|html|vue|svelte))\b`?/gi;
+  const fileRe =
+    /(?:(?:file:\s*|in\s+)`?)([a-zA-Z0-9_\-./]+\.(?:ts|js|tsx|jsx|py|go|rs|java|rb|css|scss|html|vue|svelte))\b`?/gi;
   let match: RegExpExecArray | null;
   let lastMatch: string | undefined;
   while ((match = fileRe.exec(window)) !== null) {
@@ -216,14 +261,14 @@ function findRationale(text: string, blockStart: number, blockEnd: number): stri
   const after = text.slice(blockEnd, Math.min(text.length, blockEnd + 300)).trim();
 
   // Prefer the sentence right before
-  const beforeSentences = before.split(/(?<=[.!?:—])\s+/).filter(s => s.length > 10);
+  const beforeSentences = before.split(/(?<=[.!?:—])\s+/).filter((s) => s.length > 10);
   if (beforeSentences.length > 0) {
     const last = beforeSentences[beforeSentences.length - 1]!.trim();
     if (last.length > 10 && last.length < 300) return last;
   }
 
   // Fall back to sentence after
-  const afterSentences = after.split(/(?<=[.!?])\s+/).filter(s => s.length > 10);
+  const afterSentences = after.split(/(?<=[.!?])\s+/).filter((s) => s.length > 10);
   if (afterSentences.length > 0) {
     const first = afterSentences[0]!.trim();
     if (first.length > 10 && first.length < 300) return first;
@@ -232,18 +277,24 @@ function findRationale(text: string, blockStart: number, blockEnd: number): stri
   return 'Suggested code change';
 }
 
-function extractDiffSuggestions(text: string, provider: string): PatchSuggestion[] {
+function _extractDiffSuggestions(text: string, provider: string): PatchSuggestion[] {
   const suggestions: PatchSuggestion[] = [];
   const blocks = extractCodeBlocks(text);
 
   for (const block of blocks) {
     const lines = block.code.split('\n');
-    const hasPlus = lines.some(l => l.startsWith('+'));
-    const hasMinus = lines.some(l => l.startsWith('-'));
+    const hasPlus = lines.some((l) => l.startsWith('+'));
+    const hasMinus = lines.some((l) => l.startsWith('-'));
 
     if (hasPlus && hasMinus) {
-      const beforeLines = lines.filter(l => l.startsWith('-')).map(l => l.slice(1)).join('\n');
-      const afterLines = lines.filter(l => l.startsWith('+')).map(l => l.slice(1)).join('\n');
+      const beforeLines = lines
+        .filter((l) => l.startsWith('-'))
+        .map((l) => l.slice(1))
+        .join('\n');
+      const afterLines = lines
+        .filter((l) => l.startsWith('+'))
+        .map((l) => l.slice(1))
+        .join('\n');
       const file = findNearbyFilePath(text, block.startIdx);
       if (file) {
         suggestions.push({
@@ -290,13 +341,19 @@ export function extractPatchSuggestions(
 
         // Check for diff-style blocks
         const lines = block.code.split('\n');
-        const hasPlus = lines.some(l => l.startsWith('+'));
-        const hasMinus = lines.some(l => l.startsWith('-'));
+        const hasPlus = lines.some((l) => l.startsWith('+'));
+        const hasMinus = lines.some((l) => l.startsWith('-'));
         if (hasPlus && hasMinus) {
           const file = findNearbyFilePath(text, block.startIdx);
           if (file) {
-            const beforeLines = lines.filter(l => l.startsWith('-')).map(l => l.slice(1)).join('\n');
-            const afterLines = lines.filter(l => l.startsWith('+')).map(l => l.slice(1)).join('\n');
+            const beforeLines = lines
+              .filter((l) => l.startsWith('-'))
+              .map((l) => l.slice(1))
+              .join('\n');
+            const afterLines = lines
+              .filter((l) => l.startsWith('+'))
+              .map((l) => l.slice(1))
+              .join('\n');
             allSuggestions.push({
               file,
               line: findNearbyLineNumber(text, block.startIdx),
@@ -382,10 +439,14 @@ interface FormatOptions {
 
 function riskEmoji(risk: RiskLevel): string {
   switch (risk) {
-    case 'low': return '🟢';
-    case 'medium': return '🟡';
-    case 'high': return '🔴';
-    case 'critical': return '🔴';
+    case 'low':
+      return '🟢';
+    case 'medium':
+      return '🟡';
+    case 'high':
+      return '🔴';
+    case 'critical':
+      return '🔴';
   }
 }
 
@@ -399,7 +460,10 @@ function cleanSynthesisForSummary(synthesis: string): string {
   // Strip Scores and Minority Report sections, take first 2000 chars
   let cleaned = synthesis;
   // Remove common sections
-  cleaned = cleaned.replace(/#{1,3}\s*(?:Scores?|Minority Report|Risk Matrix|Patch Suggestions?)[\s\S]*?(?=#{1,3}\s|\n$|$)/gi, '');
+  cleaned = cleaned.replace(
+    /#{1,3}\s*(?:Scores?|Minority Report|Risk Matrix|Patch Suggestions?)[\s\S]*?(?=#{1,3}\s|\n$|$)/gi,
+    '',
+  );
   cleaned = cleaned.trim();
   if (cleaned.length > 2000) {
     cleaned = cleaned.slice(0, 2000) + '...';
@@ -427,9 +491,16 @@ function formatSuggestionBlock(suggestion: PatchSuggestion): string {
 
 export function formatGitHubComment(options: FormatOptions): string {
   const {
-    synthesis, consensus, confidence, evidenceGrade,
-    riskMatrix, suggestions, dissent, evidenceSummary,
-    providers, duration,
+    synthesis,
+    consensus,
+    confidence,
+    evidenceGrade,
+    riskMatrix,
+    suggestions,
+    dissent,
+    evidenceSummary,
+    providers,
+    duration,
   } = options;
 
   const lines: string[] = [];
@@ -438,18 +509,24 @@ export function formatGitHubComment(options: FormatOptions): string {
   let statsLine = `**Consensus:** ${consensus.toFixed(2)} | **Confidence:** ${confidence.toFixed(2)}`;
   if (evidenceGrade) statsLine += ` | **Evidence:** ${evidenceGrade}`;
   lines.push(statsLine);
-  lines.push(`**Providers:** ${providers.join(', ')} | **Duration:** ${formatDuration(duration)}\n`);
+  lines.push(
+    `**Providers:** ${providers.join(', ')} | **Duration:** ${formatDuration(duration)}\n`,
+  );
 
   lines.push('### Summary\n');
   lines.push(cleanSynthesisForSummary(synthesis) + '\n');
 
   // Risk Matrix
   if (riskMatrix.length > 0) {
-    lines.push(`<details><summary>🔍 Risk Matrix (${riskMatrix.length} item${riskMatrix.length === 1 ? '' : 's'})</summary>\n`);
+    lines.push(
+      `<details><summary>🔍 Risk Matrix (${riskMatrix.length} item${riskMatrix.length === 1 ? '' : 's'})</summary>\n`,
+    );
     lines.push('| Area | Risk | Details | Flagged By |');
     lines.push('|------|------|---------|------------|');
     for (const item of riskMatrix) {
-      lines.push(`| ${item.area} | ${riskLabel(item.risk)} | ${item.details} | ${item.providers.join(', ')} |`);
+      lines.push(
+        `| ${item.area} | ${riskLabel(item.risk)} | ${item.details} | ${item.providers.join(', ')} |`,
+      );
     }
     lines.push('\n</details>\n');
   }
@@ -479,16 +556,25 @@ export function formatGitHubComment(options: FormatOptions): string {
   }
 
   lines.push('---');
-  lines.push(`*Review by [Quorum](https://github.com/quorum-ai/quorum) · ${providers.join(', ')} · ${formatDuration(duration)}*`);
+  lines.push(
+    `*Review by [Quorum](https://github.com/quorum-ai/quorum) · ${providers.join(', ')} · ${formatDuration(duration)}*`,
+  );
 
   return lines.join('\n');
 }
 
 export function formatMarkdownReport(options: FormatOptions): string {
   const {
-    synthesis, consensus, confidence, evidenceGrade,
-    riskMatrix, suggestions, dissent, evidenceSummary,
-    providers, duration,
+    synthesis,
+    consensus,
+    confidence,
+    evidenceGrade,
+    riskMatrix,
+    suggestions,
+    dissent,
+    evidenceSummary,
+    providers,
+    duration,
   } = options;
 
   const lines: string[] = [];
@@ -497,18 +583,24 @@ export function formatMarkdownReport(options: FormatOptions): string {
   let statsLine = `**Consensus:** ${consensus.toFixed(2)} | **Confidence:** ${confidence.toFixed(2)}`;
   if (evidenceGrade) statsLine += ` | **Evidence:** ${evidenceGrade}`;
   lines.push(statsLine);
-  lines.push(`**Providers:** ${providers.join(', ')} | **Duration:** ${formatDuration(duration)}\n`);
+  lines.push(
+    `**Providers:** ${providers.join(', ')} | **Duration:** ${formatDuration(duration)}\n`,
+  );
 
   lines.push('## Summary\n');
   lines.push(cleanSynthesisForSummary(synthesis) + '\n');
 
   // Risk Matrix
   if (riskMatrix.length > 0) {
-    lines.push(`## 🔍 Risk Matrix (${riskMatrix.length} item${riskMatrix.length === 1 ? '' : 's'})\n`);
+    lines.push(
+      `## 🔍 Risk Matrix (${riskMatrix.length} item${riskMatrix.length === 1 ? '' : 's'})\n`,
+    );
     lines.push('| Area | Risk | Details | Flagged By |');
     lines.push('|------|------|---------|------------|');
     for (const item of riskMatrix) {
-      lines.push(`| ${item.area} | ${riskLabel(item.risk)} | ${item.details} | ${item.providers.join(', ')} |`);
+      lines.push(
+        `| ${item.area} | ${riskLabel(item.risk)} | ${item.details} | ${item.providers.join(', ')} |`,
+      );
     }
     lines.push('');
   }
@@ -536,7 +628,9 @@ export function formatMarkdownReport(options: FormatOptions): string {
   }
 
   lines.push('---');
-  lines.push(`*Review by [Quorum](https://github.com/quorum-ai/quorum) · ${providers.join(', ')} · ${formatDuration(duration)}*`);
+  lines.push(
+    `*Review by [Quorum](https://github.com/quorum-ai/quorum) · ${providers.join(', ')} · ${formatDuration(duration)}*`,
+  );
 
   return lines.join('\n');
 }

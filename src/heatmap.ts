@@ -30,17 +30,14 @@ function spearmanCorrelation(a: number[], b: number[]): number {
  * Generate an ASCII consensus heatmap from ballots.
  * Each ballot represents one voter's ranking of all candidates.
  */
-export function generateHeatmap(
-  ballots: Ballot[],
-  candidateNames: string[],
-): string {
+export function generateHeatmap(ballots: Ballot[], candidateNames: string[]): string {
   if (ballots.length < 2) return '';
 
   // Build per-voter rank vectors aligned to candidateNames order
   const voterVectors: Record<string, number[]> = {};
   for (const ballot of ballots) {
-    const rankMap = new Map(ballot.rankings.map(r => [r.provider, r.rank]));
-    const vector: number[] = candidateNames.map(c => rankMap.get(c) ?? candidateNames.length);
+    const rankMap = new Map(ballot.rankings.map((r) => [r.provider, r.rank]));
+    const vector: number[] = candidateNames.map((c) => rankMap.get(c) ?? candidateNames.length);
     voterVectors[ballot.voter] = vector;
   }
 
@@ -54,7 +51,10 @@ export function generateHeatmap(
   for (const a of voters) {
     matrix[a] = {};
     for (const b of voters) {
-      if (a === b) { matrix[a][b] = 1; continue; }
+      if (a === b) {
+        matrix[a][b] = 1;
+        continue;
+      }
       const score = spearmanCorrelation(voterVectors[a], voterVectors[b]);
       matrix[a][b] = score;
 
@@ -73,7 +73,7 @@ export function generateHeatmap(
     return '   ';
   };
 
-  const maxNameLen = Math.max(...voters.map(v => v.length), 6);
+  const maxNameLen = Math.max(...voters.map((v) => v.length), 6);
   const pad = (s: string, n: number) => s.padEnd(n);
   const lines: string[] = [];
 
@@ -84,7 +84,7 @@ export function generateHeatmap(
   lines.push('');
 
   // Header
-  const header = pad('', maxNameLen + 2) + voters.map(v => pad(v.slice(0, 5), 5)).join(' ');
+  const header = pad('', maxNameLen + 2) + voters.map((v) => pad(v.slice(0, 5), 5)).join(' ');
   lines.push(header);
   lines.push(pad('', maxNameLen + 2) + voters.map(() => '─────').join(' '));
 
@@ -98,17 +98,20 @@ export function generateHeatmap(
         line += ` ${indicator(matrix[row][col])} `;
       }
     }
-    const peerScores = voters.filter(v => v !== row).map(v => matrix[row][v]);
-    const avg = peerScores.length > 0
-      ? (peerScores.reduce((a, b) => a + b, 0) / peerScores.length).toFixed(2)
-      : '—';
+    const peerScores = voters.filter((v) => v !== row).map((v) => matrix[row][v]);
+    const avg =
+      peerScores.length > 0
+        ? (peerScores.reduce((a, b) => a + b, 0) / peerScores.length).toFixed(2)
+        : '—';
     line += `  avg: ${avg}`;
     lines.push(line);
   }
 
   // Legend
   lines.push('');
-  lines.push('Legend:  ███ high (>0.8)  ▓▓▓ moderate (0.5-0.8)  ░░░ low (0.2-0.5)  [   ] disagreement (<0.2)');
+  lines.push(
+    'Legend:  ███ high (>0.8)  ▓▓▓ moderate (0.5-0.8)  ░░░ low (0.2-0.5)  [   ] disagreement (<0.2)',
+  );
 
   // Summary
   if (bestPair.a) {
@@ -129,8 +132,8 @@ export function generateHeatmap(
  * This is a simpler fallback using the details field from VoteResult.
  */
 export function generateHeatmapFromDetails(
-  details: Record<string, { ranks: number[]; rationale: string }>,
-  providerNames: string[],
+  _details: Record<string, { ranks: number[]; rationale: string }>,
+  _providerNames: string[],
 ): string {
   // details[provider].ranks = ranks received by that provider from various voters
   // This is candidate-centric, not voter-centric, so we can't directly build voter vectors.

@@ -4,19 +4,19 @@
 
 export interface ProviderLimits {
   contextLength: number;
-  outputReserve: number;    // tokens reserved for output + reasoning
+  outputReserve: number; // tokens reserved for output + reasoning
 }
 
 /** Known provider context limits */
 export const PROVIDER_LIMITS: Record<string, ProviderLimits> = {
-  'claude-cli':  { contextLength: 200_000, outputReserve: 4_096 },
-  'anthropic':   { contextLength: 200_000, outputReserve: 4_096 },
-  'kimi':        { contextLength: 262_144, outputReserve: 8_192 },  // reasoning eats tokens
-  'ollama':      { contextLength: 8_192,   outputReserve: 2_048 },  // default num_ctx
-  'openai':      { contextLength: 128_000, outputReserve: 4_096 },
-  'google':      { contextLength: 1_000_000, outputReserve: 8_192 },
-  'deepseek':    { contextLength: 128_000, outputReserve: 8_192 },
-  'mistral':     { contextLength: 128_000, outputReserve: 4_096 },
+  'claude-cli': { contextLength: 200_000, outputReserve: 4_096 },
+  anthropic: { contextLength: 200_000, outputReserve: 4_096 },
+  kimi: { contextLength: 262_144, outputReserve: 8_192 }, // reasoning eats tokens
+  ollama: { contextLength: 8_192, outputReserve: 2_048 }, // default num_ctx
+  openai: { contextLength: 128_000, outputReserve: 4_096 },
+  google: { contextLength: 1_000_000, outputReserve: 8_192 },
+  deepseek: { contextLength: 128_000, outputReserve: 8_192 },
+  mistral: { contextLength: 128_000, outputReserve: 4_096 },
 };
 
 /** Rough token estimate (~3.5 chars per token for English) */

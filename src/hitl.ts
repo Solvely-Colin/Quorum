@@ -9,7 +9,12 @@ import { createInterface } from 'node:readline/promises';
 
 // --- Types ---
 
-export type HITLPhase = 'after-gather' | 'after-debate' | 'after-vote' | 'on-controversy' | 'on-policy';
+export type HITLPhase =
+  | 'after-gather'
+  | 'after-debate'
+  | 'after-vote'
+  | 'on-controversy'
+  | 'on-policy';
 
 export interface HITLCheckpoint {
   phase: HITLPhase;
@@ -104,9 +109,10 @@ export function createInteractiveHandler(): HITLHandler {
 
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     try {
-      const promptSuffix = checkpoint.phase === 'after-vote'
-        ? '[c]ontinue | [i]nject guidance | [o]verride winner | [a]bort > '
-        : '[c]ontinue | [i]nject guidance | [a]bort > ';
+      const promptSuffix =
+        checkpoint.phase === 'after-vote'
+          ? '[c]ontinue | [i]nject guidance | [o]verride winner | [a]bort > '
+          : '[c]ontinue | [i]nject guidance | [a]bort > ';
 
       const choice = await rl.question(`   ${promptSuffix}`);
       const c = choice.trim().toLowerCase();

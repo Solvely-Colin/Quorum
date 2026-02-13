@@ -23,18 +23,16 @@ export class SessionStore {
     this.dir = join(base, sessionId);
   }
 
-  get path(): string { return this.dir; }
+  get path(): string {
+    return this.dir;
+  }
 
   async init(): Promise<void> {
     await mkdir(this.dir, { recursive: true });
   }
 
   async writePhase(phase: string, data: PhaseOutput): Promise<void> {
-    await writeFile(
-      join(this.dir, `${phase}.json`),
-      JSON.stringify(data, null, 2),
-      'utf-8',
-    );
+    await writeFile(join(this.dir, `${phase}.json`), JSON.stringify(data, null, 2), 'utf-8');
   }
 
   async readPhase(phase: string): Promise<PhaseOutput | null> {
@@ -44,18 +42,10 @@ export class SessionStore {
   }
 
   async writeMeta(meta: Record<string, unknown>): Promise<void> {
-    await writeFile(
-      join(this.dir, 'meta.json'),
-      JSON.stringify(meta, null, 2),
-      'utf-8',
-    );
+    await writeFile(join(this.dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf-8');
   }
 
   async writeSynthesis(synthesis: Record<string, unknown>): Promise<void> {
-    await writeFile(
-      join(this.dir, 'synthesis.json'),
-      JSON.stringify(synthesis, null, 2),
-      'utf-8',
-    );
+    await writeFile(join(this.dir, 'synthesis.json'), JSON.stringify(synthesis, null, 2), 'utf-8');
   }
 }
