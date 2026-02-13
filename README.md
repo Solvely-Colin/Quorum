@@ -181,9 +181,9 @@ Every deliberation is recorded in a SHA-256 hash-chained ledger for auditability
 
 ```bash
 # Re-run a previous deliberation
-quorum re-run last
-quorum re-run <session-id> --diff      # show differences vs original
-quorum re-run <session-id> --dry-run   # preview without API calls
+quorum rerun last
+quorum rerun <session-id> --diff      # show differences vs original
+quorum rerun <session-id> --dry-run   # preview without API calls
 
 # Ledger management
 quorum ledger list                      # show all entries
@@ -237,6 +237,10 @@ Reputation data stored in `~/.quorum/arena.json`.
 ## Session Tools
 
 ```bash
+# Session management
+quorum session list                     # list all sessions
+quorum session show <id>                # show session details
+
 # History
 quorum history
 
@@ -263,11 +267,20 @@ quorum stats
 
 # Consensus heatmap
 quorum heatmap last
+
+# Red team attack analysis
+quorum attacks
+
+# List available debate topologies
+quorum topologies                       # or: quorum topo
+
+# OAuth and credential management
+quorum auth
 ```
 
 ## Profiles
 
-Built-in: `default`, `brainstorm`, `code-review`, `research`, `decision`, `panel`, `quick`, `thorough`
+Built-in: `default`, `brainstorm`, `code-review`, `research`, `decision`, `panel`, `quick`, `thorough`, `evidence`, `research-tools`
 
 ```yaml
 # ~/.quorum/agents/my-profile.yaml
