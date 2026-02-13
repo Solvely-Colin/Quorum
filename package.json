@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.52.9",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
     "inquirer": "^12.4.0",

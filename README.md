@@ -366,6 +366,43 @@ src/
 
 All providers route through [`@mariozechner/pi-ai`](https://github.com/nichochar/pi-ai) for unified API access.
 
+## MCP Server (Model Context Protocol)
+
+Quorum can run as an MCP server, exposing its deliberation capabilities as tools for any MCP-compatible client (Claude Desktop, Cursor, OpenClaw, etc.).
+
+### Start the MCP server
+
+```bash
+quorum mcp
+```
+
+This starts a stdio-based MCP server that exposes the following tools:
+
+| Tool | Description |
+|------|-------------|
+| `quorum_ask` | Run a full multi-AI deliberation on any question |
+| `quorum_review` | Code review via multi-AI deliberation (files, staged, diff, PR) |
+| `quorum_versus` | Head-to-head comparison between two providers |
+| `quorum_providers` | List configured providers with status |
+| `quorum_history` | List recent deliberation sessions |
+
+### Claude Desktop Configuration
+
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "quorum": {
+      "command": "quorum",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+If `quorum` isn't on your PATH, use the full path (e.g. from `which quorum` or `npx quorum`).
+
 ## License
 
 MIT
