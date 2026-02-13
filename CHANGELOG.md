@@ -4,9 +4,44 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
-## [0.5.0] — 2026-02-12
+## [0.4.0] — 2026-02-12
 
-### 🔷 The "Topology" Release
+### 🏗️ The "Complete V2" Release
+
+All ten V2 features are now shipped. This release adds the final six: deterministic replay, policy guardrails, deliberation memory, topology DSL, human-in-the-loop checkpoints, and the eval arena.
+
+#### #29 Deterministic Replay + Signed Ledger
+- **SHA-256 hash-chained ledger** — every deliberation recorded in `~/.quorum/ledger.json` with tamper-evident hash chain
+- **ADR export** — export any deliberation as an Architecture Decision Record
+- **`quorum re-run <id|last>`** — near-reproducible replay of previous deliberations
+  - `--diff` — show differences between original and replay
+  - `--dry-run` — preview what would be re-run without calling APIs
+- **`quorum ledger`** subcommands:
+  - `list` — show all ledger entries
+  - `verify` — validate hash chain integrity
+  - `show <id>` — inspect a specific entry
+  - `export <id>` — export as ADR markdown
+
+#### #30 Policy-as-Code Guardrails
+- **YAML policy engine** — define rules that govern deliberation behavior
+- **Pre/post deliberation evaluation** — policies checked before and after each run
+- **4 action types:** `block` (halt), `warn` (continue with warning), `log` (silent record), `pause` (require confirmation)
+- **`--policy <name>`** flag on `ask`, `review`, `ci`
+- **`quorum policy`** subcommands:
+  - `list` — show available policies
+  - `check` — evaluate a policy against current config
+- **Built-in policies:** `default` (permissive baseline) and `strict` (production-hardened)
+- Policy files: `~/.quorum/policies/*.yaml` or project-local `.quorum/policies/`
+
+#### #33 Deliberation Memory Graph
+- **Cross-run keyword-based memory retrieval** — previous deliberation outcomes surfaced at run start when relevant
+- **Contradiction detection** — flags when new conclusions conflict with prior decisions
+- **Auto-save** — deliberation outcomes automatically stored after each run
+- **`quorum memory`** subcommands:
+  - `list` — show stored memories
+  - `search <query>` — keyword search across memory graph
+  - `clear` — reset memory store
+  - `stats` — memory usage and graph statistics
 
 #### #35 Cognitive Topology DSL
 - **7 debate topologies** — each structures deliberation differently:
@@ -23,34 +58,37 @@ All notable changes to Quorum will be documented in this file.
 - **`quorum topologies`** (alias `topo`) — list all topologies with descriptions
 - **5 bundled topology templates:** `quick-poll`, `deep-review`, `bracket-challenge`, `research-split`, `stress-test`
 - **Visibility control** — each topology controls which providers see which responses per phase
-- **Topology plan saved** to session as `topology-plan.json`
+
+#### #36 Human-in-the-Loop Checkpoints
+- **Configurable pause points** — halt deliberation at any phase for human review
+- **`--hitl`** flag on `ask`, `review`, `ci` — enables interactive checkpoints
+- **Inject guidance** — add context or steer the deliberation mid-run
+- **Override winners** — manually override vote results before synthesis
+- **On-controversy auto-pause** — automatically pauses when entropy exceeds threshold (high disagreement)
+- **Resume workflow** — continue deliberation after review with optional modifications
+- Profile YAML: `hitl: true`, `hitlPhases: [debate, vote]`
+
+#### #37 Eval Arena + Reputation System
+- **Provider performance tracking** — records win rates, evidence quality, and outcome metrics per provider per domain
+- **Reputation-weighted voting** — providers with stronger track records get proportionally more vote influence
+- **Eval suites** — run standardized benchmarks against provider roster
+- **`quorum arena`** subcommands:
+  - `leaderboard` — overall provider rankings with reputation scores
+  - `show <provider>` — detailed performance breakdown
+  - `run [suite]` — execute an eval suite
+  - `reset` — clear arena data
+- **`--reputation`** flag — enable reputation-weighted voting for a deliberation
+- Reputation data stored in `~/.quorum/arena.json`
 
 #### New Files
+- `src/ledger.ts` — hash-chained ledger, verification, ADR export
+- `src/policy.ts` — YAML policy engine, evaluation, built-in policies
+- `src/memory.ts` — deliberation memory graph, keyword retrieval, contradiction detection
 - `src/topology.ts` — topology engine, plan builder, 7 topology implementations
-- `agents/topologies/{quick-poll,deep-review,bracket-challenge,research-split,stress-test}.yaml`
-
----
-
-## [0.4.0] — 2026-02-12
-
-### 🔴 The "Red Team" Release
-
-#### #34 Adversarial Red-Team Mode
-- **Non-voting attacker agents** that stress-test the council's conclusions after debate
-- **5 bundled attack packs** (52 vectors): `general`, `code`, `security`, `legal`, `medical`
-- **Resilience scoring** — measures how well positions survive adversarial analysis (0–100%)
-- **Structured output:** unresolved risks, mitigated risks, blind spots
-- **Synthesis integration:** unresolved risks and blind spots injected into synthesis prompt — synthesizer must address them
-- **`--red-team`** flag on `ask`, `review`, `ci`
-- **`--attack-pack <packs>`** — comma-separated pack selection (default: `general`)
-- **`--custom-attacks <attacks>`** — ad-hoc attack prompts
-- **`quorum attacks`** — list available attack packs with vector counts
-- **Profile YAML:** `redTeam: true`, `attackPacks: [security, code]`, `customAttacks: [...]`
-- Attack packs searched in: project local → user global → bundled
-
-#### New Files
-- `src/redteam.ts` — attack engine, resilience scoring, report formatting
-- `agents/attacks/{general,code,security,legal,medical}.yaml` — attack pack definitions
+- `src/hitl.ts` — human-in-the-loop checkpoints, pause/resume, guidance injection
+- `src/arena.ts` — eval arena, reputation tracking, weighted voting integration
+- `agents/topologies/*.yaml` — 5 bundled topology templates
+- `agents/policies/{default,strict}.yaml` — built-in policy definitions
 
 ---
 
@@ -58,7 +96,7 @@ All notable changes to Quorum will be documented in this file.
 
 ### 🧠 The "Trust + Intelligence" Release
 
-Three V2 features that make Quorum fundamentally smarter.
+Four V2 features that make Quorum fundamentally smarter.
 
 #### #28 Evidence-Backed Claims Protocol (Deep)
 - **Sentence-level claim extraction** — every substantive assertion identified, not just tagged ones
@@ -99,9 +137,23 @@ Three V2 features that make Quorum fundamentally smarter.
 - **Profile YAML support:** `adaptive: balanced`
 - Adaptive decisions saved to session as `adaptive-decisions.json`
 
+#### #34 Adversarial Red-Team Mode
+- **Non-voting attacker agents** that stress-test the council's conclusions after debate
+- **5 bundled attack packs** (52 vectors): `general`, `code`, `security`, `legal`, `medical`
+- **Resilience scoring** — measures how well positions survive adversarial analysis (0–100%)
+- **Structured output:** unresolved risks, mitigated risks, blind spots
+- **Synthesis integration:** unresolved risks and blind spots injected into synthesis prompt
+- **`--red-team`** flag on `ask`, `review`, `ci`
+- **`--attack-pack <packs>`** — comma-separated pack selection (default: `general`)
+- **`--custom-attacks <attacks>`** — ad-hoc attack prompts
+- **`quorum attacks`** — list available attack packs with vector counts
+- **Profile YAML:** `redTeam: true`, `attackPacks: [security, code]`, `customAttacks: [...]`
+
 #### New Files
 - `src/adaptive.ts` — entropy calculation, adaptive controller, bandit learning
 - `src/ci.ts` — risk matrix, patch suggestions, PR comment/markdown formatting
+- `src/redteam.ts` — attack engine, resilience scoring, report formatting
+- `agents/attacks/{general,code,security,legal,medical}.yaml` — attack pack definitions
 - `action.yml` + `action/entrypoint.sh` + `action/README.md` — GitHub Action
 
 ---

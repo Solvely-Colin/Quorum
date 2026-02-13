@@ -160,6 +160,99 @@ Source quality tiers: **A** (URL) → **B** (file path) → **C** (data/stats) �
 
 Cross-provider validation detects corroborated and contradicted claims across providers.
 
+## Policy Guardrails
+
+Define rules that govern deliberation behavior using YAML policies:
+
+```bash
+# Use a built-in policy
+quorum ask --policy strict "Should we deploy on Friday?"
+
+# List available policies
+quorum policy list
+
+# Check a policy against current config
+quorum policy check strict
+```
+
+Policies evaluate pre- and post-deliberation with four action types: `block`, `warn`, `log`, `pause`.
+
+```yaml
+# ~/.quorum/policies/my-policy.yaml
+name: production
+rules:
+  - condition: confidence < 0.7
+    action: block
+    message: "Confidence too low for production decisions"
+  - condition: evidence_grade < C
+    action: warn
+    message: "Evidence quality below threshold"
+  - condition: providers_count < 3
+    action: pause
+    message: "Consider adding more providers"
+```
+
+Built-in policies: `default` (permissive baseline) and `strict` (production-hardened). Policy files are loaded from `~/.quorum/policies/` or project-local `.quorum/policies/`.
+
+## Deterministic Replay + Ledger
+
+Every deliberation is recorded in a SHA-256 hash-chained ledger for auditability and reproducibility:
+
+```bash
+# Re-run a previous deliberation
+quorum re-run last
+quorum re-run <session-id> --diff      # show differences vs original
+quorum re-run <session-id> --dry-run   # preview without API calls
+
+# Ledger management
+quorum ledger list                      # show all entries
+quorum ledger verify                    # validate hash chain integrity
+quorum ledger show <id>                 # inspect a specific entry
+quorum ledger export <id>              # export as ADR markdown
+```
+
+The ledger (`~/.quorum/ledger.json`) stores prompts, model versions, votes, and outcomes with tamper-evident hash chaining.
+
+## Human-in-the-Loop Checkpoints
+
+Pause deliberation at configurable phases for human review, guidance injection, or vote overrides:
+
+```bash
+# Enable HITL checkpoints
+quorum ask --hitl "Critical architecture decision"
+
+# Combines with other flags
+quorum ask --hitl --evidence strict --adaptive critical "question"
+```
+
+When paused, you can:
+- **Inject guidance** — add context or steer the deliberation
+- **Override winners** — manually set vote results before synthesis
+- **Resume** — continue with optional modifications
+
+Auto-pause triggers when disagreement entropy exceeds threshold (high controversy).
+
+Profile YAML: `hitl: true`, `hitlPhases: [debate, vote]`
+
+## Eval Arena + Reputation
+
+Track provider performance and use reputation-weighted voting:
+
+```bash
+# Arena commands
+quorum arena leaderboard               # overall provider rankings
+quorum arena show claude               # detailed breakdown for a provider
+quorum arena run                       # run eval suite
+quorum arena reset                     # clear arena data
+
+# Enable reputation-weighted voting
+quorum ask --reputation "question"
+```
+
+Providers build reputation scores based on win rates, evidence quality, and outcome metrics across domains. With `--reputation`, stronger-performing providers get proportionally more vote influence.
+
+Reputation data stored in `~/.quorum/arena.json`.
+
 ## Session Tools
 
 ```bash
@@ -228,6 +321,12 @@ Project-local config via `.quorumrc` (walks cwd → homedir).
 | Plugin hooks | `hooks:` in profile | Pre/post scripts per phase |
 | Dry run | `--dry-run` | Preview prompts without API calls |
 | Inline overrides | `--focus`, `--rounds`, etc. | Override profile fields from CLI |
+| Policy guardrails | `--policy strict` | YAML policy engine with block/warn/log/pause |
+| Ledger + replay | `quorum ledger verify` | SHA-256 hash-chained audit trail |
+| HITL checkpoints | `--hitl` | Pause/resume with human guidance |
+| Reputation voting | `--reputation` | Performance-weighted provider influence |
+| Topology DSL | `--topology tournament` | 7 debate structures (mesh, star, etc.) |
+| Memory graph | `quorum memory search` | Cross-run retrieval + contradiction detection |
 
 ## Provider Setup
 
@@ -249,7 +348,13 @@ src/
 ├── cli.ts            # CLI (commander.js)
 ├── council-v2.ts     # 7-phase deliberation engine
 ├── adaptive.ts       # Adaptive debate controller + bandit learning
+├── arena.ts          # Eval arena, reputation tracking, weighted voting
 ├── evidence.ts       # Evidence-backed claims protocol
+├── hitl.ts           # Human-in-the-loop checkpoints, pause/resume
+├── ledger.ts         # Hash-chained ledger, verification, ADR export
+├── memory.ts         # Deliberation memory graph, keyword retrieval
+├── policy.ts         # YAML policy engine, evaluation, built-in policies
+├── topology.ts       # Topology engine, 7 debate topologies
 ├── ci.ts             # CI output formatting, risk matrix, patch suggestions
 ├── git.ts            # Git/GitHub integration (PR, comments, labels)
 ├── voting.ts         # Pluggable voting algorithms

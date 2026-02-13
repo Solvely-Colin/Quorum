@@ -738,3 +738,22 @@ YAML files in `agents/topologies/` for common use cases:
 
 | 36 | Human-in-the-Loop Checkpoints | Mid-run decision gates. Live debugger showing argument graph, vote shifts, "why agent B changed mind." |
 | 37 | Eval Arena + Reputation Specialists | Continuous benchmark suite. Track role/agent performance by domain. Reputation-weighted influence. Judge models as meta-evaluators. |
+
+---
+
+### ✅ V2 Complete (10/10)
+
+All V2 features shipped as of v0.4.0.
+
+| # | Feature | Version | Notes |
+|---|---------|---------|-------|
+| 28 | Evidence-Backed Claims Protocol | v0.3.0 | Sentence-level extraction, source tiers, cross-validation |
+| 29 | Deterministic Replay + Signed Ledger | v0.4.0 | SHA-256 hash-chained ledger, ADR export, `quorum re-run`, `quorum ledger` |
+| 30 | Policy-as-Code Guardrails | v0.4.0 | YAML policy engine, block/warn/log/pause, `--policy`, `quorum policy` |
+| 31 | Native PR/CI Integration | v0.3.0 | `quorum ci`, GitHub Action, risk matrix, patch suggestions |
+| 32 | Adaptive Debate Controller | v0.3.0 | Entropy-based phase control, 4 presets, bandit learning |
+| 33 | Deliberation Memory Graph | v0.4.0 | Cross-run retrieval, contradiction detection, `quorum memory` |
+| 34 | Adversarial Red-Team Mode | v0.3.0 | Non-voting attackers, 5 attack packs, resilience scoring |
+| 35 | Cognitive Topology DSL | v0.4.0 | 7 topologies, visibility control, `--topology`, template YAMLs |
+| 36 | Human-in-the-Loop Checkpoints | v0.4.0 | Pause/resume, inject guidance, override winners, `--hitl` |
+| 37 | Eval Arena + Reputation | v0.4.0 | Performance tracking, reputation-weighted voting, `quorum arena` |
