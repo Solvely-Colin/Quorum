@@ -178,6 +178,9 @@ export class CouncilV2 {
       let policies = await loadPolicies();
       if (this.policyName) {
         policies = policies.filter(p => p.name === this.policyName);
+      } else {
+        // Only apply 'default' policy unless explicitly specified
+        policies = policies.filter(p => p.name === 'default');
       }
       const providerNames = this.adapters.map(a => a.name);
       const allPreViolations: PolicyViolation[] = [];
@@ -913,7 +916,9 @@ export class CouncilV2 {
       } catch { /* non-fatal */ }
     }
 
-    // "What Would Change My Mind" — one additional call
+    // "What Would Change My Mind" — one additional call (skip in rapid mode)
+    let whatWouldChange: string | undefined;
+    if (!this.rapid) {
     this.emit('phase', { phase: 'WHAT_WOULD_CHANGE' });
     const wwcmStart = Date.now();
     const wwcmPrompt = [
@@ -921,7 +926,6 @@ export class CouncilV2 {
       `\nGiven the council's conclusion above, what specific evidence, arguments, or scenarios would cause you to overturn or significantly revise this conclusion? Be concrete and specific.`,
     ].join('\n');
     const wwcmSys = `You are a critical thinker examining a council's conclusion for potential weaknesses and conditions under which it should be revised.`;
-    let whatWouldChange: string | undefined;
     try {
       whatWouldChange = await this.generateWithRetry(synthAdapter, wwcmPrompt, wwcmSys);
       this.emit('response', { provider: synthAdapter.name, phase: 'what_would_change' });
@@ -929,6 +933,7 @@ export class CouncilV2 {
       this.emit('warn', { message: `What-would-change failed: ${err instanceof Error ? err.message : String(err)}` });
     }
     this.emit('phase:done', { phase: 'WHAT_WOULD_CHANGE', duration: Date.now() - wwcmStart });
+    } // end !this.rapid
 
     const synthesis: Synthesis = {
       content: synthContent,
@@ -986,7 +991,7 @@ export class CouncilV2 {
     // Policy: post-deliberation checks
     try {
       let policies = await loadPolicies();
-      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      if (this.policyName) { policies = policies.filter(p => p.name === this.policyName); } else { policies = policies.filter(p => p.name === "default"); }
       const postTags = extractTags(synthesis.content);
       const allPostViolations: PolicyViolation[] = [];
       for (const policy of policies) {
@@ -1065,7 +1070,7 @@ export class CouncilV2 {
     // Policy: pre-deliberation checks (topology)
     try {
       let policies = await loadPolicies();
-      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      if (this.policyName) { policies = policies.filter(p => p.name === this.policyName); } else { policies = policies.filter(p => p.name === "default"); }
       const allPreViolations: PolicyViolation[] = [];
       for (const policy of policies) {
         allPreViolations.push(...evaluatePreDeliberation(policy, input, names, { evidence: this.profile.evidence }));
@@ -1299,7 +1304,7 @@ export class CouncilV2 {
     // Policy: post-deliberation checks (topology)
     try {
       let policies = await loadPolicies();
-      if (this.policyName) policies = policies.filter(p => p.name === this.policyName);
+      if (this.policyName) { policies = policies.filter(p => p.name === this.policyName); } else { policies = policies.filter(p => p.name === "default"); }
       const postTags = extractTags(synthesis.content);
       const allPostViolations: PolicyViolation[] = [];
       for (const policy of policies) {

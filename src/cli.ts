@@ -52,7 +52,7 @@ const program = new Command();
 program
   .name('quorum')
   .description('Multi-AI deliberation framework')
-  .version('0.4.0');
+  .version('0.4.1');
 
 // --- quorum init ---
 program
@@ -389,9 +389,13 @@ program
 
     // ── Filter excluded providers and create adapters once ──
     const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
-    const candidateProviders = providers.filter(
+    let candidateProviders = providers.filter(
       p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
+    // If exclusion leaves fewer than 2 providers, fall back to all providers
+    if (candidateProviders.length < 2 && providers.length >= 2) {
+      candidateProviders = providers;
+    }
 
     // Dry run mode — show preview and exit
     if (opts.dryRun) {
@@ -409,8 +413,22 @@ program
     }
 
     if (candidateProviders.length < 2) {
-      console.error(chalk.red(`\nNeed 2+ providers for deliberation (${candidateProviders.length} configured). Run: quorum providers test`));
-      process.exit(1);
+      if (candidateProviders.length === 1) {
+        // Auto-enable single provider mode instead of blocking
+        if (!isJSON) {
+          console.log(chalk.yellow(`\n⚡ Single provider detected — running in direct mode.\n`));
+        }
+        opts.single = candidateProviders[0].name;
+      } else {
+        const excludedNames = providers.filter(p => excluded.has(p.name.toLowerCase()) || excluded.has(p.provider.toLowerCase())).map(p => p.name);
+        if (excludedNames.length > 0) {
+          console.error(chalk.red(`\nNeed at least 1 provider (${excludedNames.join(', ')} excluded by profile).`));
+          console.error(chalk.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`));
+        } else {
+          console.error(chalk.red(`\nNo providers configured. Run: quorum providers add`));
+        }
+        process.exit(1);
+      }
     }
 
     // Create adapters once — pass into CouncilV2
@@ -657,6 +675,7 @@ program
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
       process.exit(1);
     }
+    process.exit(0);
   });
 
 // --- quorum review ---
@@ -797,6 +816,7 @@ program
     if (opts.memory === false) { askArgs.push('--no-memory'); }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
+    process.exit(0);
   });
 
 // --- quorum ci ---
@@ -1095,6 +1115,7 @@ program
     if (!approved) {
       process.exit(1);
     }
+    process.exit(0);
   });
 
 // --- quorum providers ---
@@ -1642,6 +1663,7 @@ program
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
       process.exit(1);
     }
+    process.exit(0);
   });
 
 // --- quorum versus ---
@@ -1751,6 +1773,7 @@ program
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
       process.exit(1);
     }
+    process.exit(0);
   });
 
 // --- quorum export ---
@@ -2086,12 +2109,17 @@ memoryCmd
 
 // --- Helpers ---
 
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks).toString('utf-8');
+async function readStdin(timeoutMs = 5000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const timer = setTimeout(() => {
+      process.stdin.destroy();
+      resolve(Buffer.concat(chunks).toString('utf-8'));
+    }, timeoutMs);
+    process.stdin.on('data', (chunk: Buffer) => { chunks.push(chunk); });
+    process.stdin.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks).toString('utf-8')); });
+    process.stdin.on('error', () => { clearTimeout(timer); resolve(''); });
+  });
 }
 
 async function resolveLastSession(sessionsDir: string): Promise<string> {
@@ -2364,6 +2392,7 @@ program
     }
 
     console.log('');
+    process.exit(0);
   });
 
 // --- quorum diff ---
@@ -3152,6 +3181,7 @@ program
       console.error(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
       process.exit(1);
     }
+    process.exit(0);
   });
 
 // --- quorum watch ---
@@ -3896,5 +3926,8 @@ arenaCmd
     await saveArenaState({ version: 1, results: [], reputations: {} });
     console.log(chalk.green('✅ Arena state cleared.'));
   });
+
+// Ensure clean exit after any command (prevents event-loop hangs from dangling handles)
+program.hook('postAction', () => { process.exit(0); });
 
 program.parse();

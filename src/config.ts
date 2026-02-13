@@ -134,12 +134,19 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
     const resp = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) });
     if (resp.ok) {
       const data = await resp.json() as { models?: Array<{ name: string }> };
-      const models = data.models ?? [];
+      const allModels = data.models ?? [];
+      // Filter out embedding models (not usable for chat/deliberation)
+      const embedPatterns = /embed|nomic|bge|e5-|gte-|snowflake|all-minilm/i;
+      const chatModels = allModels.filter(m => !embedPatterns.test(m.name));
+      // Prefer well-known chat models
+      const preferredOllama = ['qwen2.5:32b', 'qwen2.5:14b', 'qwen2.5:7b', 'llama3', 'mistral', 'codellama', 'deepseek-coder'];
+      const models = chatModels.length > 0 ? chatModels : allModels;
       if (models.length > 0) {
+        const preferred = preferredOllama.find(pref => models.some(m => m.name.startsWith(pref)));
         found.push({
           name: 'ollama',
           provider: 'ollama',
-          model: models[0].name,
+          model: preferred || models[0].name,
         });
       }
     }
