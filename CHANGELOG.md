@@ -4,6 +4,37 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.6.0] — 2026-02-13
+
+### 🔌 The "MCP Server" Release
+
+Quorum is now an MCP tool — any MCP-compatible client can invoke deliberations programmatically.
+
+#### MCP Server (#12)
+- **`quorum mcp`** — starts an MCP server over stdio
+- **5 tools exposed:**
+  - `quorum_ask` — full multi-AI deliberation with all config options (rapid, evidence, adaptive, devil's advocate, profiles, provider filtering)
+  - `quorum_review` — code review via deliberation (files, staged changes, diffs, PRs)
+  - `quorum_versus` — head-to-head provider comparison with optional judge
+  - `quorum_providers` — list configured providers with status
+  - `quorum_history` — browse recent deliberation sessions
+- **Works with:** Claude Desktop, Cursor, OpenClaw, and any MCP-compatible client
+- **Zero config:** just add to your MCP client config and go
+
+#### Claude Desktop Config
+```json
+{
+  "mcpServers": {
+    "quorum": {
+      "command": "quorum",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+---
+
 ## [0.5.0] — 2026-02-13
 
 ### 🧹 The "Clean House" Release
