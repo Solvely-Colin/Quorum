@@ -1,0 +1,8 @@
+src/
+tsconfig.json
+.git/
+.github/
+memory/
+ROADMAP.md
+CHANGELOG.md
+DELIBERATION-V2.md

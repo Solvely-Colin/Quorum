@@ -32,7 +32,15 @@ A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) me
 ## Quick Start
 
 ```bash
+# From npm
 npm install -g quorum-ai
+
+# From source
+git clone https://github.com/Solvely-Colin/Quorum.git
+cd Quorum && npm install && npm run build && npm link
+```
+
+```bash
 quorum init                    # auto-detect providers
 quorum ask "Your question"     # full deliberation
 ```

@@ -52,7 +52,7 @@ const program = new Command();
 program
   .name('quorum')
   .description('Multi-AI deliberation framework')
-  .version('0.1.0');
+  .version('0.4.0');
 
 // --- quorum init ---
 program
@@ -3688,9 +3688,9 @@ ledgerCmd
     }
   });
 
-// --- quorum replay (deterministic) ---
-program
-  .command('re-run')
+// --- quorum ledger replay (deterministic) ---
+ledgerCmd
+  .command('replay')
   .description('Re-run a prior deliberation with original config (deterministic replay)')
   .argument('<session-id>', 'Session ID or "last"')
   .option('--dry-run', 'Show what would be replayed without executing')

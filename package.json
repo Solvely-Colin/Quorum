@@ -19,8 +19,25 @@
     "council"
   ],
   "license": "MIT",
+  "author": "Colin Johnson",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Solvely-Colin/Quorum.git"
+  },
+  "homepage": "https://github.com/Solvely-Colin/Quorum#readme",
+  "bugs": {
+    "url": "https://github.com/Solvely-Colin/Quorum/issues"
+  },
+  "files": [
+    "dist/",
+    "agents/",
+    "action/",
+    "action.yml",
+    "LICENSE",
+    "README.md"
+  ],
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.52.9",
