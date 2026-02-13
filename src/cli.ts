@@ -4504,8 +4504,19 @@ arenaCmd
     console.log(chalk.green('✅ Arena state cleared.'));
   });
 
+// --- quorum mcp ---
+program
+  .command('mcp')
+  .description('Start MCP (Model Context Protocol) server for AI agent integration')
+  .action(async () => {
+    const { startMcpServer } = await import('./mcp.js');
+    await startMcpServer();
+  });
+
 // Ensure clean exit after any command (prevents event-loop hangs from dangling handles)
-program.hook('postAction', () => {
+program.hook('postAction', (_thisCommand, actionCommand) => {
+  // Don't force-exit for MCP server — it needs to stay running
+  if (actionCommand.name() === 'mcp') return;
   process.exit(0);
 });
 
