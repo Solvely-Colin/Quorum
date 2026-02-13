@@ -4,6 +4,31 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.5.0] — 2026-02-13
+
+### 🧹 The "Clean House" Release
+
+Developer experience overhaul — CI, linting, docs, and project infrastructure.
+
+#### CI & Automation
+- **GitHub Actions CI** — builds on Node 18, 20, 22 on every push/PR to main
+- **Automated npm releases** — publish to npm on GitHub Release via release workflow
+- **Lint & format checks** in CI pipeline
+
+#### Developer Experience
+- **ESLint + Prettier** — full linting and formatting tooling (#5)
+- **Codebase cleanup** — fixed all lint errors and formatting across 25 files (zero errors/warnings)
+- **CONTRIBUTING.md** — development setup, PR guidelines, code style (#10)
+- **Issue templates** — bug report, feature request, and config
+- **PR template** — description, related issues, checklist
+
+#### Documentation
+- **README audit** — removed aspirational features, fixed command inconsistencies (`re-run` → `rerun`), added undocumented commands and profiles
+- **ROADMAP.md** — v1.0 roadmap with 15 tracked issues across 4 milestones
+- **v1.0 roadmap issues** — #4–#18 covering DX, distribution, ecosystem, and stable release
+
+---
+
 ## [0.4.0] — 2026-02-12
 
 ### 🏗️ The "Complete V2" Release
