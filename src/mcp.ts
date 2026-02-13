@@ -63,10 +63,7 @@ export async function startMcpServer(): Promise<void> {
         .array(z.string())
         .optional()
         .describe('Specific provider names to use (defaults to all configured)'),
-      devilsAdvocate: z
-        .boolean()
-        .optional()
-        .describe("Assign one provider as devil's advocate"),
+      devilsAdvocate: z.boolean().optional().describe("Assign one provider as devil's advocate"),
     },
     async ({ question, rapid, evidence, adaptive, profile, providers, devilsAdvocate }) => {
       try {
@@ -259,7 +256,10 @@ export async function startMcpServer(): Promise<void> {
       provider1: z.string().describe('First provider name'),
       provider2: z.string().describe('Second provider name'),
       question: z.string().describe('The question to compare answers on'),
-      judge: z.string().optional().describe('Provider name to act as judge (defaults to a third provider or provider1)'),
+      judge: z
+        .string()
+        .optional()
+        .describe('Provider name to act as judge (defaults to a third provider or provider1)'),
     },
     async ({ provider1, provider2, question, judge }) => {
       try {
@@ -421,14 +421,10 @@ export async function startMcpServer(): Promise<void> {
           }
         }
 
-        sessions.sort(
-          (a, b) => ((b.startedAt as number) ?? 0) - ((a.startedAt as number) ?? 0),
-        );
+        sessions.sort((a, b) => ((b.startedAt as number) ?? 0) - ((a.startedAt as number) ?? 0));
 
         return {
-          content: [
-            { type: 'text', text: JSON.stringify(sessions.slice(0, maxResults), null, 2) },
-          ],
+          content: [{ type: 'text', text: JSON.stringify(sessions.slice(0, maxResults), null, 2) }],
         };
       } catch (err) {
         return {
