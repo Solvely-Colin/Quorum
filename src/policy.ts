@@ -91,13 +91,10 @@ async function loadYamlDir(dir: string): Promise<QuorumPolicy[]> {
 }
 
 export async function loadPolicies(): Promise<QuorumPolicy[]> {
-  const dirs = [
-    join(homedir(), '.quorum', 'policies'),
-    join(process.cwd(), 'agents', 'policies'),
-  ];
+  const dirs = [join(homedir(), '.quorum', 'policies'), join(process.cwd(), 'agents', 'policies')];
   const all: QuorumPolicy[] = [];
   for (const dir of dirs) {
-    all.push(...await loadYamlDir(dir));
+    all.push(...(await loadYamlDir(dir)));
   }
   // Deduplicate by name (last wins)
   const map = new Map<string, QuorumPolicy>();
@@ -123,14 +120,15 @@ export function evaluatePreDeliberation(
           violations.push({
             rule: rule.type,
             action: rule.action,
-            message: rule.message ?? `Minimum ${rule.value} providers required, got ${providers.length}`,
+            message:
+              rule.message ?? `Minimum ${rule.value} providers required, got ${providers.length}`,
           });
         }
         break;
       }
       case 'block_providers': {
         if (rule.providers) {
-          const blocked = providers.filter(p => rule.providers!.includes(p));
+          const blocked = providers.filter((p) => rule.providers!.includes(p));
           if (blocked.length > 0) {
             violations.push({
               rule: rule.type,
@@ -143,7 +141,7 @@ export function evaluatePreDeliberation(
       }
       case 'require_evidence': {
         const whenTags = rule.when?.tags ?? [];
-        const matches = whenTags.length === 0 || whenTags.some(t => tags.includes(t));
+        const matches = whenTags.length === 0 || whenTags.some((t) => tags.includes(t));
         if (matches && (!options.evidence || options.evidence === 'off')) {
           violations.push({
             rule: rule.type,
@@ -190,7 +188,8 @@ export function evaluatePostDeliberation(
           violations.push({
             rule: rule.type,
             action: rule.action,
-            message: rule.message ?? `Consensus ${result.consensusScore} below minimum ${rule.value}`,
+            message:
+              rule.message ?? `Consensus ${result.consensusScore} below minimum ${rule.value}`,
           });
         }
         break;
@@ -200,15 +199,14 @@ export function evaluatePostDeliberation(
           violations.push({
             rule: rule.type,
             action: rule.action,
-            message: rule.message ?? `Confidence ${result.confidenceScore} below minimum ${rule.value}`,
+            message:
+              rule.message ?? `Confidence ${result.confidenceScore} below minimum ${rule.value}`,
           });
         }
         break;
       }
       case 'human_approval': {
-        const needsApproval =
-          (rule.when?.controversial && result.controversial) ||
-          (!rule.when); // no condition = always
+        const needsApproval = (rule.when?.controversial && result.controversial) || !rule.when; // no condition = always
         if (needsApproval) {
           violations.push({
             rule: rule.type,
@@ -219,18 +217,23 @@ export function evaluatePostDeliberation(
         break;
       }
       case 'max_duration': {
-        if (rule.value !== undefined && options.duration !== undefined && options.duration > rule.value) {
+        if (
+          rule.value !== undefined &&
+          options.duration !== undefined &&
+          options.duration > rule.value
+        ) {
           violations.push({
             rule: rule.type,
             action: rule.action,
-            message: rule.message ?? `Deliberation took ${options.duration}s, max is ${rule.value}s`,
+            message:
+              rule.message ?? `Deliberation took ${options.duration}s, max is ${rule.value}s`,
           });
         }
         break;
       }
       case 'require_red_team': {
         const whenTags = rule.when?.tags ?? [];
-        const matches = whenTags.length === 0 || whenTags.some(t => tags.includes(t));
+        const matches = whenTags.length === 0 || whenTags.some((t) => tags.includes(t));
         if (matches && !options.redTeam) {
           violations.push({
             rule: rule.type,
@@ -251,24 +254,29 @@ export function evaluatePostDeliberation(
 
 export function formatViolations(violations: PolicyViolation[]): string {
   if (violations.length === 0) return 'No policy violations.';
-  return violations
-    .map(v => `[${v.action.toUpperCase()}] ${v.rule}: ${v.message}`)
-    .join('\n');
+  return violations.map((v) => `[${v.action.toUpperCase()}] ${v.rule}: ${v.message}`).join('\n');
 }
 
 export function shouldBlock(violations: PolicyViolation[]): boolean {
-  return violations.some(v => v.action === 'block');
+  return violations.some((v) => v.action === 'block');
 }
 
 export function shouldPause(violations: PolicyViolation[]): boolean {
-  return violations.some(v => v.action === 'pause');
+  return violations.some((v) => v.action === 'pause');
 }
 
 // --- Validation ---
 
 const VALID_RULE_TYPES: PolicyRuleType[] = [
-  'min_providers', 'min_consensus', 'min_confidence', 'require_evidence',
-  'block_providers', 'human_approval', 'max_duration', 'require_red_team', 'input_match',
+  'min_providers',
+  'min_consensus',
+  'min_confidence',
+  'require_evidence',
+  'block_providers',
+  'human_approval',
+  'max_duration',
+  'require_red_team',
+  'input_match',
 ];
 const VALID_ACTIONS: PolicyAction[] = ['block', 'warn', 'log', 'pause'];
 

@@ -54,7 +54,7 @@ export function exportMarkdown(sessionPath: string): string {
     lines.push('');
     lines.push(`**Date:** ${new Date(meta.startedAt).toLocaleString()}`);
     lines.push('');
-    lines.push(`**Providers:** ${meta.providers.map(p => `${p.name} (${p.model})`).join(', ')}`);
+    lines.push(`**Providers:** ${meta.providers.map((p) => `${p.name} (${p.model})`).join(', ')}`);
     lines.push('');
     lines.push('---');
     lines.push('');
@@ -146,7 +146,7 @@ export function exportHtml(sessionPath: string): string {
         <dt>Question</dt><dd>${esc(meta.input)}</dd>
         <dt>Profile</dt><dd>${esc(meta.profile)}</dd>
         <dt>Date</dt><dd>${esc(new Date(meta.startedAt).toLocaleString())}</dd>
-        <dt>Providers</dt><dd>${meta.providers.map(p => `${esc(p.name)} <span class="dim">(${esc(p.model)})</span>`).join(', ')}</dd>
+        <dt>Providers</dt><dd>${meta.providers.map((p) => `${esc(p.name)} <span class="dim">(${esc(p.model)})</span>`).join(', ')}</dd>
       </dl>
     </section>`);
   }
@@ -159,9 +159,12 @@ export function exportHtml(sessionPath: string): string {
     const secs = (phase.duration / 1000).toFixed(1);
     toc.push({ id, label });
     const responses = phase.responses ?? {};
-    const providerHtml = Object.entries(responses).map(([provider, content]) =>
-      `<h4>${esc(provider)}</h4>\n<div class="response">${esc(String(content))}</div>`
-    ).join('\n');
+    const providerHtml = Object.entries(responses)
+      .map(
+        ([provider, content]) =>
+          `<h4>${esc(provider)}</h4>\n<div class="response">${esc(String(content))}</div>`,
+      )
+      .join('\n');
     sections.push(`
     <section id="${id}">
       <details>
@@ -177,9 +180,12 @@ export function exportHtml(sessionPath: string): string {
     const secs = (vote.duration / 1000).toFixed(1);
     toc.push({ id: 'vote', label: 'Vote' });
     const responses = vote.responses ?? {};
-    const rows = Object.entries(responses).map(([provider, content]) =>
-      `<tr><td>${esc(provider)}</td><td>${esc(String(content).slice(0, 300))}</td></tr>`
-    ).join('\n');
+    const rows = Object.entries(responses)
+      .map(
+        ([provider, content]) =>
+          `<tr><td>${esc(provider)}</td><td>${esc(String(content).slice(0, 300))}</td></tr>`,
+      )
+      .join('\n');
     sections.push(`
     <section id="vote">
       <details>
@@ -217,7 +223,7 @@ export function exportHtml(sessionPath: string): string {
     </section>`);
   }
 
-  const tocHtml = toc.map(t => `<li><a href="#${t.id}">${esc(t.label)}</a></li>`).join('\n');
+  const tocHtml = toc.map((t) => `<li><a href="#${t.id}">${esc(t.label)}</a></li>`).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -265,5 +271,9 @@ export function exportHtml(sessionPath: string): string {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

@@ -82,7 +82,9 @@ export async function loadArenaState(): Promise<ArenaState> {
       const data = JSON.parse(await readFile(ARENA_PATH, 'utf-8'));
       return data as ArenaState;
     }
-  } catch { /* corrupt file */ }
+  } catch {
+    /* corrupt file */
+  }
   return emptyState();
 }
 
@@ -113,17 +115,21 @@ export function computeReputationScore(stats: ProviderReputation): number {
   const volumeRaw = stats.totalRuns > 0 ? Math.log(stats.totalRuns) / Math.log(100) : 0;
   const volumeComponent = Math.min(volumeRaw, 1.0) * 0.1;
 
-  return Math.min(1, Math.max(0, winComponent + consensusComponent + recencyComponent + volumeComponent));
+  return Math.min(
+    1,
+    Math.max(0, winComponent + consensusComponent + recencyComponent + volumeComponent),
+  );
 }
 
 function rebuildReputation(provider: string, results: EvalResult[]): ProviderReputation {
-  const providerResults = results.filter(r => r.provider === provider);
+  const providerResults = results.filter((r) => r.provider === provider);
   const totalRuns = providerResults.length;
-  const wins = providerResults.filter(r => r.wasWinner).length;
+  const wins = providerResults.filter((r) => r.wasWinner).length;
   const winRate = totalRuns > 0 ? wins / totalRuns : 0;
-  const avgConsensusContribution = totalRuns > 0
-    ? providerResults.reduce((s, r) => s + r.consensusContribution, 0) / totalRuns
-    : 0;
+  const avgConsensusContribution =
+    totalRuns > 0
+      ? providerResults.reduce((s, r) => s + r.consensusContribution, 0) / totalRuns
+      : 0;
 
   // Domain scores
   const domainScores: Record<string, { runs: number; wins: number; winRate: number }> = {};
@@ -136,7 +142,7 @@ function rebuildReputation(provider: string, results: EvalResult[]): ProviderRep
     byCategory.get(cat)!.push(r);
   }
   for (const [cat, catResults] of byCategory) {
-    const catWins = catResults.filter(r => r.wasWinner).length;
+    const catWins = catResults.filter((r) => r.wasWinner).length;
     domainScores[cat] = {
       runs: catResults.length,
       wins: catWins,
@@ -144,9 +150,8 @@ function rebuildReputation(provider: string, results: EvalResult[]): ProviderRep
     };
   }
 
-  const lastUpdated = providerResults.length > 0
-    ? Math.max(...providerResults.map(r => r.timestamp))
-    : Date.now();
+  const lastUpdated =
+    providerResults.length > 0 ? Math.max(...providerResults.map((r) => r.timestamp)) : Date.now();
 
   const rep: ProviderReputation = {
     provider,
@@ -255,7 +260,9 @@ export async function listEvalSuites(): Promise<string[]> {
       for (const f of files) {
         if (f.endsWith('.yaml')) suites.add(f.replace(/\.yaml$/, ''));
       }
-    } catch { /* dir doesn't exist */ }
+    } catch {
+      /* dir doesn't exist */
+    }
   }
   return [...suites].sort();
 }
@@ -263,7 +270,8 @@ export async function listEvalSuites(): Promise<string[]> {
 // ── Formatting ──
 
 export function formatLeaderboard(reputations: ProviderReputation[]): string {
-  if (reputations.length === 0) return 'No provider data yet. Run some deliberations or eval suites first.';
+  if (reputations.length === 0)
+    return 'No provider data yet. Run some deliberations or eval suites first.';
 
   const sorted = [...reputations].sort((a, b) => b.reputationScore - a.reputationScore);
   const lines: string[] = [''];
@@ -291,9 +299,13 @@ export function formatProviderCard(reputation: ProviderReputation): string {
   lines.push(`  ╔══════════════════════════════════════╗`);
   lines.push(`  ║  ${r.provider.padEnd(34)} ║`);
   lines.push(`  ╠══════════════════════════════════════╣`);
-  lines.push(`  ║  Reputation Score: ${(r.reputationScore * 100).toFixed(1).padStart(6)}%          ║`);
+  lines.push(
+    `  ║  Reputation Score: ${(r.reputationScore * 100).toFixed(1).padStart(6)}%          ║`,
+  );
   lines.push(`  ║  Win Rate:         ${(r.winRate * 100).toFixed(1).padStart(6)}%          ║`);
-  lines.push(`  ║  Consensus Avg:    ${(r.avgConsensusContribution * 100).toFixed(1).padStart(6)}%          ║`);
+  lines.push(
+    `  ║  Consensus Avg:    ${(r.avgConsensusContribution * 100).toFixed(1).padStart(6)}%          ║`,
+  );
   lines.push(`  ║  Total Runs:       ${String(r.totalRuns).padStart(6)}           ║`);
   lines.push(`  ║  Wins:             ${String(r.wins).padStart(6)}           ║`);
   lines.push(`  ╠══════════════════════════════════════╣`);

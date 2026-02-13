@@ -26,10 +26,11 @@ const MAX_INVOCATIONS = 3;
 async function runWebSearch(query: string): Promise<string> {
   try {
     const encoded = encodeURIComponent(query);
-    const { stdout } = await execFileAsync('curl', [
-      '-s', '-L', '--max-time', '10',
-      `https://lite.duckduckgo.com/lite?q=${encoded}`
-    ], { timeout: 15000 });
+    const { stdout } = await execFileAsync(
+      'curl',
+      ['-s', '-L', '--max-time', '10', `https://lite.duckduckgo.com/lite?q=${encoded}`],
+      { timeout: 15000 },
+    );
     // Strip HTML tags and extract text
     const text = stdout
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -81,7 +82,7 @@ async function runShell(command: string): Promise<string> {
 
 export async function executeTools(
   response: string,
-  options: ToolOptions = {}
+  options: ToolOptions = {},
 ): Promise<{ cleanedResponse: string; toolResults: ToolResult[] }> {
   const toolResults: ToolResult[] = [];
   const matches: Array<{ full: string; tool: string; input: string }> = [];

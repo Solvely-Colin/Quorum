@@ -9,17 +9,20 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { AuthConfig, AuthStore, OAuthToken, ProviderConfig } from './types.js';
+import type { AuthStore, OAuthToken, ProviderConfig } from './types.js';
 
 const AUTH_PATH = join(homedir(), '.quorum', 'auth.json');
 
 // Known OAuth configs per provider
-const OAUTH_PROVIDERS: Record<string, {
-  clientId: string;
-  deviceAuthUrl: string;
-  tokenUrl: string;
-  scopes: string[];
-}> = {
+const OAUTH_PROVIDERS: Record<
+  string,
+  {
+    clientId: string;
+    deviceAuthUrl: string;
+    tokenUrl: string;
+    scopes: string[];
+  }
+> = {
   openai: {
     clientId: 'app_EMoamEEZ73f0CkXaXp7hrann', // OpenAI public device client
     deviceAuthUrl: 'https://auth.openai.com/oauth/device/code',
@@ -119,7 +122,7 @@ async function exchangeAnthropicOAuth(oauthToken: string): Promise<string | null
     const resp = await fetch('https://api.anthropic.com/api/oauth/claude_cli/create_api_key', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${oauthToken}`,
+        Authorization: `Bearer ${oauthToken}`,
         'Content-Type': 'application/json',
         'User-Agent': 'claude-code/1.0',
         'anthropic-version': '2023-06-01',
@@ -136,7 +139,7 @@ async function exchangeAnthropicOAuth(oauthToken: string): Promise<string | null
       return null;
     }
 
-    const data = await resp.json() as { api_key?: string; key?: string };
+    const data = (await resp.json()) as { api_key?: string; key?: string };
     return data.api_key ?? data.key ?? null;
   } catch (err) {
     console.error('OAuth key exchange error:', err);
@@ -195,7 +198,7 @@ export async function startDeviceFlow(
     throw new Error(`Device auth request failed: ${resp.status}`);
   }
 
-  const device = await resp.json() as DeviceCodeResponse;
+  const device = (await resp.json()) as DeviceCodeResponse;
 
   const poll = async (): Promise<OAuthToken | null> => {
     const deadline = Date.now() + device.expires_in * 1000;
@@ -216,7 +219,7 @@ export async function startDeviceFlow(
       });
 
       if (tokenResp.ok) {
-        const data = await tokenResp.json() as {
+        const data = (await tokenResp.json()) as {
           access_token: string;
           refresh_token?: string;
           expires_in?: number;
@@ -241,7 +244,7 @@ export async function startDeviceFlow(
       }
 
       // Check if still pending
-      const err = await tokenResp.json().catch(() => ({})) as { error?: string };
+      const err = (await tokenResp.json().catch(() => ({}))) as { error?: string };
       if (err.error === 'authorization_pending' || err.error === 'slow_down') {
         continue;
       }
@@ -279,7 +282,7 @@ async function refreshOAuthToken(token: OAuthToken): Promise<OAuthToken | null> 
 
     if (!resp.ok) return null;
 
-    const data = await resp.json() as {
+    const data = (await resp.json()) as {
       access_token: string;
       refresh_token?: string;
       expires_in?: number;
@@ -331,10 +334,10 @@ const KEYCHAIN_REFRESH_CONFIG: Record<string, { tokenUrl: string; clientId: stri
 async function resolveKeychainOAuth(service: string): Promise<string | null> {
   try {
     const { execFileSync } = await import('node:child_process');
-    const raw = execFileSync(
-      'security', ['find-generic-password', '-s', service, '-w'],
-      { encoding: 'utf-8', timeout: 5000 },
-    ).trim();
+    const raw = execFileSync('security', ['find-generic-password', '-s', service, '-w'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
 
     const data = JSON.parse(raw);
 
@@ -380,7 +383,7 @@ async function refreshKeychainToken(
 
     if (!resp.ok) return null;
 
-    const tokens = await resp.json() as {
+    const tokens = (await resp.json()) as {
       access_token: string;
       refresh_token?: string;
       expires_in?: number;
@@ -388,10 +391,10 @@ async function refreshKeychainToken(
 
     // Update keychain with new tokens
     const { execFileSync } = await import('node:child_process');
-    const raw = execFileSync(
-      'security', ['find-generic-password', '-s', service, '-w'],
-      { encoding: 'utf-8', timeout: 5000 },
-    ).trim();
+    const raw = execFileSync('security', ['find-generic-password', '-s', service, '-w'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
     const data = JSON.parse(raw);
     const updated = {
       ...data,
@@ -411,7 +414,8 @@ async function refreshKeychainToken(
       // May not exist yet
     }
     execFileSync(
-      'security', ['add-generic-password', '-s', service, '-a', 'credentials', '-w', encoded],
+      'security',
+      ['add-generic-password', '-s', service, '-a', 'credentials', '-w', encoded],
       { timeout: 5000 },
     );
 

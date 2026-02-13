@@ -56,7 +56,7 @@ function extractSignificantWords(text: string): Set<string> {
 }
 
 function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
-  const intersection = new Set([...a].filter(t => b.has(t)));
+  const intersection = new Set([...a].filter((t) => b.has(t)));
   const union = new Set([...a, ...b]);
   return union.size > 0 ? intersection.size / union.size : 0;
 }
@@ -78,7 +78,10 @@ function computeTermDivergence(responses: string[]): number {
 }
 
 function extractKeyClaims(text: string): string[][] {
-  const sentences = text.split(/[.!?\n]+/).map(s => s.trim()).filter(s => s.length > 0);
+  const sentences = text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
   const claims: string[][] = [];
   for (const sentence of sentences) {
     if (ASSERTION_PATTERN.test(sentence)) {
@@ -140,10 +143,15 @@ function computePositionEntropy(responses: string[]): number {
 }
 
 export function calculateEntropy(responses: Record<string, string>): EntropyResult {
-  const texts = Object.values(responses).filter(v => v.length > 0);
+  const texts = Object.values(responses).filter((v) => v.length > 0);
 
   if (texts.length < 2) {
-    return { score: 0, termDivergence: 0, positionEntropy: 0, details: 'Insufficient responses for entropy calculation' };
+    return {
+      score: 0,
+      termDivergence: 0,
+      positionEntropy: 0,
+      details: 'Insufficient responses for entropy calculation',
+    };
   }
 
   const termDivergence = computeTermDivergence(texts);
@@ -160,13 +168,37 @@ export function calculateEntropy(responses: Record<string, string>): EntropyResu
 export function getPresetConfig(preset: AdaptivePreset): AdaptiveConfig {
   switch (preset) {
     case 'fast':
-      return { preset, skipThreshold: 0.25, addRoundThreshold: 0.85, maxExtraRounds: 1, neverSkipPhases: ['gather', 'synthesize'] };
+      return {
+        preset,
+        skipThreshold: 0.25,
+        addRoundThreshold: 0.85,
+        maxExtraRounds: 1,
+        neverSkipPhases: ['gather', 'synthesize'],
+      };
     case 'balanced':
-      return { preset, skipThreshold: 0.2, addRoundThreshold: 0.8, maxExtraRounds: 2, neverSkipPhases: ['gather', 'vote', 'synthesize'] };
+      return {
+        preset,
+        skipThreshold: 0.2,
+        addRoundThreshold: 0.8,
+        maxExtraRounds: 2,
+        neverSkipPhases: ['gather', 'vote', 'synthesize'],
+      };
     case 'critical':
-      return { preset, skipThreshold: 0.1, addRoundThreshold: 0.7, maxExtraRounds: 3, neverSkipPhases: ['gather', 'debate', 'vote', 'synthesize'] };
+      return {
+        preset,
+        skipThreshold: 0.1,
+        addRoundThreshold: 0.7,
+        maxExtraRounds: 3,
+        neverSkipPhases: ['gather', 'debate', 'vote', 'synthesize'],
+      };
     case 'off':
-      return { preset, skipThreshold: -1, addRoundThreshold: 2, maxExtraRounds: 0, neverSkipPhases: [] };
+      return {
+        preset,
+        skipThreshold: -1,
+        addRoundThreshold: 2,
+        maxExtraRounds: 0,
+        neverSkipPhases: [],
+      };
   }
 }
 
@@ -188,7 +220,11 @@ export class AdaptiveController {
     remainingPhases: string[],
   ): AdaptiveDecision {
     if (this.config.preset === 'off') {
-      const decision: AdaptiveDecision = { action: 'continue', reason: 'Adaptive control disabled', entropy: 0 };
+      const decision: AdaptiveDecision = {
+        action: 'continue',
+        reason: 'Adaptive control disabled',
+        entropy: 0,
+      };
       this.decisions.push(decision);
       return decision;
     }
@@ -203,7 +239,7 @@ export class AdaptiveController {
       const targetIdx = remainingPhases.indexOf(target);
       if (targetIdx < 0) return false;
       const skipped = remainingPhases.slice(0, targetIdx);
-      return !skipped.some(p => neverSkipPhases.includes(p));
+      return !skipped.some((p) => neverSkipPhases.includes(p));
     };
 
     let decision: AdaptiveDecision;
@@ -211,36 +247,81 @@ export class AdaptiveController {
     if (completedPhase === 'gather' && entropy < skipThreshold) {
       if (canSkipTo('vote')) {
         const skipped = remainingPhases.slice(0, remainingPhases.indexOf('vote'));
-        decision = { action: 'skip-to-vote', reason: `Providers already agree (entropy ${entropy.toFixed(3)})`, entropy, skipPhases: skipped };
+        decision = {
+          action: 'skip-to-vote',
+          reason: `Providers already agree (entropy ${entropy.toFixed(3)})`,
+          entropy,
+          skipPhases: skipped,
+        };
       } else if (canSkipTo('synthesize')) {
         const skipped = remainingPhases.slice(0, remainingPhases.indexOf('synthesize'));
-        decision = { action: 'skip-to-synthesize', reason: `Providers already agree (entropy ${entropy.toFixed(3)})`, entropy, skipPhases: skipped };
+        decision = {
+          action: 'skip-to-synthesize',
+          reason: `Providers already agree (entropy ${entropy.toFixed(3)})`,
+          entropy,
+          skipPhases: skipped,
+        };
       } else {
-        decision = { action: 'continue', reason: `Low entropy but cannot skip protected phases`, entropy };
+        decision = {
+          action: 'continue',
+          reason: `Low entropy but cannot skip protected phases`,
+          entropy,
+        };
       }
     } else if (completedPhase === 'debate') {
       if (entropy < skipThreshold + 0.1) {
         if (canSkipTo('vote')) {
           const skipped = remainingPhases.slice(0, remainingPhases.indexOf('vote'));
-          decision = { action: 'skip-to-vote', reason: `Low disagreement after debate (entropy ${entropy.toFixed(3)})`, entropy, skipPhases: skipped };
+          decision = {
+            action: 'skip-to-vote',
+            reason: `Low disagreement after debate (entropy ${entropy.toFixed(3)})`,
+            entropy,
+            skipPhases: skipped,
+          };
         } else {
-          decision = { action: 'continue', reason: `Low entropy but cannot skip protected phases`, entropy };
+          decision = {
+            action: 'continue',
+            reason: `Low entropy but cannot skip protected phases`,
+            entropy,
+          };
         }
       } else if (entropy > addRoundThreshold && this.extraRoundsUsed < maxExtraRounds) {
         this.extraRoundsUsed++;
-        decision = { action: 'add-round', reason: `High disagreement, adding debate round (entropy ${entropy.toFixed(3)})`, entropy, extraPhase: 'debate' };
+        decision = {
+          action: 'add-round',
+          reason: `High disagreement, adding debate round (entropy ${entropy.toFixed(3)})`,
+          entropy,
+          extraPhase: 'debate',
+        };
       } else {
-        decision = { action: 'continue', reason: `Entropy ${entropy.toFixed(3)} within normal range`, entropy };
+        decision = {
+          action: 'continue',
+          reason: `Entropy ${entropy.toFixed(3)} within normal range`,
+          entropy,
+        };
       }
     } else if (completedPhase === 'adjust') {
       if (entropy > addRoundThreshold - 0.1 && this.extraRoundsUsed < maxExtraRounds) {
         this.extraRoundsUsed++;
-        decision = { action: 'add-round', reason: `Still high disagreement after adjustment (entropy ${entropy.toFixed(3)})`, entropy, extraPhase: 'rebuttal' };
+        decision = {
+          action: 'add-round',
+          reason: `Still high disagreement after adjustment (entropy ${entropy.toFixed(3)})`,
+          entropy,
+          extraPhase: 'rebuttal',
+        };
       } else {
-        decision = { action: 'continue', reason: `Entropy ${entropy.toFixed(3)} acceptable after adjustment`, entropy };
+        decision = {
+          action: 'continue',
+          reason: `Entropy ${entropy.toFixed(3)} acceptable after adjustment`,
+          entropy,
+        };
       }
     } else {
-      decision = { action: 'continue', reason: `Phase ${completedPhase} complete (entropy ${entropy.toFixed(3)})`, entropy };
+      decision = {
+        action: 'continue',
+        reason: `Phase ${completedPhase} complete (entropy ${entropy.toFixed(3)})`,
+        entropy,
+      };
     }
 
     this.decisions.push(decision);
@@ -259,7 +340,13 @@ export class AdaptiveController {
 // ─── Stats Persistence ───────────────────────────────────────────────────────
 
 function emptyStats(): AdaptiveStats {
-  return { totalSessions: 0, phaseSkips: {}, extraRounds: {}, providerPairEntropy: {}, lastUpdated: Date.now() };
+  return {
+    totalSessions: 0,
+    phaseSkips: {},
+    extraRounds: {},
+    providerPairEntropy: {},
+    lastUpdated: Date.now(),
+  };
 }
 
 export async function loadAdaptiveStats(): Promise<AdaptiveStats> {
@@ -311,9 +398,8 @@ export async function recordOutcome(
   }
 
   // Record provider pair entropy
-  const avgEntropy = decisions.length > 0
-    ? decisions.reduce((sum, d) => sum + d.entropy, 0) / decisions.length
-    : 0;
+  const avgEntropy =
+    decisions.length > 0 ? decisions.reduce((sum, d) => sum + d.entropy, 0) / decisions.length : 0;
 
   const sortedProviders = [...providers].sort();
   for (let i = 0; i < sortedProviders.length; i++) {

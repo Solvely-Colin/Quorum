@@ -18,7 +18,10 @@ export async function getGitDiff(options: { staged?: boolean; ref?: string }): P
     const { stdout } = await execFile('git', args);
     return stdout;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     if (msg.includes('not a git repository')) {
       throw new Error('Not in a git repository.');
     }
@@ -26,14 +29,20 @@ export async function getGitDiff(options: { staged?: boolean; ref?: string }): P
   }
 }
 
-export async function getPrDiff(prNumber: string): Promise<{ diff: string; title: string; body: string; changedFiles: number }> {
+export async function getPrDiff(
+  prNumber: string,
+): Promise<{ diff: string; title: string; body: string; changedFiles: number }> {
   try {
     const [viewResult, diffResult] = await Promise.all([
       execFile('gh', ['pr', 'view', prNumber, '--json', 'title,body,changedFiles']),
       execFile('gh', ['pr', 'diff', prNumber]),
     ]);
 
-    const meta = JSON.parse(viewResult.stdout) as { title: string; body: string; changedFiles: number };
+    const meta = JSON.parse(viewResult.stdout) as {
+      title: string;
+      body: string;
+      changedFiles: number;
+    };
     return {
       title: meta.title,
       body: meta.body ?? '',
@@ -41,7 +50,10 @@ export async function getPrDiff(prNumber: string): Promise<{ diff: string; title
       changedFiles: meta.changedFiles ?? 0,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     if (msg.includes('ENOENT') || msg.includes('not found')) {
       throw new Error('GitHub CLI (gh) not found. Install it from https://cli.github.com/');
     }
@@ -105,7 +117,10 @@ export async function postPrComment(prNumber: string, body: string): Promise<voi
       await execFile('gh', ['pr', 'comment', prNumber, '--body', body]);
     }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     if (msg.includes('ENOENT') || msg.includes('not found')) {
       throw new Error('GitHub CLI (gh) not found. Install it from https://cli.github.com/');
     }
@@ -142,7 +157,10 @@ export async function addPrLabels(prNumber: string, labels: string[]): Promise<v
     }
     await execFile('gh', args);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     throw new Error(`Failed to add PR labels: ${msg}`);
   }
 }
@@ -160,7 +178,10 @@ export async function removePrLabels(prNumber: string, labels: string[]): Promis
 export async function getPrMetadata(prNumber: string): Promise<PrMetadata> {
   try {
     const { stdout } = await execFile('gh', [
-      'pr', 'view', prNumber, '--json',
+      'pr',
+      'view',
+      prNumber,
+      '--json',
       'title,body,author,headRefName,baseRefName,changedFiles,additions,deletions,labels,reviewRequests,isDraft',
     ]);
 
@@ -192,7 +213,10 @@ export async function getPrMetadata(prNumber: string): Promise<PrMetadata> {
       isDraft: data.isDraft ?? false,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     if (msg.includes('ENOENT') || msg.includes('not found')) {
       throw new Error('GitHub CLI (gh) not found. Install it from https://cli.github.com/');
     }
@@ -205,7 +229,10 @@ export async function getPrChangedFiles(prNumber: string): Promise<string[]> {
     const { stdout } = await execFile('gh', ['pr', 'diff', prNumber, '--name-only']);
     return stdout.trim().split('\n').filter(Boolean);
   } catch (err: unknown) {
-    const msg = err instanceof Error ? (err as Error & { stderr?: string }).stderr || err.message : String(err);
+    const msg =
+      err instanceof Error
+        ? (err as Error & { stderr?: string }).stderr || err.message
+        : String(err);
     if (msg.includes('ENOENT') || msg.includes('not found')) {
       throw new Error('GitHub CLI (gh) not found. Install it from https://cli.github.com/');
     }

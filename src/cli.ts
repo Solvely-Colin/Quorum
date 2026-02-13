@@ -11,7 +11,7 @@ try {
   // Direct approach: parse export lines from shell rc files
   const home = _homedir();
   const rcFiles = ['.zshrc', '.bashrc', '.bash_profile', '.profile']
-    .map(f => _join(home, f))
+    .map((f) => _join(home, f))
     .filter(_existsSync);
 
   for (const rc of rcFiles) {
@@ -30,8 +30,14 @@ try {
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { loadConfig, saveConfig, detectProviders, loadAgentProfile, loadProjectConfig, CONFIG_PATH } from './config.js';
-import type { ProjectConfig } from './config.js';
+import {
+  loadConfig,
+  saveConfig,
+  detectProviders,
+  loadAgentProfile,
+  loadProjectConfig,
+  CONFIG_PATH,
+} from './config.js';
 import { CouncilV2 } from './council-v2.js';
 import type { AdaptivePreset } from './adaptive.js';
 import { createProvider } from './providers/base.js';
@@ -40,19 +46,21 @@ const existsSync = _existsSync;
 import type { ProviderConfig, AgentProfile } from './types.js';
 import { join as pathJoin, extname } from 'node:path';
 import { homedir } from 'node:os';
-import { listOAuthProfiles, removeOAuthProfile, startDeviceFlow, AUTH_PATH } from './auth.js';
-import { PROVIDER_LIMITS, estimateTokens, availableInput } from './context.js';
+import { listOAuthProfiles, removeOAuthProfile, startDeviceFlow } from './auth.js';
+import { PROVIDER_LIMITS, availableInput } from './context.js';
 import { getGitDiff, getPrDiff, getGitContext } from './git.js';
-import { formatRedTeamReport, listAttackPacks, loadAttackPack, type RedTeamResult } from './redteam.js';
+import {
+  formatRedTeamReport,
+  listAttackPacks,
+  loadAttackPack,
+  type RedTeamResult,
+} from './redteam.js';
 import { listTopologies } from './topology.js';
-import { loadPolicies, validatePolicy, formatViolations } from './policy.js';
+import { loadPolicies, validatePolicy } from './policy.js';
 
 const program = new Command();
 
-program
-  .name('quorum')
-  .description('Multi-AI deliberation framework')
-  .version('0.4.1');
+program.name('quorum').description('Multi-AI deliberation framework').version('0.4.1');
 
 // --- quorum init ---
 program
@@ -95,17 +103,19 @@ program
         console.log(chalk.green(`\n✅ Auto-saved (non-TTY). Edit ${CONFIG_PATH} to customize.`));
       } else {
         const inquirer = await import('inquirer');
-        const { action } = await inquirer.default.prompt<{ action: string }>([{
-          type: 'list',
-          name: 'action',
-          message: 'What would you like to do?',
-          choices: [
-            { name: 'Use detected providers', value: 'done' },
-            { name: 'Add a provider manually', value: 'add' },
-          ],
-        }]);
+        const { action } = await inquirer.default.prompt<{ action: string }>([
+          {
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: [
+              { name: 'Use detected providers', value: 'done' },
+              { name: 'Add a provider manually', value: 'add' },
+            ],
+          },
+        ]);
 
-        let providers = [...detected];
+        const providers = [...detected];
 
         if (action === 'add') {
           let adding = true;
@@ -136,20 +146,30 @@ program
   .description('Ask the council a question')
   .argument('[question]', 'Question to ask (or pipe via stdin)')
   .option('-p, --providers <names>', 'Comma-separated provider names')
-  .option('--profile <name>', 'Agent profile (default, brainstorm, code-review, research)', 'default')
+  .option(
+    '--profile <name>',
+    'Agent profile (default, brainstorm, code-review, research)',
+    'default',
+  )
   .option('-1, --single [name]', 'Single provider mode (skip deliberation)')
   .option('-v, --verbose', 'Show phase-by-phase progress')
   .option('--audit <path>', 'Save full session JSON to file')
   .option('--json', 'Output result as JSON (for piping)')
   .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
   .option('-r, --rapid', 'Rapid mode — skip plan, formulate, adjust, rebuttal, vote phases')
-  .option('--devils-advocate', 'Assign one provider as devil\'s advocate')
+  .option('--devils-advocate', "Assign one provider as devil's advocate")
   .option('--dry-run', 'Preview what would happen without making API calls')
-  .option('--challenge-style <style>', 'Override profile challengeStyle (adversarial|collaborative|socratic)')
+  .option(
+    '--challenge-style <style>',
+    'Override profile challengeStyle (adversarial|collaborative|socratic)',
+  )
   .option('--focus <topics>', 'Comma-separated list to override profile focus')
   .option('--convergence <threshold>', 'Override convergenceThreshold (0.0-1.0)')
   .option('--rounds <n>', 'Override number of rounds')
-  .option('--weight <weights>', 'Comma-separated provider weight multipliers (e.g. claude=2,openai=1,ollama=0.5)')
+  .option(
+    '--weight <weights>',
+    'Comma-separated provider weight multipliers (e.g. claude=2,openai=1,ollama=0.5)',
+  )
   .option('--voting-method <method>', 'Voting method: borda, ranked-choice, approval, condorcet')
   .option('--heatmap', 'Show consensus heatmap (default: on when 3+ providers)')
   .option('--no-heatmap', 'Disable consensus heatmap')
@@ -159,9 +179,15 @@ program
   .option('--evidence <mode>', 'Evidence-backed claims mode: off, advisory, strict')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .option('--red-team', 'Enable adversarial red-team analysis')
-  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
+  .option(
+    '--attack-pack <packs>',
+    'Comma-separated attack packs (general, code, security, legal, medical)',
+  )
   .option('--custom-attacks <attacks>', 'Comma-separated custom attack prompts')
-  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option(
+    '--topology <name>',
+    'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel',
+  )
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
@@ -220,7 +246,11 @@ program
     const timeoutOverride = opts.timeout ? parseInt(opts.timeout as string) : undefined;
     if (timeoutOverride !== undefined) {
       if (isNaN(timeoutOverride) || timeoutOverride <= 0) {
-        console.error(chalk.red(`Invalid --timeout value: "${opts.timeout}". Must be a positive number of seconds.`));
+        console.error(
+          chalk.red(
+            `Invalid --timeout value: "${opts.timeout}". Must be a positive number of seconds.`,
+          ),
+        );
         process.exit(1);
       }
       for (const p of config.providers) {
@@ -231,11 +261,11 @@ program
     // Filter providers
     let providers = config.providers;
     if (opts.providers) {
-      const names = (opts.providers as string).split(',').map(s => s.trim());
-      providers = config.providers.filter(p => names.includes(p.name));
+      const names = (opts.providers as string).split(',').map((s) => s.trim());
+      providers = config.providers.filter((p) => names.includes(p.name));
       if (providers.length === 0) {
         console.error(chalk.red(`No matching providers: ${opts.providers}`));
-        console.error(chalk.dim(`Available: ${config.providers.map(p => p.name).join(', ')}`));
+        console.error(chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
         process.exit(1);
       }
     }
@@ -263,10 +293,14 @@ program
           for (const f of files) {
             if (f.endsWith('.yaml')) available.add(f.replace(/\.yaml$/, ''));
           }
-        } catch { /* dir doesn't exist */ }
+        } catch {
+          /* dir doesn't exist */
+        }
       }
       console.error(chalk.red(`Profile not found: ${opts.profile}`));
-      console.error(chalk.dim(`Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`));
+      console.error(
+        chalk.dim(`Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`),
+      );
       process.exit(1);
     }
 
@@ -274,13 +308,20 @@ program
     if (opts.challengeStyle) {
       const style = opts.challengeStyle as string;
       if (!['adversarial', 'collaborative', 'socratic'].includes(style)) {
-        console.error(chalk.red(`Invalid --challenge-style: "${style}". Must be adversarial, collaborative, or socratic.`));
+        console.error(
+          chalk.red(
+            `Invalid --challenge-style: "${style}". Must be adversarial, collaborative, or socratic.`,
+          ),
+        );
         process.exit(1);
       }
       profile.challengeStyle = style as AgentProfile['challengeStyle'];
     }
     if (opts.focus) {
-      profile.focus = (opts.focus as string).split(',').map(s => s.trim()).filter(Boolean);
+      profile.focus = (opts.focus as string)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     if (opts.convergence) {
       const val = parseFloat(opts.convergence as string);
@@ -311,7 +352,9 @@ program
     if (opts.evidence) {
       const mode = opts.evidence as string;
       if (!['off', 'advisory', 'strict'].includes(mode)) {
-        console.error(chalk.red(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`));
+        console.error(
+          chalk.red(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`),
+        );
         process.exit(1);
       }
       profile.evidence = mode as 'off' | 'advisory' | 'strict';
@@ -324,7 +367,9 @@ program
       for (const pair of (opts.weight as string).split(',')) {
         const [name, val] = pair.split('=');
         if (!name || !val || isNaN(parseFloat(val))) {
-          console.error(chalk.red(`Invalid --weight entry: "${pair}". Expected format: name=number`));
+          console.error(
+            chalk.red(`Invalid --weight entry: "${pair}". Expected format: name=number`),
+          );
           process.exit(1);
         }
         weights[name.trim()] = parseFloat(val);
@@ -339,7 +384,11 @@ program
     if (opts.votingMethod) {
       const vm = opts.votingMethod as string;
       if (!['borda', 'ranked-choice', 'approval', 'condorcet'].includes(vm)) {
-        console.error(chalk.red(`Invalid --voting-method: "${vm}". Must be borda, ranked-choice, approval, or condorcet.`));
+        console.error(
+          chalk.red(
+            `Invalid --voting-method: "${vm}". Must be borda, ranked-choice, approval, or condorcet.`,
+          ),
+        );
         process.exit(1);
       }
       profile.votingMethod = vm as AgentProfile['votingMethod'];
@@ -354,7 +403,7 @@ program
     // Single-provider mode — quick ask, no deliberation
     if (opts.single) {
       const targetName = typeof opts.single === 'string' ? opts.single : providers[0]?.name;
-      const target = config.providers.find(p => p.name === targetName) ?? providers[0];
+      const target = config.providers.find((p) => p.name === targetName) ?? providers[0];
       if (!target) {
         console.error(chalk.red('No provider available.'));
         process.exit(1);
@@ -365,7 +414,9 @@ program
         console.log('');
       }
       try {
-        const sys = profile?.focus?.length ? `You are an expert in: ${profile.focus.join(', ')}.` : undefined;
+        const sys = profile?.focus?.length
+          ? `You are an expert in: ${profile.focus.join(', ')}.`
+          : undefined;
         if (!isJSON && adapter.generateStream) {
           // Stream output to terminal
           await adapter.generateStream(question!, sys, (delta) => {
@@ -388,9 +439,9 @@ program
     }
 
     // ── Filter excluded providers and create adapters once ──
-    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
     let candidateProviders = providers.filter(
-      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+      (p) => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
     // If exclusion leaves fewer than 2 providers, fall back to all providers
     if (candidateProviders.length < 2 && providers.length >= 2) {
@@ -420,9 +471,17 @@ program
         }
         opts.single = candidateProviders[0].name;
       } else {
-        const excludedNames = providers.filter(p => excluded.has(p.name.toLowerCase()) || excluded.has(p.provider.toLowerCase())).map(p => p.name);
+        const excludedNames = providers
+          .filter(
+            (p) => excluded.has(p.name.toLowerCase()) || excluded.has(p.provider.toLowerCase()),
+          )
+          .map((p) => p.name);
         if (excludedNames.length > 0) {
-          console.error(chalk.red(`\nNeed at least 1 provider (${excludedNames.join(', ')} excluded by profile).`));
+          console.error(
+            chalk.red(
+              `\nNeed at least 1 provider (${excludedNames.join(', ')} excluded by profile).`,
+            ),
+          );
           console.error(chalk.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`));
         } else {
           console.error(chalk.red(`\nNo providers configured. Run: quorum providers add`));
@@ -432,11 +491,13 @@ program
     }
 
     // Create adapters once — pass into CouncilV2
-    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+    const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
     if (!isJSON) {
       console.log('');
-      console.log(chalk.dim(`${adapters.length} providers ready | Style: ${profile.challengeStyle}`));
+      console.log(
+        chalk.dim(`${adapters.length} providers ready | Style: ${profile.challengeStyle}`),
+      );
       console.log('');
     }
 
@@ -451,19 +512,27 @@ program
       noHooks: opts.hooks === false,
       noMemory: opts.memory === false,
       reputation: opts.reputation ?? false,
-      policyName: opts.policy as string || undefined,
-      hitl: opts.hitl ? {
-        enabled: true,
-        checkpoints: opts.hitlCheckpoints
-          ? (opts.hitlCheckpoints as string).split(',').map((s: string) => s.trim()) as any[]
-          : ['after-vote', 'on-controversy'],
-        controversyThreshold: opts.hitlThreshold ? parseFloat(opts.hitlThreshold as string) : 0.5,
-      } : undefined,
+      policyName: (opts.policy as string) || undefined,
+      hitl: opts.hitl
+        ? {
+            enabled: true,
+            checkpoints: opts.hitlCheckpoints
+              ? ((opts.hitlCheckpoints as string).split(',').map((s: string) => s.trim()) as any[])
+              : ['after-vote', 'on-controversy'],
+            controversyThreshold: opts.hitlThreshold
+              ? parseFloat(opts.hitlThreshold as string)
+              : 0.5,
+          }
+        : undefined,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
-      attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
-      customAttacks: opts.customAttacks ? (opts.customAttacks as string).split(',').map((s: string) => s.trim()) : undefined,
-      topology: opts.topology as any || undefined,
+      attackPacks: opts.attackPack
+        ? (opts.attackPack as string).split(',').map((s: string) => s.trim())
+        : undefined,
+      customAttacks: opts.customAttacks
+        ? (opts.customAttacks as string).split(',').map((s: string) => s.trim())
+        : undefined,
+      topology: (opts.topology as any) || undefined,
       topologyConfig: {
         ...(opts.topologyHub ? { hub: opts.topologyHub as string } : {}),
         ...(opts.topologyModerator ? { moderator: opts.topologyModerator as string } : {}),
@@ -496,17 +565,32 @@ program
             break;
           }
           case 'evidence': {
-            const report = d.report as { provider: string; supportedClaims: number; unsupportedClaims: number; totalClaims: number; evidenceScore: number };
-            console.log(chalk.dim(`  📋 ${report.provider}: ${report.supportedClaims}/${report.totalClaims} claims supported (${Math.round(report.evidenceScore * 100)}%)`));
+            const report = d.report as {
+              provider: string;
+              supportedClaims: number;
+              unsupportedClaims: number;
+              totalClaims: number;
+              evidenceScore: number;
+            };
+            console.log(
+              chalk.dim(
+                `  📋 ${report.provider}: ${report.supportedClaims}/${report.totalClaims} claims supported (${Math.round(report.evidenceScore * 100)}%)`,
+              ),
+            );
             break;
           }
           case 'adaptive': {
-            const { phase, decision } = d as { phase: string; decision: { action: string; reason: string; entropy: number } };
+            const { decision } = d as {
+              phase: string;
+              decision: { action: string; reason: string; entropy: number };
+            };
             const entropyPct = Math.round(decision.entropy * 100);
             if (decision.action === 'continue') {
               // Don't clutter output for continue decisions
             } else {
-              console.log(chalk.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`));
+              console.log(
+                chalk.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`),
+              );
             }
             break;
           }
@@ -517,8 +601,14 @@ program
             break;
           }
           case 'topology': {
-            const { topology, description, phases } = d as { topology: string; description: string; phases: number };
-            console.log(chalk.cyan(`\n🔷 Topology: ${topology} — ${description} (${phases} phases)`));
+            const { topology, description, phases } = d as {
+              topology: string;
+              description: string;
+              phases: number;
+            };
+            console.log(
+              chalk.cyan(`\n🔷 Topology: ${topology} — ${description} (${phases} phases)`),
+            );
             break;
           }
           case 'devilsAdvocate':
@@ -537,16 +627,23 @@ program
             }
             break;
           case 'votes': {
-            const v = d as unknown as { rankings: Array<{ provider: string; score: number }>; winner: string; controversial: boolean };
+            const v = d as unknown as {
+              rankings: Array<{ provider: string; score: number }>;
+              winner: string;
+              controversial: boolean;
+            };
             console.log('');
             console.log(chalk.bold('  🗳️  Results'));
             const maxScore = v.rankings[0]?.score || 1;
             for (const r of v.rankings) {
               const bar = '█'.repeat(Math.round((r.score / maxScore) * 12));
               const crown = r.provider === v.winner ? ' 👑' : '';
-              console.log(`     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`);
+              console.log(
+                `     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`,
+              );
             }
-            if (v.controversial) console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
+            if (v.controversial)
+              console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
             if ((v as any).votingDetails) {
               console.log(chalk.dim(`     Method: ${(v as any).votingDetails.split('\n')[0]}`));
             }
@@ -587,18 +684,24 @@ program
       const result = await council.deliberate(question);
 
       if (isJSON) {
-        console.log(JSON.stringify({
-          synthesis: result.synthesis.content,
-          synthesizer: result.synthesis.synthesizer,
-          consensus: result.synthesis.consensusScore,
-          confidence: result.synthesis.confidenceScore,
-          controversial: result.votes.controversial,
-          winner: result.votes.winner,
-          rankings: result.votes.rankings,
-          minorityReport: result.synthesis.minorityReport,
-          duration: result.duration,
-          sessionPath: result.sessionPath,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              synthesis: result.synthesis.content,
+              synthesizer: result.synthesis.synthesizer,
+              consensus: result.synthesis.consensusScore,
+              confidence: result.synthesis.confidenceScore,
+              controversial: result.votes.controversial,
+              winner: result.votes.winner,
+              rankings: result.votes.rankings,
+              minorityReport: result.synthesis.minorityReport,
+              duration: result.duration,
+              sessionPath: result.sessionPath,
+            },
+            null,
+            2,
+          ),
+        );
       } else {
         // ── Final output ──
         console.log('');
@@ -614,7 +717,11 @@ program
         displayContent = displayContent.replace(/^##\s*Synthesis\s*\n+/i, '');
         console.log(displayContent);
 
-        if (result.synthesis.minorityReport && result.synthesis.minorityReport !== 'None' && result.synthesis.minorityReport.trim()) {
+        if (
+          result.synthesis.minorityReport &&
+          result.synthesis.minorityReport !== 'None' &&
+          result.synthesis.minorityReport.trim()
+        ) {
           console.log('');
           console.log(chalk.bold.yellow('── Minority Report ──'));
           console.log(result.synthesis.minorityReport);
@@ -640,28 +747,42 @@ program
           try {
             const { readFile: rf } = await import('node:fs/promises');
             const { join: pjoin } = await import('node:path');
-            const reportData = JSON.parse(await rf(pjoin(result.sessionPath, 'evidence-report.json'), 'utf-8')) as Array<{ provider: string; evidenceScore: number }>;
+            const reportData = JSON.parse(
+              await rf(pjoin(result.sessionPath, 'evidence-report.json'), 'utf-8'),
+            ) as Array<{ provider: string; evidenceScore: number }>;
             if (reportData.length > 0) {
-              const summary = reportData.map((r: { provider: string; evidenceScore: number }) => `${r.provider} ${Math.round(r.evidenceScore * 100)}%`).join(', ');
+              const summary = reportData
+                .map(
+                  (r: { provider: string; evidenceScore: number }) =>
+                    `${r.provider} ${Math.round(r.evidenceScore * 100)}%`,
+                )
+                .join(', ');
               console.log(chalk.dim(`Evidence scores: ${summary}`));
             }
-          } catch { /* no evidence report */ }
+          } catch {
+            /* no evidence report */
+          }
         }
         if (opts.adaptive && opts.adaptive !== 'off') {
           try {
             const { readFile: rf } = await import('node:fs/promises');
             const { join: pjoin } = await import('node:path');
             const adaptiveData = JSON.parse(
-              await rf(pjoin(result.sessionPath, 'adaptive-decisions.json'), 'utf-8')
-            ) as { decisions: Array<{ action: string; reason: string; entropy: number }>; entropyHistory: Record<string, number> };
-            const nonContinue = adaptiveData.decisions.filter(d => d.action !== 'continue');
+              await rf(pjoin(result.sessionPath, 'adaptive-decisions.json'), 'utf-8'),
+            ) as {
+              decisions: Array<{ action: string; reason: string; entropy: number }>;
+              entropyHistory: Record<string, number>;
+            };
+            const nonContinue = adaptiveData.decisions.filter((d) => d.action !== 'continue');
             if (nonContinue.length > 0) {
               console.log(chalk.yellow(`\nAdaptive decisions: ${nonContinue.length}`));
               for (const d of nonContinue) {
                 console.log(chalk.dim(`  ⚡ ${d.action}: ${d.reason}`));
               }
             }
-          } catch { /* no adaptive data */ }
+          } catch {
+            /* no adaptive data */
+          }
         }
         console.log(chalk.dim(`Session: ${result.sessionPath}`));
         console.log('');
@@ -691,19 +812,28 @@ program
   .option('--json', 'Output result as JSON (for piping)')
   .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
   .option('-r, --rapid', 'Rapid mode — skip plan, formulate, adjust, rebuttal, vote phases')
-  .option('--devils-advocate', 'Assign one provider as devil\'s advocate')
+  .option('--devils-advocate', "Assign one provider as devil's advocate")
   .option('--diff [ref]', 'Review diff against a ref (defaults to HEAD)')
   .option('--staged', 'Review staged changes (git diff --cached)')
   .option('--pr <number>', 'Review a GitHub PR (requires gh CLI)')
   .option('--dry-run', 'Preview what would happen without making API calls')
-  .option('--challenge-style <style>', 'Override profile challengeStyle (adversarial|collaborative|socratic)')
+  .option(
+    '--challenge-style <style>',
+    'Override profile challengeStyle (adversarial|collaborative|socratic)',
+  )
   .option('--focus <topics>', 'Comma-separated list to override profile focus')
   .option('--convergence <threshold>', 'Override convergenceThreshold (0.0-1.0)')
   .option('--rounds <n>', 'Override number of rounds')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .option('--red-team', 'Enable adversarial red-team analysis')
-  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
-  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option(
+    '--attack-pack <packs>',
+    'Comma-separated attack packs (general, code, security, legal, medical)',
+  )
+  .option(
+    '--topology <name>',
+    'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel',
+  )
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
@@ -782,7 +912,11 @@ program
       }
 
       if (!content.trim()) {
-        console.error(chalk.red('No input provided. Pass file paths, pipe content, or use --staged/--diff/--pr.'));
+        console.error(
+          chalk.red(
+            'No input provided. Pass file paths, pipe content, or use --staged/--diff/--pr.',
+          ),
+        );
         console.error(chalk.dim('Usage: quorum review src/api.ts src/utils.ts'));
         console.error(chalk.dim('   or: quorum review --staged'));
         console.error(chalk.dim('   or: quorum review --diff main'));
@@ -794,26 +928,66 @@ program
     // Delegate to ask command logic by invoking program
     const askArgs = ['ask', content];
     askArgs.push('--profile', opts.profile as string);
-    if (opts.providers) { askArgs.push('--providers', opts.providers as string); }
-    if (opts.single !== undefined) { askArgs.push('--single', typeof opts.single === 'string' ? opts.single : ''); }
-    if (opts.verbose) { askArgs.push('--verbose'); }
-    if (opts.audit) { askArgs.push('--audit', opts.audit as string); }
-    if (opts.json) { askArgs.push('--json'); }
-    if (opts.timeout) { askArgs.push('--timeout', opts.timeout as string); }
-    if (opts.dryRun) { askArgs.push('--dry-run'); }
-    if (opts.rapid) { askArgs.push('--rapid'); }
-    if (opts.devilsAdvocate) { askArgs.push('--devils-advocate'); }
-    if (opts.challengeStyle) { askArgs.push('--challenge-style', opts.challengeStyle as string); }
-    if (opts.focus) { askArgs.push('--focus', opts.focus as string); }
-    if (opts.convergence) { askArgs.push('--convergence', opts.convergence as string); }
-    if (opts.rounds) { askArgs.push('--rounds', opts.rounds as string); }
-    if (opts.adaptive) { askArgs.push('--adaptive', opts.adaptive as string); }
-    if (opts.redTeam) { askArgs.push('--red-team'); }
-    if (opts.attackPack) { askArgs.push('--attack-pack', opts.attackPack as string); }
-    if (opts.topology) { askArgs.push('--topology', opts.topology as string); }
-    if (opts.topologyHub) { askArgs.push('--topology-hub', opts.topologyHub as string); }
-    if (opts.topologyModerator) { askArgs.push('--topology-moderator', opts.topologyModerator as string); }
-    if (opts.memory === false) { askArgs.push('--no-memory'); }
+    if (opts.providers) {
+      askArgs.push('--providers', opts.providers as string);
+    }
+    if (opts.single !== undefined) {
+      askArgs.push('--single', typeof opts.single === 'string' ? opts.single : '');
+    }
+    if (opts.verbose) {
+      askArgs.push('--verbose');
+    }
+    if (opts.audit) {
+      askArgs.push('--audit', opts.audit as string);
+    }
+    if (opts.json) {
+      askArgs.push('--json');
+    }
+    if (opts.timeout) {
+      askArgs.push('--timeout', opts.timeout as string);
+    }
+    if (opts.dryRun) {
+      askArgs.push('--dry-run');
+    }
+    if (opts.rapid) {
+      askArgs.push('--rapid');
+    }
+    if (opts.devilsAdvocate) {
+      askArgs.push('--devils-advocate');
+    }
+    if (opts.challengeStyle) {
+      askArgs.push('--challenge-style', opts.challengeStyle as string);
+    }
+    if (opts.focus) {
+      askArgs.push('--focus', opts.focus as string);
+    }
+    if (opts.convergence) {
+      askArgs.push('--convergence', opts.convergence as string);
+    }
+    if (opts.rounds) {
+      askArgs.push('--rounds', opts.rounds as string);
+    }
+    if (opts.adaptive) {
+      askArgs.push('--adaptive', opts.adaptive as string);
+    }
+    if (opts.redTeam) {
+      askArgs.push('--red-team');
+    }
+    if (opts.attackPack) {
+      askArgs.push('--attack-pack', opts.attackPack as string);
+    }
+    if (opts.topology) {
+      askArgs.push('--topology', opts.topology as string);
+    }
+    if (opts.topologyHub) {
+      askArgs.push('--topology-hub', opts.topologyHub as string);
+    }
+    if (opts.topologyModerator) {
+      askArgs.push('--topology-moderator', opts.topologyModerator as string);
+    }
+    if (opts.memory === false) {
+      askArgs.push('--no-memory');
+    }
 
     await program.parseAsync(['node', 'quorum', ...askArgs]);
     process.exit(0);
@@ -839,8 +1013,14 @@ program
   .option('-r, --rapid', 'Rapid mode — skip plan, formulate, adjust, rebuttal, vote phases')
   .option('--adaptive <preset>', 'Adaptive debate controller: fast, balanced, critical, off')
   .option('--red-team', 'Enable adversarial red-team analysis')
-  .option('--attack-pack <packs>', 'Comma-separated attack packs (general, code, security, legal, medical)')
-  .option('--topology <name>', 'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel')
+  .option(
+    '--attack-pack <packs>',
+    'Comma-separated attack packs (general, code, security, legal, medical)',
+  )
+  .option(
+    '--topology <name>',
+    'Debate topology: mesh, star, tournament, map_reduce, adversarial_tree, pipeline, panel',
+  )
   .option('--topology-hub <provider>', 'Hub provider for star topology')
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
@@ -881,16 +1061,36 @@ program
             const { execFile: execFileCb } = await import('node:child_process');
             const { promisify } = await import('node:util');
             const execFileAsync = promisify(execFileCb);
-            const { stdout } = await execFileAsync('gh', ['pr', 'view', prNumber, '--json', 'files', '--jq', '.files | length']);
+            const { stdout } = await execFileAsync('gh', [
+              'pr',
+              'view',
+              prNumber,
+              '--json',
+              'files',
+              '--jq',
+              '.files | length',
+            ]);
             const fileCount = parseInt(stdout.trim());
             if (fileCount > maxFiles) {
-              const skipResult = { approved: true, confidence: 1, consensus: 1, evidenceGrade: 'N/A',
-                riskMatrix: [], suggestions: [], dissent: '', synthesis: `Skipped: PR has ${fileCount} files (max: ${maxFiles})`,
-                providers: [], duration: 0, sessionId: '' };
+              const skipResult = {
+                approved: true,
+                confidence: 1,
+                consensus: 1,
+                evidenceGrade: 'N/A',
+                riskMatrix: [],
+                suggestions: [],
+                dissent: '',
+                synthesis: `Skipped: PR has ${fileCount} files (max: ${maxFiles})`,
+                providers: [],
+                duration: 0,
+                sessionId: '',
+              };
               console.log(JSON.stringify(skipResult, null, 2));
               process.exit(0);
             }
-          } catch { /* proceed anyway */ }
+          } catch {
+            /* proceed anyway */
+          }
         }
         const pr = await getPrDiff(prNumber);
         if (!pr.diff.trim()) {
@@ -931,7 +1131,10 @@ program
     }
 
     if (opts.focus) {
-      profile.focus = (opts.focus as string).split(',').map(s => s.trim()).filter(Boolean);
+      profile.focus = (opts.focus as string)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     if (opts.evidence) {
       const mode = opts.evidence as string;
@@ -949,29 +1152,31 @@ program
 
     let providers = config.providers;
     if (opts.providers) {
-      const names = (opts.providers as string).split(',').map(s => s.trim());
-      providers = config.providers.filter(p => names.includes(p.name));
+      const names = (opts.providers as string).split(',').map((s) => s.trim());
+      providers = config.providers.filter((p) => names.includes(p.name));
       if (providers.length === 0) {
         console.error(`No matching providers: ${opts.providers}`);
         process.exit(2);
       }
     } else if (projectConfig?.providers) {
       const names = projectConfig.providers;
-      const filtered = config.providers.filter(p => names.includes(p.name));
+      const filtered = config.providers.filter((p) => names.includes(p.name));
       if (filtered.length > 0) providers = filtered;
     }
 
-    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
     const candidateProviders = providers.filter(
-      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+      (p) => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
 
     if (candidateProviders.length < 2) {
-      console.error(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`);
+      console.error(
+        `Need 2+ providers for deliberation (${candidateProviders.length} configured).`,
+      );
       process.exit(2);
     }
 
-    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+    const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
     // --- Run deliberation silently ---
     const startTime = Date.now();
@@ -980,16 +1185,20 @@ program
       rapid: opts.rapid ?? false,
       devilsAdvocate: false,
       noMemory: opts.memory === false,
-      policyName: opts.policy as string || undefined,
+      policyName: (opts.policy as string) || undefined,
       adaptive: (opts.adaptive as AdaptivePreset) || undefined,
       redTeam: opts.redTeam || undefined,
-      attackPacks: opts.attackPack ? (opts.attackPack as string).split(',').map((s: string) => s.trim()) : undefined,
-      topology: opts.topology as any || undefined,
+      attackPacks: opts.attackPack
+        ? (opts.attackPack as string).split(',').map((s: string) => s.trim())
+        : undefined,
+      topology: (opts.topology as any) || undefined,
       topologyConfig: {
         ...(opts.topologyHub ? { hub: opts.topologyHub as string } : {}),
         ...(opts.topologyModerator ? { moderator: opts.topologyModerator as string } : {}),
       },
-      onEvent() { /* silent */ },
+      onEvent() {
+        /* silent */
+      },
     });
 
     let result: Awaited<ReturnType<typeof council.deliberate>>;
@@ -1007,9 +1216,13 @@ program
     try {
       const evPath = pathJoin(result.sessionPath, 'evidence-report.json');
       if (existsSync(evPath)) {
-        const evData = JSON.parse(await readFile(evPath, 'utf-8')) as Array<{ evidenceScore: number }>;
+        const evData = JSON.parse(await readFile(evPath, 'utf-8')) as Array<{
+          evidenceScore: number;
+        }>;
         if (evData.length > 0) {
-          evidencePercent = Math.round(evData.reduce((s, r) => s + r.evidenceScore, 0) / evData.length * 100);
+          evidencePercent = Math.round(
+            (evData.reduce((s, r) => s + r.evidenceScore, 0) / evData.length) * 100,
+          );
           if (evidencePercent >= 80) evidenceGrade = 'A';
           else if (evidencePercent >= 60) evidenceGrade = 'B';
           else if (evidencePercent >= 40) evidenceGrade = 'C';
@@ -1017,7 +1230,9 @@ program
           else evidenceGrade = 'F';
         }
       }
-    } catch { /* no evidence */ }
+    } catch {
+      /* no evidence */
+    }
 
     const confidence = result.synthesis.confidenceScore;
     const consensus = result.synthesis.consensusScore;
@@ -1031,7 +1246,13 @@ program
       consensus: number;
       evidenceGrade: string;
       riskMatrix: Array<{ area: string; risk: string; details: string }>;
-      suggestions: Array<{ file: string; line?: number; before?: string; after?: string; rationale: string }>;
+      suggestions: Array<{
+        file: string;
+        line?: number;
+        before?: string;
+        after?: string;
+        rationale: string;
+      }>;
       dissent: string;
       synthesis: string;
       providers: string[];
@@ -1048,7 +1269,7 @@ program
       suggestions: [],
       dissent: result.synthesis.minorityReport ?? '',
       synthesis: result.synthesis.content.replace(/^##\s*Synthesis\s*\n+/i, ''),
-      providers: candidateProviders.map(p => p.name),
+      providers: candidateProviders.map((p) => p.name),
       duration,
       sessionId: result.sessionId,
     };
@@ -1131,7 +1352,7 @@ providersCmd
       return;
     }
     for (const p of config.providers) {
-      const authType = p.auth ? p.auth.method : (p.apiKey ? 'api_key' : 'none');
+      const authType = p.auth ? p.auth.method : p.apiKey ? 'api_key' : 'none';
       console.log(`  ${chalk.bold(p.name)} — ${p.provider}/${p.model} (${authType})`);
     }
   });
@@ -1140,7 +1361,10 @@ providersCmd
   .command('add')
   .description('Add a provider')
   .requiredOption('--name <name>', 'Provider name')
-  .requiredOption('--type <type>', 'Provider type (openai, anthropic, claude-cli, ollama, google, kimi, etc.)')
+  .requiredOption(
+    '--type <type>',
+    'Provider type (openai, anthropic, claude-cli, ollama, google, kimi, etc.)',
+  )
   .requiredOption('--model <model>', 'Model name')
   .option('--api-key <key>', 'API key')
   .option('--env <var>', 'Environment variable for API key')
@@ -1161,7 +1385,7 @@ providersCmd
     };
 
     const config = await loadConfig();
-    config.providers = config.providers.filter(p => p.name !== provider.name);
+    config.providers = config.providers.filter((p) => p.name !== provider.name);
     config.providers.push(provider);
     await saveConfig(config);
     console.log(chalk.green(`✅ Added ${provider.name}`));
@@ -1174,7 +1398,17 @@ providersCmd
     const { getModels } = await import('@mariozechner/pi-ai');
     const providers = provider
       ? [provider]
-      : ['openai', 'anthropic', 'google', 'kimi-coding', 'openai-codex', 'mistral', 'deepseek', 'groq', 'xai'];
+      : [
+          'openai',
+          'anthropic',
+          'google',
+          'kimi-coding',
+          'openai-codex',
+          'mistral',
+          'deepseek',
+          'groq',
+          'xai',
+        ];
 
     for (const p of providers) {
       try {
@@ -1182,7 +1416,9 @@ providersCmd
         if (models.length === 0) continue;
         console.log(chalk.bold(`\n${p}`) + chalk.dim(` (${models.length} models)`));
         for (const m of models) {
-          const ctx = m.contextWindow ? chalk.dim(` ${(m.contextWindow / 1000).toFixed(0)}k ctx`) : '';
+          const ctx = m.contextWindow
+            ? chalk.dim(` ${(m.contextWindow / 1000).toFixed(0)}k ctx`)
+            : '';
           const cost = m.cost?.input ? chalk.dim(` $${m.cost.input}/M in`) : '';
           console.log(`  ${m.id}${ctx}${cost}`);
         }
@@ -1198,7 +1434,7 @@ providersCmd
   .action(async (name: string) => {
     const config = await loadConfig();
     const before = config.providers.length;
-    config.providers = config.providers.filter(p => p.name !== name);
+    config.providers = config.providers.filter((p) => p.name !== name);
     if (config.providers.length === before) {
       console.error(chalk.red(`Provider not found: ${name}`));
       process.exit(1);
@@ -1216,7 +1452,10 @@ providersCmd
       process.stdout.write(`  ${p.name}... `);
       try {
         const adapter = await createProvider(p);
-        const response = await adapter.generate('Say "OK" in one word.', 'You are a helpful assistant. Reply concisely.');
+        const response = await adapter.generate(
+          'Say "OK" in one word.',
+          'You are a helpful assistant. Reply concisely.',
+        );
         console.log(chalk.green(`✅ "${response.slice(0, 50)}"`));
       } catch (err) {
         console.log(chalk.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`));
@@ -1263,7 +1502,9 @@ authCmd
     }
     for (const [name, token] of entries) {
       const expired = token.expiresAt && Date.now() > token.expiresAt;
-      console.log(`  ${chalk.bold(name)} — ${expired ? chalk.red('expired') : chalk.green('active')}`);
+      console.log(
+        `  ${chalk.bold(name)} — ${expired ? chalk.red('expired') : chalk.green('active')}`,
+      );
     }
   });
 
@@ -1279,7 +1520,10 @@ authCmd
 program
   .command('session <path>')
   .description('View a saved session (all phases). Use "last" for most recent.')
-  .option('--phase <name>', 'View a specific phase (gather, plan, formulate, debate, adjust, rebuttal, vote, synthesis)')
+  .option(
+    '--phase <name>',
+    'View a specific phase (gather, plan, formulate, debate, adjust, rebuttal, vote, synthesis)',
+  )
   .action(async (sessionPath: string, opts) => {
     // Resolve "last" to most recent session
     if (sessionPath === 'last') {
@@ -1287,7 +1531,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -1322,8 +1568,13 @@ program
 
       // Map phase name to file prefix
       const phaseFiles: Record<string, string> = {
-        gather: '01-gather', plan: '02-plan', formulate: '03-formulate',
-        debate: '04-debate', adjust: '05-adjust', rebuttal: '06-rebuttal', vote: '07-vote',
+        gather: '01-gather',
+        plan: '02-plan',
+        formulate: '03-formulate',
+        debate: '04-debate',
+        adjust: '05-adjust',
+        rebuttal: '06-rebuttal',
+        vote: '07-vote',
       };
       const fileKey = phaseFiles[phaseName.toLowerCase()];
       if (!fileKey) {
@@ -1338,7 +1589,10 @@ program
       }
       const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
       console.log('');
-      console.log(chalk.bold.cyan(`═══ ${phase.phase} ═══`) + chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`));
+      console.log(
+        chalk.bold.cyan(`═══ ${phase.phase} ═══`) +
+          chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
+      );
       // Support both old "entries" and new "responses" field names
       const entries = phase.responses ?? phase.entries ?? {};
       for (const [provider, content] of Object.entries(entries)) {
@@ -1357,7 +1611,11 @@ program
       console.log('');
       console.log(chalk.bold.cyan('═══ Session ═══'));
       console.log(chalk.dim(`Question: ${String(meta.input).slice(0, 200)}`));
-      console.log(chalk.dim(`Profile: ${meta.profile} | Providers: ${meta.providers?.map((p: any) => p.name).join(', ')}`));
+      console.log(
+        chalk.dim(
+          `Profile: ${meta.profile} | Providers: ${meta.providers?.map((p: any) => p.name).join(', ')}`,
+        ),
+      );
     }
 
     const phases = [
@@ -1375,11 +1633,15 @@ program
       if (!existsSync(phasePath)) continue;
       const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
       console.log('');
-      console.log(chalk.bold.cyan(`═══ ${name} ═══`) + chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`));
+      console.log(
+        chalk.bold.cyan(`═══ ${name} ═══`) + chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
+      );
       const entries = phase.responses ?? phase.entries ?? {};
       for (const [provider, content] of Object.entries(entries)) {
         const text = String(content);
-        console.log(`  ${chalk.bold(provider)}: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`);
+        console.log(
+          `  ${chalk.bold(provider)}: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`,
+        );
       }
     }
 
@@ -1394,7 +1656,9 @@ program
         console.log('');
         console.log(chalk.bold('🗳️  Votes'));
         for (const r of synth.votes.rankings) {
-          console.log(`  ${r.provider}: ${r.score} pts${r.provider === synth.votes.winner ? ' 👑' : ''}`);
+          console.log(
+            `  ${r.provider}: ${r.score} pts${r.provider === synth.votes.winner ? ' 👑' : ''}`,
+          );
         }
       }
     }
@@ -1420,18 +1684,28 @@ program
     if (existsSync(indexPath)) {
       try {
         const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
-          sessionId: string; timestamp: number; question: string; winner: string; duration: number;
+          sessionId: string;
+          timestamp: number;
+          question: string;
+          winner: string;
+          duration: number;
         }>;
         if (entries.length > 0) {
           // Sort newest first
           entries.sort((a, b) => b.timestamp - a.timestamp);
           console.log('');
-          console.log(chalk.bold(`📜 Session History (${Math.min(entries.length, limit)} of ${entries.length})`));
+          console.log(
+            chalk.bold(
+              `📜 Session History (${Math.min(entries.length, limit)} of ${entries.length})`,
+            ),
+          );
           console.log('');
           for (const e of entries.slice(0, limit)) {
             const date = new Date(e.timestamp).toLocaleString();
             const dur = (e.duration / 1000).toFixed(1);
-            console.log(`  ${chalk.dim(date)} ${chalk.bold(e.question)}${e.question.length >= 100 ? '...' : ''}`);
+            console.log(
+              `  ${chalk.dim(date)} ${chalk.bold(e.question)}${e.question.length >= 100 ? '...' : ''}`,
+            );
             console.log(`    Winner: ${chalk.green(e.winner)} | ${chalk.dim(`${dur}s`)}`);
             console.log(`    ${chalk.dim(pathJoin(sessionsDir, e.sessionId))}`);
             console.log('');
@@ -1460,7 +1734,9 @@ program
           synth = JSON.parse(await readFile(synthPath, 'utf-8'));
         }
         sessions.push({ dir, meta, synth });
-      } catch { continue; }
+      } catch {
+        continue;
+      }
     }
 
     sessions.sort((a, b) => (b.meta.startedAt ?? 0) - (a.meta.startedAt ?? 0));
@@ -1471,7 +1747,9 @@ program
     }
 
     console.log('');
-    console.log(chalk.bold(`📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`));
+    console.log(
+      chalk.bold(`📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`),
+    );
     console.log('');
 
     for (const s of sessions.slice(0, limit)) {
@@ -1479,7 +1757,9 @@ program
       const question = String(s.meta.input ?? '').slice(0, 60);
       const winner = s.synth?.votes?.winner ?? chalk.dim('(incomplete)');
       const providers = s.meta.providers?.map((p: any) => p.name).join(', ') ?? '';
-      console.log(`  ${chalk.dim(date)} ${chalk.bold(question)}${question.length >= 60 ? '...' : ''}`);
+      console.log(
+        `  ${chalk.dim(date)} ${chalk.bold(question)}${question.length >= 60 ? '...' : ''}`,
+      );
       console.log(`    Winner: ${chalk.green(winner)} | Providers: ${chalk.dim(providers)}`);
       console.log(`    ${chalk.dim(s.dir)}`);
       console.log('');
@@ -1499,7 +1779,7 @@ program
   .option('--json', 'Output result as JSON (for piping)')
   .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
   .option('-r, --rapid', 'Rapid mode')
-  .option('--devils-advocate', 'Assign one provider as devil\'s advocate')
+  .option('--devils-advocate', "Assign one provider as devil's advocate")
   .action(async (session: string, question: string | undefined, opts) => {
     // Resolve session path
     let sessionPath = session;
@@ -1508,7 +1788,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -1563,8 +1845,8 @@ program
 
     let providers = config.providers;
     if (opts.providers) {
-      const names = (opts.providers as string).split(',').map(s => s.trim());
-      providers = config.providers.filter(p => names.includes(p.name));
+      const names = (opts.providers as string).split(',').map((s) => s.trim());
+      providers = config.providers.filter((p) => names.includes(p.name));
       if (providers.length === 0) {
         console.error(chalk.red(`No matching providers: ${opts.providers}`));
         process.exit(1);
@@ -1578,9 +1860,9 @@ program
       process.exit(1);
     }
 
-    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
     const candidateProviders = providers.filter(
-      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+      (p) => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
 
     if (candidateProviders.length < 2) {
@@ -1588,7 +1870,7 @@ program
       process.exit(1);
     }
 
-    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+    const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
     if (!isJSON) {
       console.log('');
@@ -1630,15 +1912,21 @@ program
       const result = await council.deliberate(question);
 
       if (isJSON) {
-        console.log(JSON.stringify({
-          synthesis: result.synthesis.content,
-          synthesizer: result.synthesis.synthesizer,
-          consensus: result.synthesis.consensusScore,
-          confidence: result.synthesis.confidenceScore,
-          duration: result.duration,
-          sessionPath: result.sessionPath,
-          followUpFrom: sessionPath,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              synthesis: result.synthesis.content,
+              synthesizer: result.synthesis.synthesizer,
+              consensus: result.synthesis.consensusScore,
+              confidence: result.synthesis.confidenceScore,
+              duration: result.duration,
+              sessionPath: result.sessionPath,
+              followUpFrom: sessionPath,
+            },
+            null,
+            2,
+          ),
+        );
       } else {
         console.log('');
         console.log(chalk.bold.green('━'.repeat(60)));
@@ -1700,16 +1988,16 @@ program
       for (const p of config.providers) p.timeout = timeoutOverride;
     }
 
-    const cfg1 = config.providers.find(p => p.name === provider1);
-    const cfg2 = config.providers.find(p => p.name === provider2);
+    const cfg1 = config.providers.find((p) => p.name === provider1);
+    const cfg2 = config.providers.find((p) => p.name === provider2);
     if (!cfg1) {
       console.error(chalk.red(`Provider not found: ${provider1}`));
-      console.error(chalk.dim(`Available: ${config.providers.map(p => p.name).join(', ')}`));
+      console.error(chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
       process.exit(1);
     }
     if (!cfg2) {
       console.error(chalk.red(`Provider not found: ${provider2}`));
-      console.error(chalk.dim(`Available: ${config.providers.map(p => p.name).join(', ')}`));
+      console.error(chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
       process.exit(1);
     }
 
@@ -1717,7 +2005,7 @@ program
     const adapter2 = await createProvider(cfg2);
 
     // Find a judge: third provider if available, otherwise adapter1
-    const cfgJudge = config.providers.find(p => p.name !== provider1 && p.name !== provider2);
+    const cfgJudge = config.providers.find((p) => p.name !== provider1 && p.name !== provider2);
     const judgeAdapter = cfgJudge ? await createProvider(cfgJudge) : undefined;
 
     const isJSON = opts.json;
@@ -1737,29 +2025,37 @@ program
         adapter1,
         adapter2,
         judgeAdapter,
-        isJSON ? undefined : (event, data) => {
-          const d = data as Record<string, unknown>;
-          switch (event) {
-            case 'phase':
-              process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
-              break;
-            case 'response':
-              process.stdout.write(chalk.green('✓') + chalk.dim(d.provider as string) + ' ');
-              break;
-            case 'phase:done':
-              console.log('');
-              break;
-          }
-        },
+        isJSON
+          ? undefined
+          : (event, data) => {
+              const d = data as Record<string, unknown>;
+              switch (event) {
+                case 'phase':
+                  process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+                  break;
+                case 'response':
+                  process.stdout.write(chalk.green('✓') + chalk.dim(d.provider as string) + ' ');
+                  break;
+                case 'phase:done':
+                  console.log('');
+                  break;
+              }
+            },
       );
 
       if (isJSON) {
-        console.log(JSON.stringify({
-          provider1,
-          provider2,
-          judge: judgeAdapter?.name ?? provider1,
-          comparison,
-        }, null, 2));
+        console.log(
+          JSON.stringify(
+            {
+              provider1,
+              provider2,
+              judge: judgeAdapter?.name ?? provider1,
+              comparison,
+            },
+            null,
+            2,
+          ),
+        );
       } else {
         console.log('');
         console.log(chalk.bold.green('━'.repeat(60)));
@@ -1793,7 +2089,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -1832,7 +2130,7 @@ program
 // --- quorum heatmap ---
 program
   .command('heatmap')
-  .description('Display consensus heatmap from a session\'s vote data')
+  .description("Display consensus heatmap from a session's vote data")
   .argument('<session>', 'Session path or "last" for most recent')
   .action(async (sessionArg: string) => {
     const { generateHeatmap } = await import('./heatmap.js');
@@ -1844,7 +2142,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -1890,14 +2190,17 @@ program
       letterToProvider[labels[idx]] = providerNames[idx];
     }
 
-    const ballots: Array<{ voter: string; rankings: Array<{ provider: string; rank: number }> }> = [];
+    const ballots: Array<{ voter: string; rankings: Array<{ provider: string; rank: number }> }> =
+      [];
 
     for (const [voter, voteText] of Object.entries(voteResponses)) {
       const rankings: Array<{ provider: string; rank: number }> = [];
       const assigned = new Set<string>();
 
       // Try JSON parsing
-      const jsonMatch = voteText.match(/```(?:json)?\s*([\s\S]*?)```/) || voteText.match(/(\{[\s\S]*"rankings"[\s\S]*\})/);
+      const jsonMatch =
+        voteText.match(/```(?:json)?\s*([\s\S]*?)```/) ||
+        voteText.match(/(\{[\s\S]*"rankings"[\s\S]*\})/);
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[1].trim());
@@ -1912,7 +2215,9 @@ program
               }
             }
           }
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
 
       // Fallback: numbered lines
@@ -1923,18 +2228,27 @@ program
           const rankMatch = line.match(/^\s*(?:#?\s*)?(\d+)[\.\)\-:\s]\s*/);
           if (!rankMatch) continue;
           const lineRank = parseInt(rankMatch[1]);
-          const effectiveRank = (lineRank >= 1 && lineRank <= n) ? lineRank : rank;
+          const effectiveRank = lineRank >= 1 && lineRank <= n ? lineRank : rank;
           if (effectiveRank > n) continue;
 
           const rest = line.slice(rankMatch[0].length);
           let targetName: string | undefined;
           for (let li = 0; li < labels.length; li++) {
-            const pat = new RegExp(`(?:Position\\s+)?(?:\\*\\*|"|')?${labels[li]}(?:\\*\\*|"|')?(?:\\s|\\.|—|-|:|,|\\))`, 'i');
-            if (pat.test(rest)) { targetName = providerNames[li]; break; }
+            const pat = new RegExp(
+              `(?:Position\\s+)?(?:\\*\\*|"|')?${labels[li]}(?:\\*\\*|"|')?(?:\\s|\\.|—|-|:|,|\\))`,
+              'i',
+            );
+            if (pat.test(rest)) {
+              targetName = providerNames[li];
+              break;
+            }
           }
           if (!targetName) {
             for (const pn of providerNames) {
-              if (rest.toLowerCase().includes(pn.toLowerCase())) { targetName = pn; break; }
+              if (rest.toLowerCase().includes(pn.toLowerCase())) {
+                targetName = pn;
+                break;
+              }
             }
           }
 
@@ -1973,7 +2287,9 @@ program
     console.log(chalk.bold('\nAvailable attack packs:\n'));
     for (const name of packs) {
       const pack = await loadAttackPack(name);
-      console.log(`  ${chalk.red('🔴')} ${chalk.bold(name)} — ${pack.description} (${pack.vectors.length} vectors)`);
+      console.log(
+        `  ${chalk.red('🔴')} ${chalk.bold(name)} — ${pack.description} (${pack.vectors.length} vectors)`,
+      );
     }
     console.log('');
     console.log(chalk.dim('Usage: quorum ask --red-team --attack-pack security,code "question"'));
@@ -1996,7 +2312,9 @@ memoryCmd
       console.log('');
       console.log(chalk.bold('📚 Stored Memories'));
       console.log('');
-      console.log(`${chalk.dim('Date')}       | ${chalk.dim('Consensus')} | ${chalk.dim('Winner')}   | ${chalk.dim('Question')}`);
+      console.log(
+        `${chalk.dim('Date')}       | ${chalk.dim('Consensus')} | ${chalk.dim('Winner')}   | ${chalk.dim('Question')}`,
+      );
       for (const node of graph.nodes) {
         const date = new Date(node.timestamp).toISOString().slice(0, 10);
         const consensus = node.consensusScore?.toFixed(2) ?? '—';
@@ -2006,7 +2324,9 @@ memoryCmd
       }
       console.log('');
     } catch (err) {
-      console.error(chalk.red(`Error loading memories: ${err instanceof Error ? err.message : err}`));
+      console.error(
+        chalk.red(`Error loading memories: ${err instanceof Error ? err.message : err}`),
+      );
     }
   });
 
@@ -2027,12 +2347,18 @@ memoryCmd
       console.log('');
       for (const m of memories) {
         const date = new Date(m.timestamp).toISOString().slice(0, 10);
-        console.log(`  ${chalk.dim(date)} ${chalk.bold(m.input.slice(0, 60))}${m.input.length > 60 ? '...' : ''}`);
-        console.log(`     Consensus: ${m.consensusScore?.toFixed(2) ?? '—'} | Winner: ${m.winner ?? '—'}`);
+        console.log(
+          `  ${chalk.dim(date)} ${chalk.bold(m.input.slice(0, 60))}${m.input.length > 60 ? '...' : ''}`,
+        );
+        console.log(
+          `     Consensus: ${m.consensusScore?.toFixed(2) ?? '—'} | Winner: ${m.winner ?? '—'}`,
+        );
         console.log('');
       }
     } catch (err) {
-      console.error(chalk.red(`Error searching memories: ${err instanceof Error ? err.message : err}`));
+      console.error(
+        chalk.red(`Error searching memories: ${err instanceof Error ? err.message : err}`),
+      );
     }
   });
 
@@ -2043,12 +2369,14 @@ memoryCmd
   .action(async (opts) => {
     if (!opts.force) {
       const inquirer = await import('inquirer');
-      const { confirm } = await inquirer.default.prompt([{
-        type: 'confirm',
-        name: 'confirm',
-        message: 'Are you sure you want to clear all memories?',
-        default: false,
-      }]);
+      const { confirm } = await inquirer.default.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Are you sure you want to clear all memories?',
+          default: false,
+        },
+      ]);
       if (!confirm) {
         console.log(chalk.dim('Cancelled.'));
         return;
@@ -2059,7 +2387,9 @@ memoryCmd
       await clearMemoryGraph();
       console.log(chalk.green('✅ Memory graph cleared.'));
     } catch (err) {
-      console.error(chalk.red(`Error clearing memories: ${err instanceof Error ? err.message : err}`));
+      console.error(
+        chalk.red(`Error clearing memories: ${err instanceof Error ? err.message : err}`),
+      );
     }
   });
 
@@ -2074,7 +2404,7 @@ memoryCmd
         console.log(chalk.dim('No memories stored.'));
         return;
       }
-      const timestamps = graph.nodes.map(n => n.timestamp).sort((a, b) => a - b);
+      const timestamps = graph.nodes.map((n) => n.timestamp).sort((a, b) => a - b);
       const earliest = new Date(timestamps[0]).toISOString().slice(0, 10);
       const latest = new Date(timestamps[timestamps.length - 1]).toISOString().slice(0, 10);
       // Extract tags from all nodes
@@ -2110,15 +2440,23 @@ memoryCmd
 // --- Helpers ---
 
 async function readStdin(timeoutMs = 5000): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _reject) => {
     const chunks: Buffer[] = [];
     const timer = setTimeout(() => {
       process.stdin.destroy();
       resolve(Buffer.concat(chunks).toString('utf-8'));
     }, timeoutMs);
-    process.stdin.on('data', (chunk: Buffer) => { chunks.push(chunk); });
-    process.stdin.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks).toString('utf-8')); });
-    process.stdin.on('error', () => { clearTimeout(timer); resolve(''); });
+    process.stdin.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    process.stdin.on('end', () => {
+      clearTimeout(timer);
+      resolve(Buffer.concat(chunks).toString('utf-8'));
+    });
+    process.stdin.on('error', () => {
+      clearTimeout(timer);
+      resolve('');
+    });
   });
 }
 
@@ -2140,7 +2478,9 @@ async function resolveLastSession(sessionsDir: string): Promise<string> {
         latestTime = meta.startedAt;
         latest = pathJoin(sessionsDir, entry.name);
       }
-    } catch { continue; }
+    } catch {
+      continue;
+    }
   }
   if (!latest) {
     console.error(chalk.red('No sessions found.'));
@@ -2152,22 +2492,24 @@ async function resolveLastSession(sessionsDir: string): Promise<string> {
 async function promptAddProvider(): Promise<ProviderConfig | null> {
   const inquirer = await import('inquirer');
 
-  const { provider } = await inquirer.default.prompt<{ provider: string }>([{
-    type: 'list',
-    name: 'provider',
-    message: 'Provider type:',
-    choices: [
-      { name: 'OpenAI', value: 'openai' },
-      { name: 'Anthropic (API key)', value: 'anthropic' },
-      { name: 'Claude CLI', value: 'claude-cli' },
-      { name: 'Google Gemini', value: 'google' },
-      { name: 'Ollama (local)', value: 'ollama' },
-      { name: 'Kimi Code', value: 'kimi' },
-      { name: 'DeepSeek', value: 'deepseek' },
-      { name: 'Mistral', value: 'mistral' },
-      { name: 'Custom (OpenAI-compatible)', value: 'custom' },
-    ],
-  }]);
+  const { provider } = await inquirer.default.prompt<{ provider: string }>([
+    {
+      type: 'list',
+      name: 'provider',
+      message: 'Provider type:',
+      choices: [
+        { name: 'OpenAI', value: 'openai' },
+        { name: 'Anthropic (API key)', value: 'anthropic' },
+        { name: 'Claude CLI', value: 'claude-cli' },
+        { name: 'Google Gemini', value: 'google' },
+        { name: 'Ollama (local)', value: 'ollama' },
+        { name: 'Kimi Code', value: 'kimi' },
+        { name: 'DeepSeek', value: 'deepseek' },
+        { name: 'Mistral', value: 'mistral' },
+        { name: 'Custom (OpenAI-compatible)', value: 'custom' },
+      ],
+    },
+  ]);
 
   const defaults: Record<string, { model: string; needsKey: boolean }> = {
     openai: { model: 'gpt-4o', needsKey: true },
@@ -2190,33 +2532,43 @@ async function promptAddProvider(): Promise<ProviderConfig | null> {
   let auth: ProviderConfig['auth'] = { method: 'none' };
 
   if (def.needsKey) {
-    const { method } = await inquirer.default.prompt<{ method: string }>([{
-      type: 'list',
-      name: 'method',
-      message: 'Auth method:',
-      choices: [
-        { name: 'Environment variable', value: 'env' },
-        { name: 'API key (paste)', value: 'api_key' },
-      ],
-    }]);
+    const { method } = await inquirer.default.prompt<{ method: string }>([
+      {
+        type: 'list',
+        name: 'method',
+        message: 'Auth method:',
+        choices: [
+          { name: 'Environment variable', value: 'env' },
+          { name: 'API key (paste)', value: 'api_key' },
+        ],
+      },
+    ]);
 
     if (method === 'api_key') {
-      const { key } = await inquirer.default.prompt([{ type: 'password', name: 'key', message: 'API key:', mask: '*' }]);
+      const { key } = await inquirer.default.prompt([
+        { type: 'password', name: 'key', message: 'API key:', mask: '*' },
+      ]);
       auth = { method: 'api_key', apiKey: key as string };
     } else {
       const envDefault = provider === 'kimi' ? 'KIMI_API_KEY' : `${provider.toUpperCase()}_API_KEY`;
-      const { envVar } = await inquirer.default.prompt([{ type: 'input', name: 'envVar', message: 'Env var:', default: envDefault }]);
+      const { envVar } = await inquirer.default.prompt([
+        { type: 'input', name: 'envVar', message: 'Env var:', default: envDefault },
+      ]);
       auth = { method: 'env', envVar: envVar as string };
     }
   }
 
   let baseUrl: string | undefined;
   if (provider === 'custom' || provider === 'ollama') {
-    const { url } = await inquirer.default.prompt([{
-      type: 'input', name: 'url', message: 'Base URL:',
-      default: provider === 'ollama' ? 'http://localhost:11434' : '',
-    }]);
-    baseUrl = url as string || undefined;
+    const { url } = await inquirer.default.prompt([
+      {
+        type: 'input',
+        name: 'url',
+        message: 'Base URL:',
+        default: provider === 'ollama' ? 'http://localhost:11434' : '',
+      },
+    ]);
+    baseUrl = (url as string) || undefined;
   }
 
   return {
@@ -2228,7 +2580,12 @@ async function promptAddProvider(): Promise<ProviderConfig | null> {
   };
 }
 
-function displayDryRun(profile: AgentProfile, providers: ProviderConfig[], singleMode: boolean, projectConfigPath?: string): void {
+function displayDryRun(
+  profile: AgentProfile,
+  providers: ProviderConfig[],
+  singleMode: boolean,
+  projectConfigPath?: string,
+): void {
   console.log('');
   console.log(chalk.bold.cyan('🔍 Dry Run Preview'));
   console.log('');
@@ -2251,7 +2608,11 @@ function displayDryRun(profile: AgentProfile, providers: ProviderConfig[], singl
     console.log(`  Excluded: ${profile.excludeFromDeliberation.join(', ')}`);
   }
   if (profile.weights && Object.keys(profile.weights).length > 0) {
-    console.log(`  Weights: ${Object.entries(profile.weights).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    console.log(
+      `  Weights: ${Object.entries(profile.weights)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ')}`,
+    );
   }
   console.log('');
 
@@ -2262,8 +2623,12 @@ function displayDryRun(profile: AgentProfile, providers: ProviderConfig[], singl
     const inputBudget = availableInput(p.provider, 500);
     const inputBudgetK = (inputBudget / 1000).toFixed(0);
     const ctxK = (limits.contextLength / 1000).toFixed(0);
-    console.log(`  ${chalk.green('✓')} ${chalk.bold(p.name)} ${chalk.dim(`(${p.provider}/${p.model})`)}`);
-    console.log(`    Context: ${ctxK}k tokens | Output reserve: ${limits.outputReserve} | Input budget: ~${inputBudgetK}k tokens`);
+    console.log(
+      `  ${chalk.green('✓')} ${chalk.bold(p.name)} ${chalk.dim(`(${p.provider}/${p.model})`)}`,
+    );
+    console.log(
+      `    Context: ${ctxK}k tokens | Output reserve: ${limits.outputReserve} | Input budget: ~${inputBudgetK}k tokens`,
+    );
     if (p.timeout) console.log(`    Timeout: ${p.timeout}s`);
   }
   console.log('');
@@ -2273,7 +2638,16 @@ function displayDryRun(profile: AgentProfile, providers: ProviderConfig[], singl
     console.log(chalk.bold('Pipeline:'));
     console.log('  Single provider mode — direct query, no deliberation');
   } else {
-    const phases = ['GATHER', 'PLAN', 'FORMULATE', 'DEBATE', 'ADJUST', 'REBUTTAL', 'VOTE', 'SYNTHESIZE'];
+    const phases = [
+      'GATHER',
+      'PLAN',
+      'FORMULATE',
+      'DEBATE',
+      'ADJUST',
+      'REBUTTAL',
+      'VOTE',
+      'SYNTHESIZE',
+    ];
     console.log(chalk.bold('Phase Pipeline:'));
     for (let i = 0; i < phases.length; i++) {
       const arrow = i < phases.length - 1 ? ' →' : '';
@@ -2301,7 +2675,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -2326,7 +2702,13 @@ program
 
     // Read all phase files
     const phaseFiles = [
-      '01-gather', '02-plan', '03-formulate', '04-debate', '05-adjust', '06-rebuttal', '07-vote',
+      '01-gather',
+      '02-plan',
+      '03-formulate',
+      '04-debate',
+      '05-adjust',
+      '06-rebuttal',
+      '07-vote',
     ];
     const phases: Record<string, unknown> = {};
     for (const pf of phaseFiles) {
@@ -2352,10 +2734,10 @@ program
 
     let providerConfig: ProviderConfig;
     if (opts.provider) {
-      const found = config.providers.find(p => p.name === (opts.provider as string));
+      const found = config.providers.find((p) => p.name === (opts.provider as string));
       if (!found) {
         console.error(chalk.red(`Provider not found: ${opts.provider}`));
-        console.error(chalk.dim(`Available: ${config.providers.map(p => p.name).join(', ')}`));
+        console.error(chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
         process.exit(1);
       }
       providerConfig = found;
@@ -2411,11 +2793,15 @@ program
         const indexPath = pathJoin(sessionsDir, 'index.json');
         if (existsSync(indexPath)) {
           try {
-            const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+            const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+              sessionId: string;
+            }>;
             if (entries.length > 0) {
               return pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
             }
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
         }
         return resolveLastSession(sessionsDir);
       }
@@ -2483,7 +2869,7 @@ program
       }
       let providerConfig: ProviderConfig;
       if (opts.provider) {
-        const found = config.providers.find(p => p.name === (opts.provider as string));
+        const found = config.providers.find((p) => p.name === (opts.provider as string));
         if (!found) {
           console.error(chalk.red(`Provider not found: ${opts.provider}`));
           process.exit(1);
@@ -2507,10 +2893,15 @@ program
         console.log(chalk.dim(`Analyzing with ${providerConfig.name}...`));
       }
       try {
-        analysisNarrative = await adapter.generate(prompt, 'You are an expert analyst comparing two AI deliberation outcomes. Be concise and insightful.');
+        analysisNarrative = await adapter.generate(
+          prompt,
+          'You are an expert analyst comparing two AI deliberation outcomes. Be concise and insightful.',
+        );
       } catch (err) {
         if (!opts.json) {
-          console.error(chalk.yellow(`Analysis failed: ${err instanceof Error ? err.message : err}`));
+          console.error(
+            chalk.yellow(`Analysis failed: ${err instanceof Error ? err.message : err}`),
+          );
         }
       }
     }
@@ -2518,12 +2909,29 @@ program
     // JSON output
     if (opts.json) {
       const output: any = {
-        session1: { path: path1, question: q1, providers: providers1, winner: winner1, consensus: consensus1, confidence: confidence1, rankings: rankings1 },
-        session2: { path: path2, question: q2, providers: providers2, winner: winner2, consensus: consensus2, confidence: confidence2, rankings: rankings2 },
+        session1: {
+          path: path1,
+          question: q1,
+          providers: providers1,
+          winner: winner1,
+          consensus: consensus1,
+          confidence: confidence1,
+          rankings: rankings1,
+        },
+        session2: {
+          path: path2,
+          question: q2,
+          providers: providers2,
+          winner: winner2,
+          consensus: consensus2,
+          confidence: confidence2,
+          rankings: rankings2,
+        },
         providerDiff: { common, onlyInSession1: onlyIn1, onlyInSession2: onlyIn2 },
         winnerChanged: winner1 !== winner2,
         consensusDelta: consensus1 != null && consensus2 != null ? consensus2 - consensus1 : null,
-        confidenceDelta: confidence1 != null && confidence2 != null ? confidence2 - confidence1 : null,
+        confidenceDelta:
+          confidence1 != null && confidence2 != null ? confidence2 - confidence1 : null,
       };
       if (analysisNarrative) output.analysis = analysisNarrative;
       console.log(JSON.stringify(output, null, 2));
@@ -2562,13 +2970,15 @@ program
     if (winner1 === winner2) {
       console.log(`  ${chalk.green(winner1)} (unchanged)`);
     } else {
-      console.log(`  ${chalk.dim('S1:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('S2:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`);
+      console.log(
+        `  ${chalk.dim('S1:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('S2:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`,
+      );
     }
 
     // Scores
     console.log('');
     console.log(chalk.bold('Scores:'));
-    const fmtScore = (v: number | null) => v != null ? v.toFixed(2) : '—';
+    const fmtScore = (v: number | null) => (v != null ? v.toFixed(2) : '—');
     const fmtDelta = (a: number | null, b: number | null) => {
       if (a == null || b == null) return '';
       const d = b - a;
@@ -2576,8 +2986,12 @@ program
       const color = d > 0 ? chalk.green : d < 0 ? chalk.red : chalk.dim;
       return color(` (${sign}${d.toFixed(2)})`);
     };
-    console.log(`  Consensus:  ${fmtScore(consensus1)} → ${fmtScore(consensus2)}${fmtDelta(consensus1, consensus2)}`);
-    console.log(`  Confidence: ${fmtScore(confidence1)} → ${fmtScore(confidence2)}${fmtDelta(confidence1, confidence2)}`);
+    console.log(
+      `  Consensus:  ${fmtScore(consensus1)} → ${fmtScore(consensus2)}${fmtDelta(consensus1, consensus2)}`,
+    );
+    console.log(
+      `  Confidence: ${fmtScore(confidence1)} → ${fmtScore(confidence2)}${fmtDelta(confidence1, confidence2)}`,
+    );
 
     // Vote rankings
     console.log('');
@@ -2620,11 +3034,19 @@ program
     const indexPath = pathJoin(sessionsDir, 'index.json');
 
     // Load index entries
-    let entries: Array<{ sessionId: string; timestamp: number; question: string; winner: string; duration: number }> = [];
+    let entries: Array<{
+      sessionId: string;
+      timestamp: number;
+      question: string;
+      winner: string;
+      duration: number;
+    }> = [];
     if (existsSync(indexPath)) {
       try {
         entries = JSON.parse(await readFile(indexPath, 'utf-8'));
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     if (entries.length === 0) {
@@ -2663,7 +3085,11 @@ program
           totalConsensus += synth.consensusScore;
           consensusCount++;
           if (!mostControversial || synth.consensusScore < mostControversial.consensus) {
-            mostControversial = { sessionId: entry.sessionId, question: entry.question, consensus: synth.consensusScore };
+            mostControversial = {
+              sessionId: entry.sessionId,
+              question: entry.question,
+              consensus: synth.consensusScore,
+            };
           }
         }
         if (typeof synth.confidenceScore === 'number') {
@@ -2672,7 +3098,9 @@ program
         }
 
         // Vote rankings → participation & wins
-        const rankings = synth.votes?.rankings as Array<{ provider: string; score: number }> | undefined;
+        const rankings = synth.votes?.rankings as
+          | Array<{ provider: string; score: number }>
+          | undefined;
         const winner = synth.votes?.winner as string | undefined;
         if (rankings) {
           for (const r of rankings) {
@@ -2682,30 +3110,43 @@ program
         if (winner) {
           providerWins[winner] = (providerWins[winner] ?? 0) + 1;
         }
-      } catch { /* skip bad files */ }
+      } catch {
+        /* skip bad files */
+      }
     }
 
     // Compute win rates
-    const allProviders = new Set([...Object.keys(providerWins), ...Object.keys(providerParticipation)]);
-    const providerStats = [...allProviders].map(name => {
-      const wins = providerWins[name] ?? 0;
-      const participated = providerParticipation[name] ?? 0;
-      const winRate = participated > 0 ? wins / participated : 0;
-      return { name, wins, participated, winRate };
-    }).sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
+    const allProviders = new Set([
+      ...Object.keys(providerWins),
+      ...Object.keys(providerParticipation),
+    ]);
+    const providerStats = [...allProviders]
+      .map((name) => {
+        const wins = providerWins[name] ?? 0;
+        const participated = providerParticipation[name] ?? 0;
+        const winRate = participated > 0 ? wins / participated : 0;
+        return { name, wins, participated, winRate };
+      })
+      .sort((a, b) => b.winRate - a.winRate || b.wins - a.wins);
 
     const avgConsensus = consensusCount > 0 ? totalConsensus / consensusCount : null;
     const avgConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : null;
 
     if (opts.json) {
-      console.log(JSON.stringify({
-        totalSessions: entries.length,
-        totalDurationMs: totalDuration,
-        avgConsensus,
-        avgConfidence,
-        providers: providerStats,
-        mostControversial,
-      }, null, 2));
+      console.log(
+        JSON.stringify(
+          {
+            totalSessions: entries.length,
+            totalDurationMs: totalDuration,
+            avgConsensus,
+            avgConfidence,
+            providers: providerStats,
+            mostControversial,
+          },
+          null,
+          2,
+        ),
+      );
       return;
     }
 
@@ -2715,9 +3156,13 @@ program
     console.log(chalk.dim('━'.repeat(50)));
     console.log('');
     console.log(`  Sessions: ${chalk.bold(String(entries.length))}`);
-    console.log(`  Total deliberation time: ${chalk.bold((totalDuration / 1000).toFixed(1) + 's')}`);
-    if (avgConsensus != null) console.log(`  Avg consensus: ${chalk.bold(avgConsensus.toFixed(2))}`);
-    if (avgConfidence != null) console.log(`  Avg confidence: ${chalk.bold(avgConfidence.toFixed(2))}`);
+    console.log(
+      `  Total deliberation time: ${chalk.bold((totalDuration / 1000).toFixed(1) + 's')}`,
+    );
+    if (avgConsensus != null)
+      console.log(`  Avg consensus: ${chalk.bold(avgConsensus.toFixed(2))}`);
+    if (avgConfidence != null)
+      console.log(`  Avg confidence: ${chalk.bold(avgConfidence.toFixed(2))}`);
     console.log('');
 
     // Provider table
@@ -2726,13 +3171,17 @@ program
     for (const p of providerStats) {
       const pct = (p.winRate * 100).toFixed(0);
       const bar = '█'.repeat(Math.round(p.winRate * 20));
-      console.log(`    ${p.name.padEnd(12)} ${chalk.cyan(bar.padEnd(20))} ${pct}%  (${p.wins}/${p.participated} sessions)`);
+      console.log(
+        `    ${p.name.padEnd(12)} ${chalk.cyan(bar.padEnd(20))} ${pct}%  (${p.wins}/${p.participated} sessions)`,
+      );
     }
 
     if (mostControversial) {
       console.log('');
       console.log(chalk.bold('  Most Controversial:'));
-      console.log(`    ${chalk.yellow(mostControversial.question.slice(0, 80))}${mostControversial.question.length > 80 ? '...' : ''}`);
+      console.log(
+        `    ${chalk.yellow(mostControversial.question.slice(0, 80))}${mostControversial.question.length > 80 ? '...' : ''}`,
+      );
       console.log(`    Consensus: ${chalk.red(mostControversial.consensus.toFixed(2))}`);
       console.log(`    ${chalk.dim(pathJoin(sessionsDir, mostControversial.sessionId))}`);
     }
@@ -2746,11 +3195,11 @@ program
   .description('Play back a deliberation session phase-by-phase with simulated typing')
   .argument('<session>', 'Session path or "last" for most recent')
   .option('--phase <name>', 'Filter to a single phase (e.g., debate, gather)')
-  .option('--provider <name>', 'Filter to a single provider\'s responses')
+  .option('--provider <name>', "Filter to a single provider's responses")
   .option('--speed <speed>', 'Typing speed: fast (5ms), normal (20ms), slow (50ms)', 'normal')
   .action(async (sessionArg: string, opts) => {
     const speedMap: Record<string, number> = { fast: 5, normal: 20, slow: 50 };
-    const delay = speedMap[(opts.speed as string)] ?? 20;
+    const delay = speedMap[opts.speed as string] ?? 20;
 
     // Resolve session path
     let sessionPath = sessionArg;
@@ -2759,7 +3208,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -2773,7 +3224,7 @@ program
       }
     }
 
-    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
     async function streamText(text: string): Promise<void> {
       for (const ch of text) {
@@ -2797,7 +3248,8 @@ program
     const providerNames = (meta.providers ?? []).map((p: any) => p.name).join(', ');
     console.log(chalk.dim(`Providers: ${providerNames}`));
     console.log(chalk.dim(`Profile: ${meta.profile ?? 'default'}`));
-    if (meta.startedAt) console.log(chalk.dim(`Time: ${new Date(meta.startedAt).toLocaleString()}`));
+    if (meta.startedAt)
+      console.log(chalk.dim(`Time: ${new Date(meta.startedAt).toLocaleString()}`));
     console.log('');
 
     // Phase files in order
@@ -2815,7 +3267,8 @@ program
     const providerFilter = opts.provider as string | undefined;
 
     for (const { file, name } of phaseFiles) {
-      if (phaseFilter && !name.toLowerCase().startsWith(phaseFilter) && !file.includes(phaseFilter)) continue;
+      if (phaseFilter && !name.toLowerCase().startsWith(phaseFilter) && !file.includes(phaseFilter))
+        continue;
 
       const phasePath = pathJoin(sessionPath, `${file}.json`);
       if (!existsSync(phasePath)) continue;
@@ -2852,7 +3305,9 @@ program
         }
 
         // Vote rankings
-        const rankings = synth.votes?.rankings as Array<{ provider: string; score: number }> | undefined;
+        const rankings = synth.votes?.rankings as
+          | Array<{ provider: string; score: number }>
+          | undefined;
         const winner = synth.votes?.winner as string | undefined;
         if (rankings) {
           console.log(chalk.bold('🗳️  Vote Rankings'));
@@ -2876,7 +3331,7 @@ program
   .option('--json', 'Output result as JSON')
   .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
   .option('-r, --rapid', 'Rapid mode')
-  .option('--devils-advocate', 'Assign one provider as devil\'s advocate')
+  .option('--devils-advocate', "Assign one provider as devil's advocate")
   .action(async (sessionArg: string, opts) => {
     // Resolve session path
     let originalSessionPath = sessionArg;
@@ -2885,14 +3340,18 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             originalSessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
             originalSessionPath = await resolveLastSession(sessionsDir);
           }
         } catch {
-          originalSessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+          originalSessionPath = await resolveLastSession(
+            pathJoin(homedir(), '.quorum', 'sessions'),
+          );
         }
       } else {
         originalSessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
@@ -2932,11 +3391,11 @@ program
     // Filter providers
     let providers = config.providers;
     if (opts.providers) {
-      const names = (opts.providers as string).split(',').map(s => s.trim());
-      providers = config.providers.filter(p => names.includes(p.name));
+      const names = (opts.providers as string).split(',').map((s) => s.trim());
+      providers = config.providers.filter((p) => names.includes(p.name));
       if (providers.length === 0) {
         console.error(chalk.red(`No matching providers: ${opts.providers}`));
-        console.error(chalk.dim(`Available: ${config.providers.map(p => p.name).join(', ')}`));
+        console.error(chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
         process.exit(1);
       }
     }
@@ -2952,24 +3411,28 @@ program
     }
 
     // Filter excluded providers
-    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
     const candidateProviders = providers.filter(
-      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+      (p) => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
 
     if (candidateProviders.length < 2) {
-      console.error(chalk.red(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`));
+      console.error(
+        chalk.red(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`),
+      );
       process.exit(1);
     }
 
-    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+    const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
     if (!isJSON) {
       console.log('');
       console.log(chalk.bold.cyan(`🔄 Re-running previous deliberation`));
       console.log(chalk.dim(`Original session: ${originalSessionPath}`));
-      console.log(chalk.dim(`Question: ${question.slice(0, 120)}${question.length > 120 ? '...' : ''}`));
-      console.log(chalk.dim(`Providers: ${candidateProviders.map(p => p.name).join(', ')}`));
+      console.log(
+        chalk.dim(`Question: ${question.slice(0, 120)}${question.length > 120 ? '...' : ''}`),
+      );
+      console.log(chalk.dim(`Providers: ${candidateProviders.map((p) => p.name).join(', ')}`));
       console.log(chalk.dim(`Profile: ${profile.name}`));
       console.log('');
     }
@@ -2997,16 +3460,23 @@ program
             break;
           }
           case 'votes': {
-            const v = d as unknown as { rankings: Array<{ provider: string; score: number }>; winner: string; controversial: boolean };
+            const v = d as unknown as {
+              rankings: Array<{ provider: string; score: number }>;
+              winner: string;
+              controversial: boolean;
+            };
             console.log('');
             console.log(chalk.bold('  🗳️  Results'));
             const maxScore = v.rankings[0]?.score || 1;
             for (const r of v.rankings) {
               const bar = '█'.repeat(Math.round((r.score / maxScore) * 12));
               const crown = r.provider === v.winner ? ' 👑' : '';
-              console.log(`     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`);
+              console.log(
+                `     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`,
+              );
             }
-            if (v.controversial) console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
+            if (v.controversial)
+              console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
             break;
           }
           case 'complete':
@@ -3045,7 +3515,11 @@ program
         displayContent = displayContent.replace(/^##\s*Synthesis\s*\n+/i, '');
         console.log(displayContent);
 
-        if (result.synthesis.minorityReport && result.synthesis.minorityReport !== 'None' && result.synthesis.minorityReport.trim()) {
+        if (
+          result.synthesis.minorityReport &&
+          result.synthesis.minorityReport !== 'None' &&
+          result.synthesis.minorityReport.trim()
+        ) {
           console.log('');
           console.log(chalk.bold.yellow('── Minority Report ──'));
           console.log(result.synthesis.minorityReport);
@@ -3066,7 +3540,11 @@ program
       // Summary
       if (!isJSON) {
         console.log('');
-        console.log(chalk.bold(`Re-ran '${question.slice(0, 80)}${question.length > 80 ? '...' : ''}' with [${candidateProviders.map(p => p.name).join(', ')}] — new session: ${result.sessionPath}`));
+        console.log(
+          chalk.bold(
+            `Re-ran '${question.slice(0, 80)}${question.length > 80 ? '...' : ''}' with [${candidateProviders.map((p) => p.name).join(', ')}] — new session: ${result.sessionPath}`,
+          ),
+        );
       }
 
       // Auto-compare if --compare
@@ -3110,12 +3588,30 @@ program
 
         if (isJSON) {
           const output: any = {
-            session1: { path: originalSessionPath, question: q1, providers: providers1, winner: winner1, consensus: consensus1, confidence: confidence1, rankings: rankings1 },
-            session2: { path: newSessionPath, question: q2, providers: providers2, winner: winner2, consensus: consensus2, confidence: confidence2, rankings: rankings2 },
+            session1: {
+              path: originalSessionPath,
+              question: q1,
+              providers: providers1,
+              winner: winner1,
+              consensus: consensus1,
+              confidence: confidence1,
+              rankings: rankings1,
+            },
+            session2: {
+              path: newSessionPath,
+              question: q2,
+              providers: providers2,
+              winner: winner2,
+              consensus: consensus2,
+              confidence: confidence2,
+              rankings: rankings2,
+            },
             providerDiff: { common, onlyInSession1: onlyIn1, onlyInSession2: onlyIn2 },
             winnerChanged: winner1 !== winner2,
-            consensusDelta: consensus1 != null && consensus2 != null ? consensus2 - consensus1 : null,
-            confidenceDelta: confidence1 != null && confidence2 != null ? confidence2 - confidence1 : null,
+            consensusDelta:
+              consensus1 != null && consensus2 != null ? consensus2 - consensus1 : null,
+            confidenceDelta:
+              confidence1 != null && confidence2 != null ? confidence2 - confidence1 : null,
           };
           console.log(JSON.stringify(output, null, 2));
         } else {
@@ -3126,7 +3622,8 @@ program
             console.log(`  ${chalk.green('Same:')} ${providers1.join(', ')}`);
           } else {
             console.log(`  ${chalk.dim('Common:')} ${common.join(', ') || '(none)'}`);
-            if (onlyIn1.length) console.log(`  ${chalk.red('Only Original:')} ${onlyIn1.join(', ')}`);
+            if (onlyIn1.length)
+              console.log(`  ${chalk.red('Only Original:')} ${onlyIn1.join(', ')}`);
             if (onlyIn2.length) console.log(`  ${chalk.red('Only Re-run:')} ${onlyIn2.join(', ')}`);
           }
 
@@ -3136,13 +3633,15 @@ program
           if (winner1 === winner2) {
             console.log(`  ${chalk.green(winner1)} (unchanged)`);
           } else {
-            console.log(`  ${chalk.dim('Original:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('Re-run:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`);
+            console.log(
+              `  ${chalk.dim('Original:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('Re-run:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`,
+            );
           }
 
           // Scores
           console.log('');
           console.log(chalk.bold('Scores:'));
-          const fmtScore = (v: number | null) => v != null ? v.toFixed(2) : '—';
+          const fmtScore = (v: number | null) => (v != null ? v.toFixed(2) : '—');
           const fmtDelta = (a: number | null, b: number | null) => {
             if (a == null || b == null) return '';
             const d = b - a;
@@ -3150,8 +3649,12 @@ program
             const color = d > 0 ? chalk.green : d < 0 ? chalk.red : chalk.dim;
             return color(` (${sign}${d.toFixed(2)})`);
           };
-          console.log(`  Consensus:  ${fmtScore(consensus1)} → ${fmtScore(consensus2)}${fmtDelta(consensus1, consensus2)}`);
-          console.log(`  Confidence: ${fmtScore(confidence1)} → ${fmtScore(confidence2)}${fmtDelta(confidence1, confidence2)}`);
+          console.log(
+            `  Consensus:  ${fmtScore(consensus1)} → ${fmtScore(consensus2)}${fmtDelta(consensus1, consensus2)}`,
+          );
+          console.log(
+            `  Confidence: ${fmtScore(confidence1)} → ${fmtScore(confidence2)}${fmtDelta(confidence1, confidence2)}`,
+          );
 
           // Rankings
           console.log('');
@@ -3214,7 +3717,9 @@ program
             results.push(full);
           }
         }
-      } catch { /* skip unreadable dirs */ }
+      } catch {
+        /* skip unreadable dirs */
+      }
       return results;
     }
 
@@ -3270,7 +3775,9 @@ program
     const debounceMs = parseInt(opts.debounce as string) || 1000;
 
     console.log('');
-    console.log(chalk.bold.cyan(`👁  Watching ${fileList.length} file(s) for changes... (Ctrl+C to stop)`));
+    console.log(
+      chalk.bold.cyan(`👁  Watching ${fileList.length} file(s) for changes... (Ctrl+C to stop)`),
+    );
     for (const f of fileList.slice(0, 10)) {
       console.log(chalk.dim(`  ${relative(process.cwd(), f)}`));
     }
@@ -3338,7 +3845,11 @@ program
             const ext = extname(filePath).slice(1) || 'text';
             content += `## File: ${relative(process.cwd(), filePath)}\n\`\`\`${ext}\n${fileContent}\n\`\`\`\n\n`;
           } catch (err) {
-            console.error(chalk.yellow(`  Warning: Could not read ${filePath}: ${err instanceof Error ? err.message : err}`));
+            console.error(
+              chalk.yellow(
+                `  Warning: Could not read ${filePath}: ${err instanceof Error ? err.message : err}`,
+              ),
+            );
           }
         }
 
@@ -3356,7 +3867,9 @@ program
 
         await program.parseAsync(['node', 'quorum', ...askArgs]);
       } catch (err) {
-        console.error(chalk.red(`Error during deliberation: ${err instanceof Error ? err.message : err}`));
+        console.error(
+          chalk.red(`Error during deliberation: ${err instanceof Error ? err.message : err}`),
+        );
       }
 
       running = false;
@@ -3369,7 +3882,11 @@ program
       console.log('');
       console.log(chalk.dim('Closing watchers...'));
       for (const w of watchers) {
-        try { w.close(); } catch { /* ignore */ }
+        try {
+          w.close();
+        } catch {
+          /* ignore */
+        }
       }
       process.exit(0);
     });
@@ -3391,7 +3908,9 @@ program
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           } else {
@@ -3409,7 +3928,9 @@ program
     const reportPath = pathJoin(sessionPath, 'evidence-report.json');
     if (!existsSync(reportPath)) {
       console.error(chalk.red(`No evidence report found at ${reportPath}`));
-      console.error(chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'));
+      console.error(
+        chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'),
+      );
       process.exit(1);
     }
 
@@ -3456,7 +3977,7 @@ program
     // Filter by provider
     if (opts.provider) {
       const name = opts.provider as string;
-      reports = reports.filter(r => r.provider.toLowerCase() === name.toLowerCase());
+      reports = reports.filter((r) => r.provider.toLowerCase() === name.toLowerCase());
       if (reports.length === 0) {
         console.error(chalk.red(`No report found for provider: ${name}`));
         process.exit(1);
@@ -3464,7 +3985,7 @@ program
     }
 
     // Filter by tier
-    const tierFilter = opts.tier ? (opts.tier as string).toUpperCase() as SourceTier : undefined;
+    const tierFilter = opts.tier ? ((opts.tier as string).toUpperCase() as SourceTier) : undefined;
     if (tierFilter && !['A', 'B', 'C', 'D', 'F'].includes(tierFilter)) {
       console.error(chalk.red(`Invalid tier: ${opts.tier}. Must be A, B, C, D, or F.`));
       process.exit(1);
@@ -3525,12 +4046,25 @@ program
       const weighted = `${Math.round(r.weightedScore * 100)}%`;
       const claims = `${r.supportedClaims}/${r.totalClaims}`;
       const tb = r.tierBreakdown;
-      const tierStr = ['A', 'B', 'C', 'D', 'F'].map(t => `${tb[t as SourceTier] ?? 0}${t}`).join(' ');
+      const tierStr = ['A', 'B', 'C', 'D', 'F']
+        .map((t) => `${tb[t as SourceTier] ?? 0}${t}`)
+        .join(' ');
       const grade = evidenceGrade(r.weightedScore);
 
-      const gradeColor = grade === 'A' ? chalk.green : grade === 'B' ? chalk.cyan : grade === 'C' ? chalk.yellow : grade === 'D' ? chalk.red : chalk.bgRed;
+      const gradeColor =
+        grade === 'A'
+          ? chalk.green
+          : grade === 'B'
+            ? chalk.cyan
+            : grade === 'C'
+              ? chalk.yellow
+              : grade === 'D'
+                ? chalk.red
+                : chalk.bgRed;
 
-      console.log(`│ ${pad(r.provider, colProvider)} │ ${padC(score, colScore)} │ ${padC(weighted, colWeighted)} │ ${padC(claims, colClaims)} │ ${pad(tierStr, colTier)} │ ${padC(gradeColor(grade), colGrade)} │`);
+      console.log(
+        `│ ${pad(r.provider, colProvider)} │ ${padC(score, colScore)} │ ${padC(weighted, colWeighted)} │ ${padC(claims, colClaims)} │ ${pad(tierStr, colTier)} │ ${padC(gradeColor(grade), colGrade)} │`,
+      );
     }
 
     console.log(divBot);
@@ -3541,10 +4075,14 @@ program
       console.log(chalk.bold('Cross-References:'));
       for (const cr of crossRefs) {
         if (cr.corroborated) {
-          console.log(`  ${chalk.green('✅')} "${cr.claimText}" — ${cr.providers.join(', ')} (tier ${cr.bestSourceTier})`);
+          console.log(
+            `  ${chalk.green('✅')} "${cr.claimText}" — ${cr.providers.join(', ')} (tier ${cr.bestSourceTier})`,
+          );
         } else if (cr.contradicted) {
           const details = cr.contradictions?.join('; ') ?? '';
-          console.log(`  ${chalk.yellow('⚠️')}  "${cr.claimText}" — ${details || cr.providers.join(' vs ')}`);
+          console.log(
+            `  ${chalk.yellow('⚠️')}  "${cr.claimText}" — ${details || cr.providers.join(' vs ')}`,
+          );
         }
       }
     }
@@ -3553,7 +4091,7 @@ program
     for (const r of reports) {
       let claims = r.claims;
       if (tierFilter) {
-        claims = claims.filter(c => c.sourceTier === tierFilter);
+        claims = claims.filter((c) => c.sourceTier === tierFilter);
       }
       if (claims.length === 0) continue;
 
@@ -3561,11 +4099,12 @@ program
       console.log(chalk.bold(`Provider Detail — ${r.provider}:`));
 
       for (const c of claims) {
-        const icon = c.sourceTier === 'A' || c.sourceTier === 'B'
-          ? chalk.green('✅')
-          : c.sourceTier === 'C' || c.sourceTier === 'D'
-            ? chalk.yellow('⚠️')
-            : chalk.red('❌');
+        const icon =
+          c.sourceTier === 'A' || c.sourceTier === 'B'
+            ? chalk.green('✅')
+            : c.sourceTier === 'C' || c.sourceTier === 'D'
+              ? chalk.yellow('⚠️')
+              : chalk.red('❌');
         const sourceInfo = c.source ? ` [source: ${c.source}]` : '';
         console.log(`  ${icon} [${c.sourceTier}] "${c.claim}"${chalk.dim(sourceInfo)}`);
       }
@@ -3605,14 +4144,27 @@ policyCmd
         return;
       }
       for (const p of policies) {
-        console.log(`${chalk.bold(p.name)} ${chalk.dim(`v${p.version}`)} — ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`);
+        console.log(
+          `${chalk.bold(p.name)} ${chalk.dim(`v${p.version}`)} — ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`,
+        );
         for (const r of p.rules) {
-          const actionColor = r.action === 'block' ? chalk.red : r.action === 'warn' ? chalk.yellow : r.action === 'pause' ? chalk.magenta : chalk.dim;
-          console.log(`  ${actionColor(r.action.padEnd(5))} ${r.type}${r.value !== undefined ? ` (${r.value})` : ''}${r.message ? ` — ${r.message}` : ''}`);
+          const actionColor =
+            r.action === 'block'
+              ? chalk.red
+              : r.action === 'warn'
+                ? chalk.yellow
+                : r.action === 'pause'
+                  ? chalk.magenta
+                  : chalk.dim;
+          console.log(
+            `  ${actionColor(r.action.padEnd(5))} ${r.type}${r.value !== undefined ? ` (${r.value})` : ''}${r.message ? ` — ${r.message}` : ''}`,
+          );
         }
       }
     } catch (err) {
-      console.error(chalk.red(`Error loading policies: ${err instanceof Error ? err.message : err}`));
+      console.error(
+        chalk.red(`Error loading policies: ${err instanceof Error ? err.message : err}`),
+      );
       process.exit(1);
     }
   });
@@ -3628,7 +4180,11 @@ policyCmd
       const errors = validatePolicy(parsed);
       if (errors.length === 0) {
         console.log(chalk.green(`✓ ${file} is valid`));
-        console.log(chalk.dim(`  Policy: ${parsed.name} v${parsed.version} — ${parsed.rules?.length ?? 0} rules`));
+        console.log(
+          chalk.dim(
+            `  Policy: ${parsed.name} v${parsed.version} — ${parsed.rules?.length ?? 0} rules`,
+          ),
+        );
       } else {
         console.log(chalk.red(`✗ ${file} has errors:`));
         for (const e of errors) console.log(chalk.red(`  - ${e}`));
@@ -3658,12 +4214,16 @@ ledgerCmd
       console.log(chalk.dim('No ledger entries yet.'));
       return;
     }
-    console.log(chalk.bold(`\n📒 Ledger (${entries.length} of ${ledger.entries.length} entries)\n`));
+    console.log(
+      chalk.bold(`\n📒 Ledger (${entries.length} of ${ledger.entries.length} entries)\n`),
+    );
     for (const e of entries) {
       const date = new Date(e.timestamp).toLocaleString();
       const preview = e.input.length > 60 ? e.input.slice(0, 57) + '...' : e.input;
       console.log(`  ${chalk.dim(date)} ${chalk.bold(e.id.slice(0, 8))} ${preview}`);
-      console.log(`    Winner: ${chalk.green(e.votes.winner)} | Consensus: ${e.synthesis.consensusScore.toFixed(2)} | ${chalk.dim(e.topology)}`);
+      console.log(
+        `    Winner: ${chalk.green(e.votes.winner)} | Consensus: ${e.synthesis.consensusScore.toFixed(2)} | ${chalk.dim(e.topology)}`,
+      );
     }
     console.log('');
   });
@@ -3739,7 +4299,9 @@ ledgerCmd
     console.log(chalk.dim(`Input: ${entry.input.slice(0, 200)}`));
     console.log(chalk.dim(`Profile: ${entry.profile}`));
     console.log(chalk.dim(`Topology: ${entry.topology}`));
-    console.log(chalk.dim(`Providers: ${entry.providers.map(p => `${p.name}(${p.model})`).join(', ')}`));
+    console.log(
+      chalk.dim(`Providers: ${entry.providers.map((p) => `${p.name}(${p.model})`).join(', ')}`),
+    );
     console.log('');
 
     if (opts.dryRun) {
@@ -3758,8 +4320,8 @@ ledgerCmd
     }
 
     const candidateProviders = providerNames
-      ? config.providers.filter(p => providerNames!.includes(p.name))
-      : config.providers.filter(p => entry.providers.some(ep => ep.name === p.name));
+      ? config.providers.filter((p) => providerNames!.includes(p.name))
+      : config.providers.filter((p) => entry.providers.some((ep) => ep.name === p.name));
 
     if (candidateProviders.length < 2) {
       console.error(chalk.red('Need 2+ providers for replay.'));
@@ -3771,18 +4333,21 @@ ledgerCmd
       process.exit(1);
     }
 
-    const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+    const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
     const council = new CouncilV2(adapters, candidateProviders, profile, {
       streaming: true,
-      topology: entry.options.topology as any || undefined,
+      topology: (entry.options.topology as any) || undefined,
       redTeam: entry.options.redTeam || undefined,
       onEvent(event, data) {
         const d = data as Record<string, unknown>;
         if (event === 'phase') process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
-        if (event === 'response') process.stdout.write(chalk.green('✓') + chalk.dim(String(d.provider)) + ' ');
-        if (event === 'phase:done') console.log(chalk.dim(`(${((d.duration as number) / 1000).toFixed(1)}s)`));
-        if (event === 'complete') console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+        if (event === 'response')
+          process.stdout.write(chalk.green('✓') + chalk.dim(String(d.provider)) + ' ');
+        if (event === 'phase:done')
+          console.log(chalk.dim(`(${((d.duration as number) / 1000).toFixed(1)}s)`));
+        if (event === 'complete')
+          console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
       },
     });
 
@@ -3790,7 +4355,9 @@ ledgerCmd
 
     console.log(chalk.bold.green('\n═══ SYNTHESIS ═══\n'));
     console.log(result.synthesis.content);
-    console.log(`\nWinner: ${chalk.bold(result.votes.winner)} | Consensus: ${result.synthesis.consensusScore.toFixed(2)}`);
+    console.log(
+      `\nWinner: ${chalk.bold(result.votes.winner)} | Consensus: ${result.synthesis.consensusScore.toFixed(2)}`,
+    );
 
     if (opts.diff) {
       console.log(chalk.bold.yellow('\n═══ DIFF ═══\n'));
@@ -3857,8 +4424,8 @@ arenaCmd
     const config = await loadConfig();
     let providers = config.providers;
     if (opts.providers) {
-      const names = (opts.providers as string).split(',').map(s => s.trim());
-      providers = config.providers.filter(p => names.includes(p.name));
+      const names = (opts.providers as string).split(',').map((s) => s.trim());
+      providers = config.providers.filter((p) => names.includes(p.name));
     }
     if (providers.length < 2) {
       console.error(chalk.red('Need 2+ providers.'));
@@ -3871,19 +4438,25 @@ arenaCmd
       process.exit(1);
     }
 
-    const excluded = new Set(profile.excludeFromDeliberation?.map(s => s.toLowerCase()) ?? []);
+    const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
     const candidateProviders = providers.filter(
-      p => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
+      (p) => !excluded.has(p.name.toLowerCase()) && !excluded.has(p.provider.toLowerCase()),
     );
 
-    console.log(chalk.bold.cyan(`\n🏟️  Arena: Running "${suite.name}" v${suite.version} (${suite.cases.length} cases)\n`));
+    console.log(
+      chalk.bold.cyan(
+        `\n🏟️  Arena: Running "${suite.name}" v${suite.version} (${suite.cases.length} cases)\n`,
+      ),
+    );
 
     for (const evalCase of suite.cases) {
-      console.log(chalk.bold(`  Case ${evalCase.id} [${evalCase.category}/${evalCase.difficulty}]`));
+      console.log(
+        chalk.bold(`  Case ${evalCase.id} [${evalCase.category}/${evalCase.difficulty}]`),
+      );
       console.log(chalk.dim(`    ${evalCase.question.slice(0, 80)}...`));
 
       try {
-        const adapters = await Promise.all(candidateProviders.map(p => createProvider(p)));
+        const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
         const council = new CouncilV2(adapters, candidateProviders, profile, {
           streaming: false,
           rapid: true,
@@ -3895,7 +4468,7 @@ arenaCmd
         const result = await council.deliberate(evalCase.question);
 
         for (const adapter of adapters) {
-          const ranking = result.votes.rankings.find(r => r.provider === adapter.name);
+          const ranking = result.votes.rankings.find((r) => r.provider === adapter.name);
           await arRecord(
             adapter.name,
             evalCase.id,
@@ -3906,7 +4479,11 @@ arenaCmd
           );
         }
 
-        console.log(chalk.green(`    Winner: ${result.votes.winner} (${(result.duration / 1000).toFixed(1)}s)`));
+        console.log(
+          chalk.green(
+            `    Winner: ${result.votes.winner} (${(result.duration / 1000).toFixed(1)}s)`,
+          ),
+        );
       } catch (err) {
         console.log(chalk.red(`    Failed: ${err instanceof Error ? err.message : err}`));
       }
@@ -3928,6 +4505,8 @@ arenaCmd
   });
 
 // Ensure clean exit after any command (prevents event-loop hangs from dangling handles)
-program.hook('postAction', () => { process.exit(0); });
+program.hook('postAction', () => {
+  process.exit(0);
+});
 
 program.parse();

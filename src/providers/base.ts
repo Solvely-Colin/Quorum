@@ -1,8 +1,13 @@
 import type { ProviderAdapter, ProviderConfig } from '../types.js';
 import { resolveCredential } from '../auth.js';
-import { completeSimple, streamSimple, getModel, getModels } from '@mariozechner/pi-ai';
-import type { Api, Model, SimpleStreamOptions, KnownProvider, AssistantMessageEvent } from '@mariozechner/pi-ai';
-import { homedir } from 'node:os';
+import { completeSimple, streamSimple, getModels } from '@mariozechner/pi-ai';
+import type {
+  Api,
+  Model,
+  SimpleStreamOptions,
+  KnownProvider,
+  AssistantMessageEvent,
+} from '@mariozechner/pi-ai';
 
 // ============================================================================
 // Auto-credential resolution for CLI-authed providers
@@ -16,7 +21,8 @@ async function resolveClaudeOAuthToken(): Promise<string | null> {
   try {
     const { execFileSync } = await import('node:child_process');
     const raw = execFileSync(
-      'security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+      'security',
+      ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
       { encoding: 'utf-8', timeout: 5000 },
     ).trim();
     const data = JSON.parse(raw);
@@ -89,47 +95,87 @@ function resolveModel(config: ProviderConfig): Model<Api> {
 /** Map our provider names to pi-ai provider keys */
 function mapProvider(p: ProviderConfig['provider']): string {
   const map: Record<string, string> = {
-    'openai': 'openai',
-    'anthropic': 'anthropic',
-    'google': 'google',
-    'gemini-cli': 'google',    // resolved as CLI shim, not pi-ai
-    'kimi': 'kimi-coding',
-    'deepseek': 'openai',      // OpenAI-compatible
-    'mistral': 'openai',       // OpenAI-compatible
-    'ollama': 'openai',        // OpenAI-compatible
-    'custom': 'openai',        // OpenAI-compatible
-    'codex': 'openai-codex',
+    openai: 'openai',
+    anthropic: 'anthropic',
+    google: 'google',
+    'gemini-cli': 'google', // resolved as CLI shim, not pi-ai
+    kimi: 'kimi-coding',
+    deepseek: 'openai', // OpenAI-compatible
+    mistral: 'openai', // OpenAI-compatible
+    ollama: 'openai', // OpenAI-compatible
+    custom: 'openai', // OpenAI-compatible
+    codex: 'openai-codex',
   };
   return map[p] ?? p;
 }
 
 /** Resolve the pi-ai api type + baseUrl for a provider */
-function resolveApiDetails(config: ProviderConfig): { api: Api; provider: string; baseUrl: string } {
+function resolveApiDetails(config: ProviderConfig): {
+  api: Api;
+  provider: string;
+  baseUrl: string;
+} {
   switch (config.provider) {
     case 'anthropic':
-      return { api: 'anthropic-messages', provider: 'anthropic', baseUrl: config.baseUrl || 'https://api.anthropic.com' };
+      return {
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        baseUrl: config.baseUrl || 'https://api.anthropic.com',
+      };
     case 'openai':
-      return { api: 'openai-responses', provider: 'openai', baseUrl: config.baseUrl || 'https://api.openai.com/v1' };
+      return {
+        api: 'openai-responses',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'https://api.openai.com/v1',
+      };
     case 'google':
-      return { api: 'google-generative-ai', provider: 'google', baseUrl: config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta' };
+      return {
+        api: 'google-generative-ai',
+        provider: 'google',
+        baseUrl: config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta',
+      };
     case 'kimi':
       return {
         api: 'anthropic-messages',
         provider: 'kimi-coding',
-        baseUrl: config.baseUrl || (config.apiKey?.startsWith('sk-kimi-') ? 'https://api.kimi.com/coding' : 'https://api.moonshot.cn/v1'),
+        baseUrl:
+          config.baseUrl ||
+          (config.apiKey?.startsWith('sk-kimi-')
+            ? 'https://api.kimi.com/coding'
+            : 'https://api.moonshot.cn/v1'),
       };
     case 'codex':
-      return { api: 'openai-codex-responses', provider: 'openai-codex', baseUrl: config.baseUrl || 'https://chatgpt.com/backend-api' };
+      return {
+        api: 'openai-codex-responses',
+        provider: 'openai-codex',
+        baseUrl: config.baseUrl || 'https://chatgpt.com/backend-api',
+      };
     case 'deepseek':
-      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'https://api.deepseek.com/v1' };
+      return {
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'https://api.deepseek.com/v1',
+      };
     case 'mistral':
-      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'https://api.mistral.ai/v1' };
+      return {
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'https://api.mistral.ai/v1',
+      };
     case 'ollama':
-      return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || 'http://localhost:11434/v1' };
+      return {
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'http://localhost:11434/v1',
+      };
     case 'custom':
       return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || '' };
     default:
-      return { api: 'openai-completions', provider: config.provider, baseUrl: config.baseUrl || '' };
+      return {
+        api: 'openai-completions',
+        provider: config.provider,
+        baseUrl: config.baseUrl || '',
+      };
   }
 }
 
@@ -205,12 +251,23 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
 
   const buildContext = (prompt: string, systemPrompt?: string) => ({
     systemPrompt,
-    messages: [{ role: 'user' as const, content: [{ type: 'text' as const, text: prompt }], timestamp: Date.now() }],
+    messages: [
+      {
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: prompt }],
+        timestamp: Date.now(),
+      },
+    ],
   });
 
-  const extractText = (result: { errorMessage?: string; content: Array<{ type: string; text?: string }> }): string => {
+  const extractText = (result: {
+    errorMessage?: string;
+    content: Array<{ type: string; text?: string }>;
+  }): string => {
     if (result.errorMessage) {
-      throw new Error(`${resolved.provider}/${resolved.model}: ${result.errorMessage.slice(0, 200)}`);
+      throw new Error(
+        `${resolved.provider}/${resolved.model}: ${result.errorMessage.slice(0, 200)}`,
+      );
     }
     for (const block of result.content) {
       if (block.type === 'text' && block.text) return block.text;
@@ -225,7 +282,10 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
     return Promise.race([
       promise,
       new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+        setTimeout(
+          () => reject(new Error(`${label} timed out after ${timeoutMs / 1000}s`)),
+          timeoutMs,
+        ),
       ),
     ]);
   };
@@ -240,18 +300,32 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
       );
       return extractText(result as any);
     },
-    async generateStream(prompt: string, systemPrompt: string | undefined, onDelta: (delta: string) => void) {
+    async generateStream(
+      prompt: string,
+      systemPrompt: string | undefined,
+      onDelta: (delta: string) => void,
+    ) {
       const ac = new AbortController();
       const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
       const stream = streamSimple(model, buildContext(prompt, systemPrompt), buildOpts());
       let text = '';
       try {
         const abortPromise = new Promise<never>((_, reject) => {
-          ac.signal.addEventListener('abort', () => {
-            // Close the underlying stream connection
-            (stream as AsyncIterable<AssistantMessageEvent> & { [Symbol.asyncIterator](): AsyncIterator<AssistantMessageEvent> })[Symbol.asyncIterator]().return?.();
-            reject(new Error(`${resolved.name} stream timed out after ${timeoutMs / 1000}s`));
-          }, { once: true });
+          ac.signal.addEventListener(
+            'abort',
+            () => {
+              // Close the underlying stream connection
+              (
+                stream as AsyncIterable<AssistantMessageEvent> & {
+                  [Symbol.asyncIterator](): AsyncIterator<AssistantMessageEvent>;
+                }
+              )
+                [Symbol.asyncIterator]()
+                .return?.();
+              reject(new Error(`${resolved.name} stream timed out after ${timeoutMs / 1000}s`));
+            },
+            { once: true },
+          );
         });
         const iterate = async () => {
           let lastChunkTime = Date.now();
@@ -319,14 +393,26 @@ async function createGeminiCli(config: ProviderConfig): Promise<ProviderAdapter>
       const { spawn } = await import('node:child_process');
       return new Promise<string>((resolve, reject) => {
         let settled = false;
-        const proc = spawn('gemini', args, { env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] });
-        let stdout = '', stderr = '';
-        proc.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
-        proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+        const proc = spawn('gemini', args, {
+          env: { ...process.env },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        let stdout = '',
+          stderr = '';
+        proc.stdout.on('data', (d: Buffer) => {
+          stdout += d.toString();
+        });
+        proc.stderr.on('data', (d: Buffer) => {
+          stderr += d.toString();
+        });
         proc.on('close', (code) => {
           if (settled) return;
           settled = true;
-          code === 0 ? resolve(stdout.trim()) : reject(new Error(`gemini-cli exited ${code}: ${stderr}`));
+          if (code === 0) {
+            resolve(stdout.trim());
+          } else {
+            reject(new Error(`gemini-cli exited ${code}: ${stderr}`));
+          }
         });
         proc.on('error', (err) => {
           if (settled) return;

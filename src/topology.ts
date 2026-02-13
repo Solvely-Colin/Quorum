@@ -48,15 +48,43 @@ export interface TopologyPlan {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-export function listTopologies(): Array<{ name: TopologyName; description: string; bestFor: string }> {
+export function listTopologies(): Array<{
+  name: TopologyName;
+  description: string;
+  bestFor: string;
+}> {
   return [
     { name: 'mesh', description: 'All-vs-all debate (default)', bestFor: 'general deliberation' },
-    { name: 'star', description: 'Hub-and-spoke, fast synthesis', bestFor: 'quick polls, cost-sensitive' },
-    { name: 'tournament', description: 'Bracket elimination', bestFor: 'competitive comparison, "which is best?"' },
-    { name: 'map_reduce', description: 'Split into sub-questions, merge', bestFor: 'complex multi-part questions' },
-    { name: 'adversarial_tree', description: 'Attack/defend binary tree', bestFor: 'stress-testing claims' },
-    { name: 'pipeline', description: 'Sequential refinement chain', bestFor: 'iterative improvement' },
-    { name: 'panel', description: 'Moderated discussion', bestFor: 'structured exploration, interviews' },
+    {
+      name: 'star',
+      description: 'Hub-and-spoke, fast synthesis',
+      bestFor: 'quick polls, cost-sensitive',
+    },
+    {
+      name: 'tournament',
+      description: 'Bracket elimination',
+      bestFor: 'competitive comparison, "which is best?"',
+    },
+    {
+      name: 'map_reduce',
+      description: 'Split into sub-questions, merge',
+      bestFor: 'complex multi-part questions',
+    },
+    {
+      name: 'adversarial_tree',
+      description: 'Attack/defend binary tree',
+      bestFor: 'stress-testing claims',
+    },
+    {
+      name: 'pipeline',
+      description: 'Sequential refinement chain',
+      bestFor: 'iterative improvement',
+    },
+    {
+      name: 'panel',
+      description: 'Moderated discussion',
+      bestFor: 'structured exploration, interviews',
+    },
   ];
 }
 
@@ -69,7 +97,8 @@ export function validateTopologyConfig(
 
   switch (topology) {
     case 'tournament':
-      if (providers.length < 3) return 'Tournament requires at least 3 providers (2 to debate, 1 to judge)';
+      if (providers.length < 3)
+        return 'Tournament requires at least 3 providers (2 to debate, 1 to judge)';
       break;
     case 'adversarial_tree':
       if (providers.length < 2) return 'Adversarial tree requires at least 2 providers';
@@ -109,13 +138,20 @@ export function buildTopologyPlan(
   if (error) throw new Error(error);
 
   switch (topology) {
-    case 'mesh': return buildMesh(providers, input, memoryContext);
-    case 'star': return buildStar(providers, input, config, memoryContext);
-    case 'tournament': return buildTournament(providers, input, config, memoryContext);
-    case 'map_reduce': return buildMapReduce(providers, input, config, memoryContext);
-    case 'adversarial_tree': return buildAdversarialTree(providers, input, memoryContext);
-    case 'pipeline': return buildPipeline(providers, input, memoryContext);
-    case 'panel': return buildPanel(providers, input, config, memoryContext);
+    case 'mesh':
+      return buildMesh(providers, input, memoryContext);
+    case 'star':
+      return buildStar(providers, input, config, memoryContext);
+    case 'tournament':
+      return buildTournament(providers, input, config, memoryContext);
+    case 'map_reduce':
+      return buildMapReduce(providers, input, config, memoryContext);
+    case 'adversarial_tree':
+      return buildAdversarialTree(providers, input, memoryContext);
+    case 'pipeline':
+      return buildPipeline(providers, input, memoryContext);
+    case 'panel':
+      return buildPanel(providers, input, config, memoryContext);
   }
 }
 
@@ -129,7 +165,7 @@ function noVisibility(participants: string[]): Record<string, string[]> {
 
 function fullVisibility(participants: string[], allProviders: string[]): Record<string, string[]> {
   const v: Record<string, string[]> = {};
-  for (const p of participants) v[p] = allProviders.filter(o => o !== p);
+  for (const p of participants) v[p] = allProviders.filter((o) => o !== p);
   return v;
 }
 
@@ -161,7 +197,8 @@ function buildMesh(providers: string[], _input: string, memoryContext?: string):
             .join('\n\n');
           return `You are debating other experts. Consider their perspectives and refine your position.\n\nOther responses:\n${others}`;
         },
-        userPrompt: (ctx) => `Given the other perspectives, provide your refined response to: ${ctx.input}`,
+        userPrompt: (ctx) =>
+          `Given the other perspectives, provide your refined response to: ${ctx.input}`,
         parallel: true,
       },
       {
@@ -174,7 +211,8 @@ function buildMesh(providers: string[], _input: string, memoryContext?: string):
             .join('\n\n');
           return `Review all responses and vote for the best one (not your own). Explain your reasoning briefly.\n\n${others}`;
         },
-        userPrompt: (ctx) => `Which response best answers: ${ctx.input}\nRespond with the provider name and a brief justification.`,
+        userPrompt: (ctx) =>
+          `Which response best answers: ${ctx.input}\nRespond with the provider name and a brief justification.`,
         parallel: true,
       },
     ],
@@ -186,9 +224,14 @@ function buildMesh(providers: string[], _input: string, memoryContext?: string):
 
 // ── star ────────────────────────────────────────────────────────────────────────
 
-function buildStar(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
+function buildStar(
+  providers: string[],
+  _input: string,
+  config?: TopologyConfig,
+  memoryContext?: string,
+): TopologyPlan {
   const hub = config?.hub ?? providers[0];
-  const spokes = providers.filter(p => p !== hub);
+  const spokes = providers.filter((p) => p !== hub);
   const baseSystemPrompt = memoryContext
     ? `You are an expert analyst. Provide your independent assessment.\n\n${memoryContext}`
     : 'You are an expert analyst. Provide your independent assessment.';
@@ -235,7 +278,12 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
-function buildTournament(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
+function buildTournament(
+  providers: string[],
+  _input: string,
+  config?: TopologyConfig,
+  memoryContext?: string,
+): TopologyPlan {
   const seed = config?.bracketSeed ?? 'random';
   const seeded = seed === 'random' ? shuffleArray(providers) : [...providers];
   const baseSystemPrompt = memoryContext
@@ -262,7 +310,9 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
   }
 
   const phases: TopologyPhase[] = [];
-  const allJudges = providers.filter(p => !pairs.some(([a, b]) => a === p || b === p) || byes.includes(p));
+  const allJudges = providers.filter(
+    (p) => !pairs.some(([a, b]) => a === p || b === p) || byes.includes(p),
+  );
 
   // Round 1: each pair debates
   for (const [a, b] of pairs) {
@@ -287,12 +337,13 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
           .join('\n\n');
         return `Your opponent has responded. Critique their position and strengthen yours.\n\n${opponentResponse}`;
       },
-      userPrompt: (ctx) => `Critique your opponent's response and defend your position on: ${ctx.input}`,
+      userPrompt: (ctx) =>
+        `Critique your opponent's response and defend your position on: ${ctx.input}`,
       parallel: true,
     });
 
     // Judging phase
-    const judges = allJudges.length > 0 ? allJudges : providers.filter(p => p !== a && p !== b);
+    const judges = allJudges.length > 0 ? allJudges : providers.filter((p) => p !== a && p !== b);
     if (judges.length > 0) {
       const judgeVisibility: Record<string, string[]> = {};
       for (const j of judges) judgeVisibility[j] = [a, b];
@@ -307,7 +358,8 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
             .join('\n\n');
           return `You are a judge. Review both debaters and declare a winner.\n\n${responses}`;
         },
-        userPrompt: () => 'Which debater presented a stronger argument? Respond with the provider name and brief justification.',
+        userPrompt: () =>
+          'Which debater presented a stronger argument? Respond with the provider name and brief justification.',
         parallel: true,
       });
     }
@@ -324,7 +376,12 @@ function buildTournament(providers: string[], _input: string, config?: TopologyC
 
 // ── map_reduce ──────────────────────────────────────────────────────────────────
 
-function buildMapReduce(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
+function buildMapReduce(
+  providers: string[],
+  _input: string,
+  config?: TopologyConfig,
+  memoryContext?: string,
+): TopologyPlan {
   const numSubQuestions = config?.subQuestions ?? 3;
   const decomposer = providers[0];
   const decomposePrompt = memoryContext
@@ -378,7 +435,11 @@ function buildMapReduce(providers: string[], _input: string, config?: TopologyCo
 
 // ── adversarial_tree ────────────────────────────────────────────────────────────
 
-function buildAdversarialTree(providers: string[], _input: string, memoryContext?: string): TopologyPlan {
+function buildAdversarialTree(
+  providers: string[],
+  _input: string,
+  memoryContext?: string,
+): TopologyPlan {
   const phases: TopologyPhase[] = [];
   const thesis = providers[0];
   const thesisPrompt = memoryContext
@@ -439,7 +500,8 @@ function buildAdversarialTree(providers: string[], _input: string, memoryContext
     phases,
     synthesizer: 'auto',
     votingEnabled: true,
-    description: 'Attack/defend binary tree: thesis → challenge → defend → counter, with final vote',
+    description:
+      'Attack/defend binary tree: thesis → challenge → defend → counter, with final vote',
   };
 }
 
@@ -493,9 +555,14 @@ function buildPipeline(providers: string[], _input: string, memoryContext?: stri
 
 // ── panel ───────────────────────────────────────────────────────────────────────
 
-function buildPanel(providers: string[], _input: string, config?: TopologyConfig, memoryContext?: string): TopologyPlan {
+function buildPanel(
+  providers: string[],
+  _input: string,
+  config?: TopologyConfig,
+  memoryContext?: string,
+): TopologyPlan {
   const moderator = config?.moderator ?? providers[0];
-  const panelists = providers.filter(p => p !== moderator);
+  const panelists = providers.filter((p) => p !== moderator);
   const panelistPrompt = memoryContext
     ? `You are a panelist in an expert discussion. Provide your opening statement with your perspective and key arguments.\n\n${memoryContext}`
     : 'You are a panelist in an expert discussion. Provide your opening statement with your perspective and key arguments.';
@@ -521,7 +588,8 @@ function buildPanel(providers: string[], _input: string, config?: TopologyConfig
             .join('\n\n');
           return `You are the moderator. You have read all panelist opening statements. Generate a targeted follow-up question for each panelist to deepen the discussion. Format: one question per panelist, labeled with their name.\n\n${statements}`;
         },
-        userPrompt: (ctx) => `Based on the opening statements, generate follow-up questions for each panelist regarding: ${ctx.input}`,
+        userPrompt: (ctx) =>
+          `Based on the opening statements, generate follow-up questions for each panelist regarding: ${ctx.input}`,
         parallel: false,
       },
       {

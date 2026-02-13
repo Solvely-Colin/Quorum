@@ -53,26 +53,135 @@ Unsupported claims are penalized in voting. Use [quote: "excerpt"] for key evide
 Optionally add [confidence: 0.X] after each source tag.`;
 
 const STOPWORDS = new Set([
-  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-  'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
-  'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
-  'before', 'after', 'above', 'below', 'between', 'out', 'off', 'over',
-  'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when',
-  'where', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more',
-  'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
-  'same', 'so', 'than', 'too', 'very', 'just', 'because', 'but', 'and',
-  'or', 'if', 'while', 'about', 'up', 'that', 'this', 'it', 'its',
-  'they', 'them', 'their', 'we', 'our', 'you', 'your', 'he', 'she',
-  'his', 'her', 'i', 'me', 'my', 'also', 'which', 'what', 'who',
+  'the',
+  'a',
+  'an',
+  'is',
+  'are',
+  'was',
+  'were',
+  'be',
+  'been',
+  'being',
+  'have',
+  'has',
+  'had',
+  'do',
+  'does',
+  'did',
+  'will',
+  'would',
+  'could',
+  'should',
+  'may',
+  'might',
+  'shall',
+  'can',
+  'to',
+  'of',
+  'in',
+  'for',
+  'on',
+  'with',
+  'at',
+  'by',
+  'from',
+  'as',
+  'into',
+  'through',
+  'during',
+  'before',
+  'after',
+  'above',
+  'below',
+  'between',
+  'out',
+  'off',
+  'over',
+  'under',
+  'again',
+  'further',
+  'then',
+  'once',
+  'here',
+  'there',
+  'when',
+  'where',
+  'why',
+  'how',
+  'all',
+  'each',
+  'every',
+  'both',
+  'few',
+  'more',
+  'most',
+  'other',
+  'some',
+  'such',
+  'no',
+  'nor',
+  'not',
+  'only',
+  'own',
+  'same',
+  'so',
+  'than',
+  'too',
+  'very',
+  'just',
+  'because',
+  'but',
+  'and',
+  'or',
+  'if',
+  'while',
+  'about',
+  'up',
+  'that',
+  'this',
+  'it',
+  'its',
+  'they',
+  'them',
+  'their',
+  'we',
+  'our',
+  'you',
+  'your',
+  'he',
+  'she',
+  'his',
+  'her',
+  'i',
+  'me',
+  'my',
+  'also',
+  'which',
+  'what',
+  'who',
 ]);
 
 const NEGATION_PATTERNS = [
-  /\bnot\b/i, /\bno\b/i, /\bnever\b/i, /\bwon'?t\b/i, /\bcan'?t\b/i,
-  /\bdoesn'?t\b/i, /\bisn'?t\b/i, /\baren'?t\b/i, /\bwasn'?t\b/i,
-  /\bweren'?t\b/i, /\bshouldn'?t\b/i, /\bwouldn'?t\b/i, /\bcouldn'?t\b/i,
-  /\bhardly\b/i, /\brarely\b/i, /\bseldom\b/i, /\binstead\b/i,
-  /\bavoid\b/i, /\bwithout\b/i,
+  /\bnot\b/i,
+  /\bno\b/i,
+  /\bnever\b/i,
+  /\bwon'?t\b/i,
+  /\bcan'?t\b/i,
+  /\bdoesn'?t\b/i,
+  /\bisn'?t\b/i,
+  /\baren'?t\b/i,
+  /\bwasn'?t\b/i,
+  /\bweren'?t\b/i,
+  /\bshouldn'?t\b/i,
+  /\bwouldn'?t\b/i,
+  /\bcouldn'?t\b/i,
+  /\bhardly\b/i,
+  /\brarely\b/i,
+  /\bseldom\b/i,
+  /\binstead\b/i,
+  /\bavoid\b/i,
+  /\bwithout\b/i,
 ];
 
 const FILLER_PATTERNS = [
@@ -86,11 +195,16 @@ const FILLER_PATTERNS = [
 
 export function tierWeight(tier: SourceTier): number {
   switch (tier) {
-    case 'A': return 1.0;
-    case 'B': return 0.8;
-    case 'C': return 0.7;
-    case 'D': return 0.4;
-    case 'F': return 0.0;
+    case 'A':
+      return 1.0;
+    case 'B':
+      return 0.8;
+    case 'C':
+      return 0.7;
+    case 'D':
+      return 0.4;
+    case 'F':
+      return 0.0;
   }
 }
 
@@ -98,9 +212,15 @@ function detectSourceTier(source: string | undefined): SourceTier {
   if (!source) return 'F';
   const s = source.trim();
   if (/^https?:\/\//i.test(s)) return 'A';
-  if (/\.(ts|js|tsx|jsx|py|go|rs|java|rb|c|cpp|h|json|yaml|yml|md|txt|sh|css|html)\b/i.test(s) ||
-      /^[./~]/.test(s) || /:\d+/.test(s) || /^src\//.test(s)) return 'B';
-  if ((/\d+%|\d+\.\d+|\$\d|#\d/.test(s)) && (/[""]|according|study|report|survey|research/i.test(s))) return 'C';
+  if (
+    /\.(ts|js|tsx|jsx|py|go|rs|java|rb|c|cpp|h|json|yaml|yml|md|txt|sh|css|html)\b/i.test(s) ||
+    /^[./~]/.test(s) ||
+    /:\d+/.test(s) ||
+    /^src\//.test(s)
+  )
+    return 'B';
+  if (/\d+%|\d+\.\d+|\$\d|#\d/.test(s) && /[""]|according|study|report|survey|research/i.test(s))
+    return 'C';
   if (/reasoning|logic|deduct|infer|because|argument/i.test(s)) return 'D';
   // Fallback heuristics
   if (/\//.test(s) && s.length > 3) return 'B'; // path-like
@@ -113,7 +233,15 @@ function detectSourceTier(source: string | undefined): SourceTier {
 // ---------------------------------------------------------------------------
 
 function makeClaimHash(text: string): string {
-  return createHash('sha256').update(text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()).digest('hex').slice(0, 12);
+  return createHash('sha256')
+    .update(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .trim(),
+    )
+    .digest('hex')
+    .slice(0, 12);
 }
 
 function isFiller(text: string): boolean {
@@ -125,12 +253,15 @@ function isFiller(text: string): boolean {
 }
 
 function significantWords(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/)
-    .filter(w => w.length > 2 && !STOPWORDS.has(w));
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
 }
 
 function hasNegation(text: string): boolean {
-  return NEGATION_PATTERNS.some(p => p.test(text));
+  return NEGATION_PATTERNS.some((p) => p.test(text));
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +282,11 @@ export function parseEvidence(response: string): EvidenceClaim[] {
   const confidenceRegex = /\[confidence:\s*([\d.]+)\]/gi;
 
   // Build a map of character positions to their associated source
-  interface MarkerInfo { start: number; end: number; source: string; }
+  interface MarkerInfo {
+    start: number;
+    end: number;
+    source: string;
+  }
   const markers: MarkerInfo[] = [];
   let m: RegExpExecArray | null;
   while ((m = markerRegex.exec(response)) !== null) {
@@ -159,14 +294,22 @@ export function parseEvidence(response: string): EvidenceClaim[] {
   }
 
   // Collect quotes
-  interface QuoteInfo { start: number; end: number; text: string; }
+  interface QuoteInfo {
+    start: number;
+    end: number;
+    text: string;
+  }
   const quotes: QuoteInfo[] = [];
   while ((m = quoteRegex.exec(response)) !== null) {
     quotes.push({ start: m.index, end: m.index + m[0].length, text: m[1].trim() });
   }
 
   // Collect confidence tags
-  interface ConfInfo { start: number; end: number; value: number; }
+  interface ConfInfo {
+    start: number;
+    end: number;
+    value: number;
+  }
   const confs: ConfInfo[] = [];
   while ((m = confidenceRegex.exec(response)) !== null) {
     confs.push({ start: m.index, end: m.index + m[0].length, value: parseFloat(m[1]) });
@@ -181,8 +324,8 @@ export function parseEvidence(response: string): EvidenceClaim[] {
   // Split into sentences
   const sentences = cleanText
     .split(/(?<=[.!?])\s+|\n{2,}|\n(?=[-•*\d])/g)
-    .map(s => s.replace(/^\s*[-•*\d.)\s]+/, '').trim())
-    .filter(s => s.length > 0);
+    .map((s) => s.replace(/^\s*[-•*\d.)\s]+/, '').trim())
+    .filter((s) => s.length > 0);
 
   // For each sentence, find its position in original text and associate markers
   for (const sentence of sentences) {
@@ -314,7 +457,7 @@ function mapCleanToOriginal(original: string, cleanPos: number): number {
  */
 export function scoreEvidence(claims: EvidenceClaim[]): number {
   if (claims.length === 0) return 0;
-  const supported = claims.filter(c => c.source && c.source.length > 0).length;
+  const supported = claims.filter((c) => c.source && c.source.length > 0).length;
   return supported / claims.length;
 }
 
@@ -336,7 +479,7 @@ export function weightedScoreEvidence(claims: EvidenceClaim[]): number {
  */
 export function generateEvidenceReport(provider: string, response: string): EvidenceReport {
   const claims = parseEvidence(response);
-  const supported = claims.filter(c => c.source && c.source.length > 0).length;
+  const supported = claims.filter((c) => c.source && c.source.length > 0).length;
   const unsupported = claims.length - supported;
 
   const tierBreakdown: Record<SourceTier, number> = { A: 0, B: 0, C: 0, D: 0, F: 0 };
@@ -402,27 +545,28 @@ export function crossValidateClaims(reports: EvidenceReport[]): CrossReference[]
       }
     }
 
-    if (group.length > 1 || true) { // include all for completeness
+    if (group.length > 1 || true) {
+      // include all for completeness
       groups.push(group);
     }
   }
 
   const tierOrder: SourceTier[] = ['A', 'B', 'C', 'D', 'F'];
 
-  return groups.map(group => {
-    const providers = [...new Set(group.map(c => c.provider))];
+  return groups.map((group) => {
+    const providers = [...new Set(group.map((c) => c.provider))];
     const corroborated = providers.length >= 2;
 
     // Check for contradictions: same topic but opposite negation
     let contradicted = false;
     const contradictions: string[] = [];
     if (providers.length >= 2) {
-      const withNeg = group.filter(c => c.hasNeg);
-      const withoutNeg = group.filter(c => !c.hasNeg);
+      const withNeg = group.filter((c) => c.hasNeg);
+      const withoutNeg = group.filter((c) => !c.hasNeg);
       if (withNeg.length > 0 && withoutNeg.length > 0) {
         // Ensure they're from different providers
-        const negProviders = new Set(withNeg.map(c => c.provider));
-        const posProviders = new Set(withoutNeg.map(c => c.provider));
+        const negProviders = new Set(withNeg.map((c) => c.provider));
+        const posProviders = new Set(withoutNeg.map((c) => c.provider));
         for (const p of negProviders) {
           if (!posProviders.has(p) || negProviders.size > 1) {
             contradicted = true;
@@ -433,7 +577,7 @@ export function crossValidateClaims(reports: EvidenceReport[]): CrossReference[]
       }
     }
 
-    const bestTier = tierOrder.find(t => group.some(c => c.tier === t)) ?? 'F';
+    const bestTier = tierOrder.find((t) => group.some((c) => c.tier === t)) ?? 'F';
 
     return {
       claimText: group[0].text,
@@ -446,7 +590,10 @@ export function crossValidateClaims(reports: EvidenceReport[]): CrossReference[]
   });
 }
 
-function areSimilar(a: { text: string; words: string[] }, b: { text: string; words: string[] }): boolean {
+function areSimilar(
+  a: { text: string; words: string[] },
+  b: { text: string; words: string[] },
+): boolean {
   const aLower = a.text.toLowerCase();
   const bLower = b.text.toLowerCase();
 
@@ -454,7 +601,7 @@ function areSimilar(a: { text: string; words: string[] }, b: { text: string; wor
   if (aLower.includes(bLower) || bLower.includes(aLower)) return true;
 
   // Share 3+ significant words
-  const shared = a.words.filter(w => b.words.includes(w));
+  const shared = a.words.filter((w) => b.words.includes(w));
   return shared.length >= 3;
 }
 
@@ -467,10 +614,10 @@ function areSimilar(a: { text: string; words: string[] }, b: { text: string; wor
  */
 export function formatEvidenceSummary(reports: EvidenceReport[]): string {
   return reports
-    .map(r => {
+    .map((r) => {
       const tierStr = (['A', 'B', 'C', 'D', 'F'] as SourceTier[])
-        .filter(t => r.tierBreakdown[t] > 0)
-        .map(t => `${t}:${r.tierBreakdown[t]}`)
+        .filter((t) => r.tierBreakdown[t] > 0)
+        .map((t) => `${t}:${r.tierBreakdown[t]}`)
         .join(' ');
       return `${r.provider}: ${Math.round(r.evidenceScore * 100)}% evidence (weighted: ${Math.round(r.weightedScore * 100)}%) [${tierStr}]`;
     })

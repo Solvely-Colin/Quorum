@@ -9,7 +9,11 @@ import type { AgentProfile, CounselConfig, ProviderConfig } from './types.js';
 
 // Prefer ~/.quorum/, fall back to legacy ~/.counsel/ for backward compat
 const LEGACY_CONFIG_DIR = join(homedir(), '.counsel');
-const CONFIG_DIR = existsSync(join(homedir(), '.quorum')) ? join(homedir(), '.quorum') : (existsSync(LEGACY_CONFIG_DIR) ? LEGACY_CONFIG_DIR : join(homedir(), '.quorum'));
+const CONFIG_DIR = existsSync(join(homedir(), '.quorum'))
+  ? join(homedir(), '.quorum')
+  : existsSync(LEGACY_CONFIG_DIR)
+    ? LEGACY_CONFIG_DIR
+    : join(homedir(), '.quorum');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.yaml');
 
 const DEFAULT_CONFIG: CounselConfig = {
@@ -54,14 +58,62 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
 
   // 1. Environment variable API keys — resolve best model from pi-ai registry
   //    preferredModels: ordered list of preferred model IDs to look for in registry
-  const envChecks: Array<{ env: string; name: string; provider: ProviderConfig['provider']; piaiProvider: string; preferredModels: string[] }> = [
-    { env: 'OPENAI_API_KEY', name: 'openai', provider: 'openai', piaiProvider: 'openai', preferredModels: ['gpt-5.2-pro', 'gpt-5-pro', 'o3-pro', 'gpt-4o', 'gpt-4o-mini'] },
-    { env: 'ANTHROPIC_API_KEY', name: 'claude', provider: 'anthropic', piaiProvider: 'anthropic', preferredModels: ['claude-opus-4-1', 'claude-opus-4-0', 'claude-sonnet-4-20250514'] },
-    { env: 'GOOGLE_API_KEY', name: 'gemini', provider: 'google', piaiProvider: 'google', preferredModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'] },
-    { env: 'MISTRAL_API_KEY', name: 'mistral', provider: 'mistral', piaiProvider: 'mistral', preferredModels: ['mistral-large-latest'] },
-    { env: 'DEEPSEEK_API_KEY', name: 'deepseek', provider: 'deepseek', piaiProvider: 'deepseek', preferredModels: ['deepseek-chat'] },
-    { env: 'KIMI_API_KEY', name: 'kimi', provider: 'kimi', piaiProvider: 'kimi-coding', preferredModels: ['k2p5', 'kimi-k2-thinking'] },
-    { env: 'CODEX_ACCESS_TOKEN', name: 'codex', provider: 'codex' as ProviderConfig['provider'], piaiProvider: 'openai-codex', preferredModels: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2', 'gpt-5.1'] },
+  const envChecks: Array<{
+    env: string;
+    name: string;
+    provider: ProviderConfig['provider'];
+    piaiProvider: string;
+    preferredModels: string[];
+  }> = [
+    {
+      env: 'OPENAI_API_KEY',
+      name: 'openai',
+      provider: 'openai',
+      piaiProvider: 'openai',
+      preferredModels: ['gpt-5.2-pro', 'gpt-5-pro', 'o3-pro', 'gpt-4o', 'gpt-4o-mini'],
+    },
+    {
+      env: 'ANTHROPIC_API_KEY',
+      name: 'claude',
+      provider: 'anthropic',
+      piaiProvider: 'anthropic',
+      preferredModels: ['claude-opus-4-1', 'claude-opus-4-0', 'claude-sonnet-4-20250514'],
+    },
+    {
+      env: 'GOOGLE_API_KEY',
+      name: 'gemini',
+      provider: 'google',
+      piaiProvider: 'google',
+      preferredModels: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'],
+    },
+    {
+      env: 'MISTRAL_API_KEY',
+      name: 'mistral',
+      provider: 'mistral',
+      piaiProvider: 'mistral',
+      preferredModels: ['mistral-large-latest'],
+    },
+    {
+      env: 'DEEPSEEK_API_KEY',
+      name: 'deepseek',
+      provider: 'deepseek',
+      piaiProvider: 'deepseek',
+      preferredModels: ['deepseek-chat'],
+    },
+    {
+      env: 'KIMI_API_KEY',
+      name: 'kimi',
+      provider: 'kimi',
+      piaiProvider: 'kimi-coding',
+      preferredModels: ['k2p5', 'kimi-k2-thinking'],
+    },
+    {
+      env: 'CODEX_ACCESS_TOKEN',
+      name: 'codex',
+      provider: 'codex' as ProviderConfig['provider'],
+      piaiProvider: 'openai-codex',
+      preferredModels: ['gpt-5.3-codex', 'gpt-5.2-codex', 'gpt-5.2', 'gpt-5.1'],
+    },
   ];
 
   for (const check of envChecks) {
@@ -72,7 +124,7 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
         const models = getModels(check.piaiProvider as KnownProvider);
         if (models.length > 0) {
           // Pick first preferred model that exists in registry
-          const match = check.preferredModels.find(pref => models.some(m => m.id === pref));
+          const match = check.preferredModels.find((pref) => models.some((m) => m.id === pref));
           model = match || models[0].id;
         }
       } catch {
@@ -89,11 +141,12 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
   }
 
   // 2. Claude Code OAuth (macOS Keychain) — only if no ANTHROPIC_API_KEY found
-  if (!found.some(p => p.name === 'claude')) {
+  if (!found.some((p) => p.name === 'claude')) {
     try {
       const { execFileSync } = await import('node:child_process');
       const raw = execFileSync(
-        'security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+        'security',
+        ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
         { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] },
       ).trim();
       const data = JSON.parse(raw);
@@ -112,10 +165,14 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
   }
 
   // 2b. Gemini CLI fallback — only if no GOOGLE_API_KEY was found above
-  if (!found.some(p => p.name === 'gemini')) {
+  if (!found.some((p) => p.name === 'gemini')) {
     try {
       const { execFileSync } = await import('node:child_process');
-      const version = execFileSync('gemini', ['--version'], { encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      const version = execFileSync('gemini', ['--version'], {
+        encoding: 'utf-8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
       if (version) {
         found.push({
           name: 'gemini',
@@ -131,18 +188,30 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
 
   // 3. Ollama (local)
   try {
-    const resp = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(2000) });
+    const resp = await fetch('http://localhost:11434/api/tags', {
+      signal: AbortSignal.timeout(2000),
+    });
     if (resp.ok) {
-      const data = await resp.json() as { models?: Array<{ name: string }> };
+      const data = (await resp.json()) as { models?: Array<{ name: string }> };
       const allModels = data.models ?? [];
       // Filter out embedding models (not usable for chat/deliberation)
       const embedPatterns = /embed|nomic|bge|e5-|gte-|snowflake|all-minilm/i;
-      const chatModels = allModels.filter(m => !embedPatterns.test(m.name));
+      const chatModels = allModels.filter((m) => !embedPatterns.test(m.name));
       // Prefer well-known chat models
-      const preferredOllama = ['qwen2.5:32b', 'qwen2.5:14b', 'qwen2.5:7b', 'llama3', 'mistral', 'codellama', 'deepseek-coder'];
+      const preferredOllama = [
+        'qwen2.5:32b',
+        'qwen2.5:14b',
+        'qwen2.5:7b',
+        'llama3',
+        'mistral',
+        'codellama',
+        'deepseek-coder',
+      ];
       const models = chatModels.length > 0 ? chatModels : allModels;
       if (models.length > 0) {
-        const preferred = preferredOllama.find(pref => models.some(m => m.name.startsWith(pref)));
+        const preferred = preferredOllama.find((pref) =>
+          models.some((m) => m.name.startsWith(pref)),
+        );
         found.push({
           name: 'ollama',
           provider: 'ollama',
@@ -156,9 +225,11 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
 
   // 3. LM Studio (local, OpenAI-compatible)
   try {
-    const resp = await fetch('http://localhost:1234/v1/models', { signal: AbortSignal.timeout(2000) });
+    const resp = await fetch('http://localhost:1234/v1/models', {
+      signal: AbortSignal.timeout(2000),
+    });
     if (resp.ok) {
-      const data = await resp.json() as { data?: Array<{ id: string }> };
+      const data = (await resp.json()) as { data?: Array<{ id: string }> };
       const models = data.data ?? [];
       if (models.length > 0) {
         found.push({
@@ -191,7 +262,7 @@ export async function loadAgentProfile(name: string): Promise<AgentProfile | nul
   const searchPaths = [
     join(process.cwd(), 'agents', `${name}.yaml`),
     join(homedir(), '.quorum', 'agents', `${name}.yaml`),
-    join(homedir(), '.counsel', 'agents', `${name}.yaml`),  // legacy fallback
+    join(homedir(), '.counsel', 'agents', `${name}.yaml`), // legacy fallback
     join(builtinDir, `${name}.yaml`),
   ];
 
@@ -236,14 +307,16 @@ export async function loadProjectConfig(): Promise<ProjectConfig | null> {
           profile: typeof parsed.profile === 'string' ? parsed.profile : undefined,
           providers: Array.isArray(parsed.providers) ? parsed.providers.map(String) : undefined,
           focus: Array.isArray(parsed.focus) ? parsed.focus.map(String) : undefined,
-          challengeStyle: typeof parsed.challengeStyle === 'string' &&
+          challengeStyle:
+            typeof parsed.challengeStyle === 'string' &&
             ['adversarial', 'collaborative', 'socratic'].includes(parsed.challengeStyle)
-            ? parsed.challengeStyle as ProjectConfig['challengeStyle']
-            : undefined,
+              ? (parsed.challengeStyle as ProjectConfig['challengeStyle'])
+              : undefined,
           rounds: typeof parsed.rounds === 'number' ? parsed.rounds : undefined,
-          weights: parsed.weights && typeof parsed.weights === 'object' && !Array.isArray(parsed.weights)
-            ? parsed.weights as Record<string, number>
-            : undefined,
+          weights:
+            parsed.weights && typeof parsed.weights === 'object' && !Array.isArray(parsed.weights)
+              ? (parsed.weights as Record<string, number>)
+              : undefined,
         };
       }
     }

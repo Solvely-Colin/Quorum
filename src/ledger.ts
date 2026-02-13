@@ -8,8 +8,8 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import type { V2Result, VoteResult } from './council-v2.js';
-import type { Synthesis, ProviderConfig, AgentProfile } from './types.js';
+import type { V2Result } from './council-v2.js';
+import type { ProviderConfig, AgentProfile } from './types.js';
 
 // --- Types ---
 
@@ -69,7 +69,13 @@ function canonicalStringify(obj: unknown): string {
     return '[' + obj.map(canonicalStringify).join(',') + ']';
   }
   const sorted = Object.keys(obj as Record<string, unknown>).sort();
-  return '{' + sorted.map(k => JSON.stringify(k) + ':' + canonicalStringify((obj as Record<string, unknown>)[k])).join(',') + '}';
+  return (
+    '{' +
+    sorted
+      .map((k) => JSON.stringify(k) + ':' + canonicalStringify((obj as Record<string, unknown>)[k]))
+      .join(',') +
+    '}'
+  );
 }
 
 // --- Hash ---
@@ -116,9 +122,8 @@ export interface LedgerConfig {
 export async function appendToLedger(result: V2Result, config: LedgerConfig): Promise<LedgerEntry> {
   const ledger = await loadLedger();
 
-  const previousHash = ledger.entries.length > 0
-    ? ledger.entries[ledger.entries.length - 1].hash
-    : 'genesis';
+  const previousHash =
+    ledger.entries.length > 0 ? ledger.entries[ledger.entries.length - 1].hash : 'genesis';
 
   const entry: LedgerEntry = {
     id: result.sessionId,
@@ -128,7 +133,7 @@ export async function appendToLedger(result: V2Result, config: LedgerConfig): Pr
     input: config.input,
     profile: config.profile.name,
     topology: config.topology,
-    providers: config.providerConfigs.map(p => ({ name: p.name, model: p.model })),
+    providers: config.providerConfigs.map((p) => ({ name: p.name, model: p.model })),
     phases: config.phases,
     votes: {
       winner: result.votes.winner,
@@ -164,7 +169,11 @@ export async function appendToLedger(result: V2Result, config: LedgerConfig): Pr
   return entry;
 }
 
-export async function verifyLedgerIntegrity(): Promise<{ valid: boolean; brokenAt?: number; message?: string }> {
+export async function verifyLedgerIntegrity(): Promise<{
+  valid: boolean;
+  brokenAt?: number;
+  message?: string;
+}> {
   const ledger = await loadLedger();
   if (ledger.entries.length === 0) {
     return { valid: true, message: 'Ledger is empty' };
@@ -176,13 +185,21 @@ export async function verifyLedgerIntegrity(): Promise<{ valid: boolean; brokenA
     // Verify hash
     const computed = computeEntryHash(entry);
     if (computed !== entry.hash) {
-      return { valid: false, brokenAt: i, message: `Entry ${i} hash mismatch: expected ${computed}, got ${entry.hash}` };
+      return {
+        valid: false,
+        brokenAt: i,
+        message: `Entry ${i} hash mismatch: expected ${computed}, got ${entry.hash}`,
+      };
     }
 
     // Verify chain
     const expectedPrev = i === 0 ? 'genesis' : ledger.entries[i - 1].hash;
     if (entry.previousHash !== expectedPrev) {
-      return { valid: false, brokenAt: i, message: `Entry ${i} chain broken: expected previousHash ${expectedPrev}, got ${entry.previousHash}` };
+      return {
+        valid: false,
+        brokenAt: i,
+        message: `Entry ${i} chain broken: expected previousHash ${expectedPrev}, got ${entry.previousHash}`,
+      };
     }
   }
 
@@ -194,16 +211,16 @@ export async function getLedgerEntry(sessionId: string): Promise<LedgerEntry | n
   if (sessionId === 'last') {
     return ledger.entries.length > 0 ? ledger.entries[ledger.entries.length - 1] : null;
   }
-  return ledger.entries.find(e => e.id === sessionId) ?? null;
+  return ledger.entries.find((e) => e.id === sessionId) ?? null;
 }
 
 export function exportLedgerADR(entry: LedgerEntry): string {
   const truncInput = entry.input.length > 80 ? entry.input.slice(0, 77) + '...' : entry.input;
   const date = new Date(entry.timestamp).toISOString();
-  const providerList = entry.providers.map(p => `${p.name} (${p.model})`).join(', ');
+  const providerList = entry.providers.map((p) => `${p.name} (${p.model})`).join(', ');
 
   const rankingsTable = entry.votes.rankings
-    .map(r => `| ${r.provider} | ${r.score} |`)
+    .map((r) => `| ${r.provider} | ${r.score} |`)
     .join('\n');
 
   return `# ADR: ${truncInput}
