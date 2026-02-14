@@ -4398,6 +4398,89 @@ policyCmd
     }
   });
 
+policyCmd
+  .command('init')
+  .description('Create a default policy configuration file')
+  .option('--path <path>', 'Custom path for the policy file')
+  .action(async (opts) => {
+    const { initPolicyFile } = await import('./policy-controls.js');
+    try {
+      const filePath = await initPolicyFile(opts.path as string | undefined);
+      console.log(chalk.green(`✅ Created policy file: ${filePath}`));
+      console.log(chalk.dim('Edit the file to customize risk tier thresholds and actions.'));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+policyCmd
+  .command('show')
+  .description('Display the current policy configuration')
+  .option('--path <path>', 'Path to policy file')
+  .action(async (opts) => {
+    const { loadPolicyFile, formatPolicyConfig } = await import('./policy-controls.js');
+    try {
+      const config = await loadPolicyFile(opts.path as string | undefined);
+      console.log('');
+      console.log(formatPolicyConfig(config));
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+policyCmd
+  .command('validate')
+  .description('Validate a policy configuration file')
+  .option('--path <path>', 'Path to policy file')
+  .action(async (opts) => {
+    const { validatePolicyConfig } = await import('./policy-controls.js');
+    try {
+      const filePath = (opts.path as string) || undefined;
+      const { readFile: rf } = await import('node:fs/promises');
+      const { parse: parseYaml } = await import('yaml');
+      const { defaultPolicyPath } = await import('./policy-controls.js');
+      const path = filePath ?? defaultPolicyPath();
+      const raw = await rf(path, 'utf-8');
+      const parsed = parseYaml(raw);
+      const errors = validatePolicyConfig(parsed);
+      if (errors.length === 0) {
+        console.log(chalk.green(`✓ ${path} is valid`));
+      } else {
+        console.log(chalk.red(`✗ ${path} has errors:`));
+        for (const e of errors) console.log(chalk.red(`  - ${e}`));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+policyCmd
+  .command('calibration')
+  .description('Show calibration accuracy statistics')
+  .action(async () => {
+    const { loadCalibrationStore, computeCalibrationStats, formatCalibrationStats } =
+      await import('./calibration.js');
+    try {
+      const store = await loadCalibrationStore();
+      if (store.entries.length === 0) {
+        console.log(chalk.yellow('No calibration data yet.'));
+        console.log(chalk.dim('Run deliberations with --policy to start tracking.'));
+        return;
+      }
+      const stats = computeCalibrationStats(store);
+      console.log('');
+      console.log(formatCalibrationStats(stats));
+      console.log('');
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
 // --- quorum ledger ---
 const ledgerCmd = program
   .command('ledger')
