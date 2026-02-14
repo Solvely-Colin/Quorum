@@ -85,6 +85,7 @@ export interface CouncilV2Options {
   topology?: TopologyName;
   topologyConfig?: TopologyConfig;
   hitl?: HITLOptions;
+  schema?: import('./schema.js').ReasoningSchema;
 }
 
 export interface V2Result {
@@ -139,6 +140,7 @@ export class CouncilV2 {
   private reputation: boolean = false;
   private hitl: HITLOptions | undefined;
   private policyName: string | undefined;
+  private schema: import('./schema.js').ReasoningSchema | undefined;
   private collectedPhases: Array<{
     name: string;
     duration: number;
@@ -172,6 +174,7 @@ export class CouncilV2 {
     this.reputation = options?.reputation ?? false;
     this.hitl = options?.hitl;
     this.policyName = options?.policyName;
+    this.schema = options?.schema;
     this.redTeam = options?.redTeam ?? profile.redTeam ?? false;
     this.attackPacks = options?.attackPacks ?? profile.attackPacks ?? [];
     this.customAttacks = options?.customAttacks ?? profile.customAttacks ?? [];
@@ -2563,6 +2566,36 @@ export class CouncilV2 {
       base = this.interpolate(custom.system);
     } else {
       base = fallback;
+    }
+    // Inject schema context for gather and plan phases
+    if (this.schema && (phase === 'gather' || phase === 'plan')) {
+      try {
+        // Dynamic import avoided — use inline schema injection
+        const schema = this.schema;
+        const parts: string[] = [`\n\n--- Reasoning Schema: "${schema.name}" ---`, schema.description];
+        if (phase === 'gather') {
+          parts.push('\nFollow these decomposition steps in your analysis:');
+          for (let i = 0; i < schema.decompositionSteps.length; i++) {
+            parts.push(`  ${i + 1}. ${schema.decompositionSteps[i]}`);
+          }
+          parts.push('\nPrioritize these evidence types (by weight):');
+          const sorted = [...schema.evidenceTypes].sort((a, b) => b.weight - a.weight);
+          for (const et of sorted) {
+            parts.push(`  • ${et.name} (weight: ${et.weight}) — ${et.description}`);
+          }
+        } else {
+          parts.push('\nApply these inference rules when forming your argument strategy:');
+          for (const rule of schema.inferenceRules) {
+            parts.push(`  • ${rule.name}: ${rule.description}`);
+            parts.push(`    When: ${rule.condition}`);
+            parts.push(`    Then: ${rule.conclusion}`);
+          }
+          parts.push(`\nConfidence thresholds: high=${schema.confidenceThresholds.high}, medium=${schema.confidenceThresholds.medium}, low=${schema.confidenceThresholds.low}`);
+          parts.push('Calibrate your confidence claims against these thresholds.');
+        }
+        parts.push('--- End Schema ---\n');
+        base += parts.join('\n');
+      } catch { /* non-fatal */ }
     }
     if (adapterName && this.profile.roles?.[adapterName]) {
       return `You are acting as a ${this.profile.roles[adapterName]}. Bring this perspective to all your responses.\n\n${base}`;

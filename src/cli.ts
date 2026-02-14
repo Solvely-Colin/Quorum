@@ -197,6 +197,7 @@ program
   .option('--hitl-threshold <n>', 'HITL controversy threshold (default 0.5)')
   .option('--policy <name>', 'Use only the named policy for guardrail checks')
   .option('--interactive', 'Enable constitutional intervention points between phases')
+  .option('--schema <name>', 'Use a reasoning schema to guide deliberation')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -502,6 +503,22 @@ program
       console.log('');
     }
 
+    // Load schema if specified
+    let activeSchema: import('./schema.js').ReasoningSchema | undefined;
+    if (opts.schema) {
+      const { loadSchema, listSchemas } = await import('./schema.js');
+      activeSchema = (await loadSchema(opts.schema as string)) ?? undefined;
+      if (!activeSchema) {
+        const available = await listSchemas();
+        console.error(chalk.red(`Schema not found: ${opts.schema}`));
+        console.error(chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`));
+        process.exit(1);
+      }
+      if (!isJSON) {
+        console.log(chalk.dim(`Schema: ${activeSchema.name}`));
+      }
+    }
+
     // Track phase timing for compact progress
     const phaseStartTimes: Record<string, number> = {};
     const providersDone: Record<string, string[]> = {};
@@ -514,6 +531,7 @@ program
       noMemory: opts.memory === false,
       reputation: opts.reputation ?? false,
       policyName: (opts.policy as string) || undefined,
+      schema: activeSchema,
       hitl: opts.hitl
         ? {
             enabled: true,
@@ -1663,6 +1681,18 @@ program
         }
       }
     }
+
+    // Show uncertainty metrics if available
+    try {
+      const { loadUncertaintyMetrics, formatUncertaintyDisplay } = await import('./uncertainty.js');
+      const uncertainty = await loadUncertaintyMetrics(sessionPath);
+      if (uncertainty) {
+        console.log('');
+        console.log(chalk.bold('📊 Uncertainty'));
+        console.log(formatUncertaintyDisplay(uncertainty));
+      }
+    } catch { /* no uncertainty data */ }
+
     console.log('');
   });
 
@@ -3338,6 +3368,17 @@ program
     const phaseFilter = opts.phase ? (opts.phase as string).toLowerCase() : null;
     const providerFilter = opts.provider as string | undefined;
 
+    // Load interventions for inline display
+    const { loadInterventions } = await import('./intervention.js');
+    const interventions = await loadInterventions(sessionPath);
+    const interventionsByPhase = new Map<string, typeof interventions>();
+    for (const iv of interventions) {
+      const key = iv.phase.toUpperCase();
+      const existing = interventionsByPhase.get(key) ?? [];
+      existing.push(iv);
+      interventionsByPhase.set(key, existing);
+    }
+
     for (const { file, name } of phaseFiles) {
       if (phaseFilter && !name.toLowerCase().startsWith(phaseFilter) && !file.includes(phaseFilter))
         continue;
@@ -3360,6 +3401,20 @@ program
 
       const dur = phase.duration != null ? `${(phase.duration / 1000).toFixed(1)}s` : '?';
       console.log(chalk.dim(`  Phase duration: ${dur}`));
+
+      // Show interventions after this phase
+      const phaseInterventions = interventionsByPhase.get(name);
+      if (phaseInterventions && phaseInterventions.length > 0) {
+        console.log('');
+        for (const iv of phaseInterventions) {
+          const typeIcon = iv.type === 'halt' ? '⏸' : iv.type === 'redirect' ? '🔄' : iv.type === 'inject-evidence' ? '📎' : '❓';
+          console.log(chalk.bold.red(`  ${typeIcon} INTERVENTION: ${iv.type}`));
+          console.log(chalk.red(`    ${iv.content}`));
+          if (iv.constraints) {
+            console.log(chalk.dim(`    Constraints: ${iv.constraints.join(', ')}`));
+          }
+        }
+      }
       console.log('');
     }
 
@@ -4586,8 +4641,10 @@ program
   });
 
 // --- quorum attest ---
-program
-  .command('attest')
+const attestCmd = program.command('attest').description('Attestation chain commands');
+
+attestCmd
+  .command('view')
   .description('View the attestation chain for a deliberation session')
   .argument('<session>', 'Session path or "last" for most recent')
   .option('--json', 'Output as JSON')
@@ -4670,6 +4727,130 @@ program
     }
   });
 
+attestCmd
+  .command('diff')
+  .description('Compare attestation chains across two sessions')
+  .argument('<session1>', 'First session path')
+  .argument('<session2>', 'Second session path')
+  .option('--json', 'Output as JSON')
+  .action(async (session1: string, session2: string, opts) => {
+    const { buildCanonicalRecord } = await import('./canonical.js');
+    const { buildAttestationChain } = await import('./attestation.js');
+    const { diffAttestationChains, formatAttestationDiff } = await import('./attestation-diff.js');
+
+    async function buildChain(sessionPath: string) {
+      const metaPath = pathJoin(sessionPath, 'meta.json');
+      if (!existsSync(metaPath)) {
+        console.error(chalk.red(`Session not found: ${sessionPath}`));
+        process.exit(1);
+      }
+      const record = await buildCanonicalRecord(sessionPath);
+      const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
+      const phaseData = record.phases.map((p) => ({
+        phase: p.name,
+        input: meta.input,
+        responses: p.responses,
+        providers: Object.keys(p.responses),
+        timestamp: p.timestamp,
+      }));
+      return buildAttestationChain(record.sessionId, record.hashChain, phaseData);
+    }
+
+    try {
+      const chain1 = await buildChain(session1);
+      const chain2 = await buildChain(session2);
+      const diff = diffAttestationChains(chain1, chain2);
+
+      if (opts.json) {
+        console.log(JSON.stringify(diff, null, 2));
+      } else {
+        console.log('');
+        console.log(chalk.bold.cyan('🔍 Attestation Diff'));
+        console.log(formatAttestationDiff(diff));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+attestCmd
+  .command('export')
+  .description('Export attestation as a formatted certificate')
+  .argument('<session>', 'Session path or "last" for most recent')
+  .option('--format <format>', 'Output format: json, html, pdf', 'json')
+  .option('--output <file>', 'Output file path (default: stdout for json/html)')
+  .action(async (sessionArg: string, opts) => {
+    const { buildCanonicalRecord } = await import('./canonical.js');
+    const { buildAttestationChain, exportAttestationJSON } = await import('./attestation.js');
+    const { loadExportData, exportAttestationHTML, exportAttestationPDF } = await import('./attestation-export.js');
+
+    let sessionPath = sessionArg;
+    if (sessionPath === 'last') {
+      const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
+      const indexPath = pathJoin(sessionsDir, 'index.json');
+      if (existsSync(indexPath)) {
+        try {
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          if (entries.length > 0) {
+            sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
+          }
+        } catch { /* fall through */ }
+      }
+    }
+
+    const metaPath = pathJoin(sessionPath, 'meta.json');
+    if (!existsSync(metaPath)) {
+      console.error(chalk.red(`Session not found: ${sessionPath}`));
+      process.exit(1);
+    }
+
+    try {
+      const record = await buildCanonicalRecord(sessionPath);
+      const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
+      const phaseData = record.phases.map((p) => ({
+        phase: p.name,
+        input: meta.input,
+        responses: p.responses,
+        providers: Object.keys(p.responses),
+        timestamp: p.timestamp,
+      }));
+      const chain = buildAttestationChain(record.sessionId, record.hashChain, phaseData);
+      const data = await loadExportData(sessionPath, chain);
+
+      const format = (opts.format as string).toLowerCase();
+
+      if (format === 'json') {
+        const json = exportAttestationJSON(chain);
+        if (opts.output) {
+          await writeFile(opts.output as string, json, 'utf-8');
+          console.error(chalk.green(`✅ Exported JSON to ${opts.output}`));
+        } else {
+          console.log(json);
+        }
+      } else if (format === 'html') {
+        const html = exportAttestationHTML(data);
+        if (opts.output) {
+          await writeFile(opts.output as string, html, 'utf-8');
+          console.error(chalk.green(`✅ Exported HTML to ${opts.output}`));
+        } else {
+          console.log(html);
+        }
+      } else if (format === 'pdf') {
+        const outputPath = (opts.output as string) ?? 'attestation.pdf';
+        const pdfBytes = await exportAttestationPDF(data);
+        await writeFile(outputPath, pdfBytes);
+        console.log(chalk.green(`✅ Exported PDF to ${outputPath} (${pdfBytes.length} bytes)`));
+      } else {
+        console.error(chalk.red(`Invalid format: ${format}. Use json, html, or pdf.`));
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
 // --- quorum schema ---
 const schemaCmd = program.command('schema').description('Manage reasoning schemas');
 
@@ -4723,6 +4904,40 @@ schemaCmd
     });
     await saveSchema(schema);
     console.log(chalk.green(`✅ Created schema: ${schema.name}`));
+  });
+
+schemaCmd
+  .command('init')
+  .description('Initialize built-in domain schemas (legal, technical-review, risk-assessment)')
+  .action(async () => {
+    const { BUILTIN_SCHEMAS } = await import('./builtin-schemas.js');
+    const { saveSchema } = await import('./schema.js');
+    for (const schema of BUILTIN_SCHEMAS) {
+      const now = Date.now();
+      await saveSchema({ ...schema, createdAt: now, updatedAt: now });
+      console.log(chalk.green(`  ✅ ${schema.name} — ${schema.description}`));
+    }
+    console.log(chalk.green(`\nInitialized ${BUILTIN_SCHEMAS.length} built-in schemas.`));
+  });
+
+// --- quorum uncertainty trends ---
+const uncertaintyCmd = program.command('uncertainty').description('Uncertainty tracking commands');
+
+uncertaintyCmd
+  .command('trends')
+  .description('View uncertainty trends across deliberations')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { loadLedger, computeTrends, formatTrends } = await import('./uncertainty-trends.js');
+    const ledger = await loadLedger();
+    const trends = computeTrends(ledger);
+
+    if (opts.json) {
+      console.log(JSON.stringify(trends, null, 2));
+    } else {
+      console.log('');
+      console.log(chalk.bold('📊 ' + formatTrends(trends)));
+    }
   });
 
 // Ensure clean exit after any command (prevents event-loop hangs from dangling handles)

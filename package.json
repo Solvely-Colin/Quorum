@@ -50,6 +50,7 @@
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
     "inquirer": "^12.4.0",
+    "pdf-lib": "^1.17.1",
     "yaml": "^2.7.0"
   },
   "devDependencies": {
