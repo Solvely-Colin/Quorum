@@ -859,7 +859,40 @@ program
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
   .option('--policy <name>', 'Use only the named policy for guardrail checks')
+  .option('--card', 'Output a summary card (delegates to ci command)')
+  .option(
+    '--card-format <format>',
+    'Summary card format: markdown, json, html (implies --card)',
+    'markdown',
+  )
+  .option('--card-detailed', 'Output a detailed summary card (no char limit)')
+  .option('--annotations', 'Output GitHub Actions annotations')
   .action(async (files: string[], opts) => {
+    // If --card is requested, delegate to ci command for structured output
+    const wantsCard =
+      opts.card || opts.cardFormat !== 'markdown' || opts.cardDetailed || opts.annotations;
+    if (wantsCard) {
+      const ciArgs = ['ci'];
+      if (opts.staged) ciArgs.push('--staged');
+      else if (opts.diff !== undefined)
+        ciArgs.push('--diff', typeof opts.diff === 'string' ? opts.diff : '');
+      else if (opts.pr) ciArgs.push('--pr', opts.pr as string);
+      if (opts.card) ciArgs.push('--card');
+      if (opts.cardFormat) ciArgs.push('--card-format', opts.cardFormat as string);
+      if (opts.cardDetailed) ciArgs.push('--card-detailed');
+      if (opts.annotations) ciArgs.push('--annotations');
+      if (opts.providers) ciArgs.push('--providers', opts.providers as string);
+      if (opts.profile && opts.profile !== 'code-review')
+        ciArgs.push('--profile', opts.profile as string);
+      if (opts.rapid) ciArgs.push('--rapid');
+      if (opts.focus) ciArgs.push('--focus', opts.focus as string);
+      if (opts.timeout) ciArgs.push('--timeout', opts.timeout as string);
+      if (opts.memory === false) ciArgs.push('--no-memory');
+      if (opts.policy) ciArgs.push('--policy', opts.policy as string);
+      await program.parseAsync(['node', 'quorum', ...ciArgs]);
+      return;
+    }
+
     let content = '';
     let gitContextStr = '';
 
@@ -1046,6 +1079,14 @@ program
   .option('--topology-moderator <provider>', 'Moderator for panel topology')
   .option('--no-memory', 'Skip deliberation memory (no retrieval or storage)')
   .option('--policy <name>', 'Use only the named policy for guardrail checks')
+  .option('--card', 'Output a summary card to stdout')
+  .option(
+    '--card-format <format>',
+    'Summary card format: markdown, json, html (implies --card)',
+    'markdown',
+  )
+  .option('--card-detailed', 'Output a detailed summary card (no char limit)')
+  .option('--annotations', 'Output GitHub Actions annotations')
   .action(async (opts) => {
     // --- Resolve diff content ---
     let content = '';
@@ -1350,6 +1391,29 @@ program
         } catch (err) {
           console.error(`Failed to add label: ${err instanceof Error ? err.message : err}`);
         }
+      }
+    }
+
+    // --- Summary card output ---
+    const wantsCard =
+      opts.card || opts.cardFormat !== 'markdown' || opts.cardDetailed || opts.annotations;
+    if (wantsCard) {
+      const { generateSummaryCard, generateAnnotations: genAnnotations } =
+        await import('./summary-card.js');
+      const cardInput = {
+        synthesis: result.synthesis,
+        votes: result.votes,
+        duration,
+        sessionId: result.sessionId,
+        providers: ciResult.providers,
+        confidenceThreshold: threshold,
+        sessionUrl: prNumber ? `https://github.com/pulls/${prNumber}` : undefined,
+      };
+      const cardFormat = (opts.cardFormat as 'markdown' | 'json' | 'html') || 'markdown';
+      const card = generateSummaryCard(cardInput, cardFormat, opts.cardDetailed ?? false);
+      console.log(card);
+      if (opts.annotations) {
+        console.log(genAnnotations(cardInput));
       }
     }
 
