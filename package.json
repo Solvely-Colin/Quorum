@@ -1,6 +1,6 @@
 {
   "name": "quorum-ai",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Quorum — Multi-AI deliberation framework — diverge, challenge, converge.",
   "type": "module",
   "bin": {
