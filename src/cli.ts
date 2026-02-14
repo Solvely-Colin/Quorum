@@ -2647,6 +2647,45 @@ memoryCmd
     }
   });
 
+// --- quorum workspace ---
+program
+  .command('workspace')
+  .description('Launch real-time deliberation workspace UI')
+  .argument('[session-id]', 'Session ID to replay (omit for live mode)')
+  .option('--live', 'Start in live mode, stream next deliberation')
+  .option('--port <port>', 'Server port', '3737')
+  .action(async (sessionId: string | undefined, opts) => {
+    const { startWorkspaceServer } = await import('./workspace-server.js');
+    const port = parseInt(opts.port as string) || 3737;
+
+    const isLive = opts.live || !sessionId;
+
+    const server = await startWorkspaceServer({
+      port,
+      sessionId: sessionId ?? undefined,
+      live: isLive,
+    });
+
+    console.log('');
+    console.log(chalk.bold.cyan('🏛️  Quorum Workspace'));
+    console.log('');
+    console.log(`  ${chalk.green('▸')} http://localhost:${server.port}`);
+    if (sessionId) {
+      console.log(`  ${chalk.dim('Mode: replay')} — session ${sessionId}`);
+    } else {
+      console.log(`  ${chalk.dim('Mode: live')} — waiting for deliberation...`);
+    }
+    console.log('');
+    console.log(chalk.dim('Press Ctrl+C to stop'));
+
+    // Keep process alive
+    process.on('SIGINT', async () => {
+      console.log(chalk.dim('\nShutting down workspace...'));
+      await server.close();
+      process.exit(0);
+    });
+  });
+
 // --- Helpers ---
 
 async function readStdin(timeoutMs = 5000): Promise<string> {
