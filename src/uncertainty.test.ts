@@ -58,11 +58,7 @@ describe('uncertainty', () => {
 
   describe('countEvidenceConflicts', () => {
     it('counts contradicted refs', () => {
-      const refs = [
-        { contradicted: true },
-        { contradicted: false },
-        { contradicted: true },
-      ];
+      const refs = [{ contradicted: true }, { contradicted: false }, { contradicted: true }];
       expect(countEvidenceConflicts(refs)).toBe(2);
     });
 
@@ -73,11 +69,15 @@ describe('uncertainty', () => {
 
   describe('detectNovelty', () => {
     it('returns true for novel question', () => {
-      expect(detectNovelty('quantum computing risks', ['cooking recipes', 'gardening tips'])).toBe(true);
+      expect(detectNovelty('quantum computing risks', ['cooking recipes', 'gardening tips'])).toBe(
+        true,
+      );
     });
 
     it('returns false for similar prior', () => {
-      expect(detectNovelty('quantum computing risks', ['quantum computing benefits and risks'])).toBe(false);
+      expect(
+        detectNovelty('quantum computing risks', ['quantum computing benefits and risks']),
+      ).toBe(false);
     });
 
     it('returns true for no priors', () => {

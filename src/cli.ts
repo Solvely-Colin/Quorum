@@ -511,7 +511,9 @@ program
       if (!activeSchema) {
         const available = await listSchemas();
         console.error(chalk.red(`Schema not found: ${opts.schema}`));
-        console.error(chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`));
+        console.error(
+          chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`),
+        );
         process.exit(1);
       }
       if (!isJSON) {
@@ -1691,7 +1693,9 @@ program
         console.log(chalk.bold('📊 Uncertainty'));
         console.log(formatUncertaintyDisplay(uncertainty));
       }
-    } catch { /* no uncertainty data */ }
+    } catch {
+      /* no uncertainty data */
+    }
 
     console.log('');
   });
@@ -3407,7 +3411,14 @@ program
       if (phaseInterventions && phaseInterventions.length > 0) {
         console.log('');
         for (const iv of phaseInterventions) {
-          const typeIcon = iv.type === 'halt' ? '⏸' : iv.type === 'redirect' ? '🔄' : iv.type === 'inject-evidence' ? '📎' : '❓';
+          const typeIcon =
+            iv.type === 'halt'
+              ? '⏸'
+              : iv.type === 'redirect'
+                ? '🔄'
+                : iv.type === 'inject-evidence'
+                  ? '📎'
+                  : '❓';
           console.log(chalk.bold.red(`  ${typeIcon} INTERVENTION: ${iv.type}`));
           console.log(chalk.red(`    ${iv.content}`));
           if (iv.constraints) {
@@ -4651,7 +4662,12 @@ attestCmd
   .option('--cbor <path>', 'Export as binary attestation file')
   .action(async (sessionArg: string, opts) => {
     const { buildCanonicalRecord } = await import('./canonical.js');
-    const { buildAttestationChain, verifyAttestationChain, exportAttestationJSON, exportAttestationCBOR } = await import('./attestation.js');
+    const {
+      buildAttestationChain,
+      verifyAttestationChain,
+      exportAttestationJSON,
+      exportAttestationCBOR,
+    } = await import('./attestation.js');
 
     let sessionPath = sessionArg;
     if (sessionPath === 'last') {
@@ -4659,11 +4675,15 @@ attestCmd
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           }
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
     }
 
@@ -4783,7 +4803,8 @@ attestCmd
   .action(async (sessionArg: string, opts) => {
     const { buildCanonicalRecord } = await import('./canonical.js');
     const { buildAttestationChain, exportAttestationJSON } = await import('./attestation.js');
-    const { loadExportData, exportAttestationHTML, exportAttestationPDF } = await import('./attestation-export.js');
+    const { loadExportData, exportAttestationHTML, exportAttestationPDF } =
+      await import('./attestation-export.js');
 
     let sessionPath = sessionArg;
     if (sessionPath === 'last') {
@@ -4791,11 +4812,15 @@ attestCmd
       const indexPath = pathJoin(sessionsDir, 'index.json');
       if (existsSync(indexPath)) {
         try {
-          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
           if (entries.length > 0) {
             sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
           }
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
     }
 

@@ -82,8 +82,20 @@ describe('attestation', () => {
         { phase: 'DEBATE', hash: 'h2', previousHash: 'h1', timestamp: 2000 },
       ];
       const phaseData = [
-        { phase: 'GATHER', input: 'q', responses: { a: 'r1' }, providers: ['a', 'b'], timestamp: 1000 },
-        { phase: 'DEBATE', input: 'q', responses: { a: 'r2' }, providers: ['a', 'b'], timestamp: 2000 },
+        {
+          phase: 'GATHER',
+          input: 'q',
+          responses: { a: 'r1' },
+          providers: ['a', 'b'],
+          timestamp: 1000,
+        },
+        {
+          phase: 'DEBATE',
+          input: 'q',
+          responses: { a: 'r2' },
+          providers: ['a', 'b'],
+          timestamp: 2000,
+        },
       ];
 
       const chain = buildAttestationChain('session-1', entries, phaseData);
@@ -100,7 +112,13 @@ describe('attestation', () => {
         { phase: 'SYNTH', hash: 'h1', previousHash: null, timestamp: 1000 },
       ];
       const phaseData = [
-        { phase: 'SYNTH', input: 'q', responses: { claude: 'ans' }, providers: ['claude'], timestamp: 1000 },
+        {
+          phase: 'SYNTH',
+          input: 'q',
+          responses: { claude: 'ans' },
+          providers: ['claude'],
+          timestamp: 1000,
+        },
       ];
 
       const chain = buildAttestationChain('s1', entries, phaseData);
@@ -157,7 +175,12 @@ describe('attestation', () => {
     });
 
     it('handles empty chain', () => {
-      const chain: AttestationChain = { version: 1, sessionId: 's1', records: [], createdAt: Date.now() };
+      const chain: AttestationChain = {
+        version: 1,
+        sessionId: 's1',
+        records: [],
+        createdAt: Date.now(),
+      };
       expect(verifyAttestationChain(chain).valid).toBe(true);
     });
   });

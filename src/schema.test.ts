@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  DEFAULT_SCHEMA,
-  createSchema,
-  validateSchema,
-  formatSchemaDisplay,
-} from './schema.js';
+import { DEFAULT_SCHEMA, createSchema, validateSchema, formatSchemaDisplay } from './schema.js';
 
 describe('schema', () => {
   describe('DEFAULT_SCHEMA', () => {
@@ -14,7 +9,9 @@ describe('schema', () => {
       expect(DEFAULT_SCHEMA.decompositionSteps.length).toBeGreaterThan(0);
       expect(DEFAULT_SCHEMA.evidenceTypes.length).toBeGreaterThan(0);
       expect(DEFAULT_SCHEMA.inferenceRules.length).toBeGreaterThan(0);
-      expect(DEFAULT_SCHEMA.confidenceThresholds.high).toBeGreaterThan(DEFAULT_SCHEMA.confidenceThresholds.low);
+      expect(DEFAULT_SCHEMA.confidenceThresholds.high).toBeGreaterThan(
+        DEFAULT_SCHEMA.confidenceThresholds.low,
+      );
     });
   });
 
@@ -47,7 +44,13 @@ describe('schema', () => {
     });
 
     it('rejects missing name', () => {
-      const result = validateSchema({ description: 'x', decompositionSteps: [], evidenceTypes: [], inferenceRules: [], confidenceThresholds: { high: 0.8, medium: 0.5, low: 0.3 } });
+      const result = validateSchema({
+        description: 'x',
+        decompositionSteps: [],
+        evidenceTypes: [],
+        inferenceRules: [],
+        confidenceThresholds: { high: 0.8, medium: 0.5, low: 0.3 },
+      });
       expect(result.valid).toBe(false);
       expect(result.errors.some((e) => e.includes('name'))).toBe(true);
     });

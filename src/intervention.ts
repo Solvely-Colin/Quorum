@@ -68,11 +68,7 @@ export function createHalt(phase: string, reason: string): Intervention {
 /**
  * Create a redirect intervention — reframe with modified constraints.
  */
-export function createRedirect(
-  phase: string,
-  reason: string,
-  constraints: string[],
-): Intervention {
+export function createRedirect(phase: string, reason: string, constraints: string[]): Intervention {
   const timestamp = Date.now();
   const content = `${reason}\nConstraints: ${constraints.join(', ')}`;
   return {
@@ -122,7 +118,10 @@ export function createRequestClarification(phase: string, question: string): Int
 /**
  * Save an intervention to the session directory.
  */
-export async function saveIntervention(sessionDir: string, intervention: Intervention): Promise<void> {
+export async function saveIntervention(
+  sessionDir: string,
+  intervention: Intervention,
+): Promise<void> {
   const filename = `intervention-${intervention.phase}.json`;
   const filepath = join(sessionDir, filename);
   await writeFile(filepath, JSON.stringify(intervention, null, 2), 'utf-8');
@@ -152,9 +151,7 @@ export async function loadInterventions(sessionDir: string): Promise<Interventio
  * Interactive intervention prompt — asks the user what they want to do at a phase boundary.
  * Returns null if the user chooses to continue without intervention.
  */
-export async function promptIntervention(
-  prompt: InterventionPrompt,
-): Promise<Intervention | null> {
+export async function promptIntervention(prompt: InterventionPrompt): Promise<Intervention | null> {
   // This requires TTY — check first
   if (!process.stdin.isTTY) return null;
 
@@ -177,7 +174,10 @@ export async function promptIntervention(
         { name: '⏸ Halt — pause for external input', value: 'halt' },
         { name: '🔄 Redirect — reframe with new constraints', value: 'redirect' },
         { name: '📎 Inject Evidence — add new data/context', value: 'inject-evidence' },
-        { name: '❓ Request Clarification — force uncertainty signaling', value: 'request-clarification' },
+        {
+          name: '❓ Request Clarification — force uncertainty signaling',
+          value: 'request-clarification',
+        },
       ],
     },
   ]);
@@ -201,7 +201,10 @@ export async function promptIntervention(
     return createRedirect(
       prompt.phase,
       reason,
-      constraints.split(',').map((s: string) => s.trim()).filter(Boolean),
+      constraints
+        .split(',')
+        .map((s: string) => s.trim())
+        .filter(Boolean),
     );
   }
 

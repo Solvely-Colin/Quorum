@@ -9,7 +9,10 @@ import {
 import type { UncertaintyMetrics } from './uncertainty.js';
 
 describe('uncertainty-trends', () => {
-  const makeMetrics = (level: 'low' | 'medium' | 'high', disagreement = 0.1): UncertaintyMetrics => ({
+  const makeMetrics = (
+    level: 'low' | 'medium' | 'high',
+    disagreement = 0.1,
+  ): UncertaintyMetrics => ({
     disagreementScore: disagreement,
     positionDrift: 0.05,
     evidenceConflictCount: 0,
@@ -41,9 +44,27 @@ describe('uncertainty-trends', () => {
       const ledger: UncertaintyLedger = {
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('high') },
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 2000, sessionId: 's2', metrics: makeMetrics('low') },
-          { questionHash: 'bbb', questionPreview: 'Q2', timestamp: 3000, sessionId: 's3', metrics: makeMetrics('medium') },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('high'),
+          },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 2000,
+            sessionId: 's2',
+            metrics: makeMetrics('low'),
+          },
+          {
+            questionHash: 'bbb',
+            questionPreview: 'Q2',
+            timestamp: 3000,
+            sessionId: 's3',
+            metrics: makeMetrics('medium'),
+          },
         ],
       };
 
@@ -55,8 +76,20 @@ describe('uncertainty-trends', () => {
       const ledger: UncertaintyLedger = {
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('high') },
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 2000, sessionId: 's2', metrics: makeMetrics('low') },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('high'),
+          },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 2000,
+            sessionId: 's2',
+            metrics: makeMetrics('low'),
+          },
         ],
       };
 
@@ -68,8 +101,20 @@ describe('uncertainty-trends', () => {
       const ledger: UncertaintyLedger = {
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('low') },
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 2000, sessionId: 's2', metrics: makeMetrics('high') },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('low'),
+          },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 2000,
+            sessionId: 's2',
+            metrics: makeMetrics('high'),
+          },
         ],
       };
 
@@ -81,8 +126,20 @@ describe('uncertainty-trends', () => {
       const ledger: UncertaintyLedger = {
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('medium') },
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 2000, sessionId: 's2', metrics: makeMetrics('medium') },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('medium'),
+          },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 2000,
+            sessionId: 's2',
+            metrics: makeMetrics('medium'),
+          },
         ],
       };
 
@@ -94,7 +151,13 @@ describe('uncertainty-trends', () => {
       const ledger: UncertaintyLedger = {
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Q1', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('low') },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Q1',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('low'),
+          },
         ],
       };
 
@@ -116,8 +179,20 @@ describe('uncertainty-trends', () => {
       const trends = computeTrends({
         version: 1,
         entries: [
-          { questionHash: 'aaa', questionPreview: 'Test Q', timestamp: 1000, sessionId: 's1', metrics: makeMetrics('high', 0.8) },
-          { questionHash: 'aaa', questionPreview: 'Test Q', timestamp: 2000, sessionId: 's2', metrics: makeMetrics('low', 0.1) },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Test Q',
+            timestamp: 1000,
+            sessionId: 's1',
+            metrics: makeMetrics('high', 0.8),
+          },
+          {
+            questionHash: 'aaa',
+            questionPreview: 'Test Q',
+            timestamp: 2000,
+            sessionId: 's2',
+            metrics: makeMetrics('low', 0.1),
+          },
         ],
       });
 

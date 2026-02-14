@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { BUILTIN_SCHEMAS, LEGAL_SCHEMA, TECHNICAL_REVIEW_SCHEMA, RISK_ASSESSMENT_SCHEMA } from './builtin-schemas.js';
+import {
+  BUILTIN_SCHEMAS,
+  LEGAL_SCHEMA,
+  TECHNICAL_REVIEW_SCHEMA,
+  RISK_ASSESSMENT_SCHEMA,
+} from './builtin-schemas.js';
 import { validateSchema } from './schema.js';
 
 describe('builtin-schemas', () => {
@@ -28,7 +33,9 @@ describe('builtin-schemas', () => {
       });
 
       it('has valid confidence thresholds', () => {
-        expect(schema.confidenceThresholds.high).toBeGreaterThan(schema.confidenceThresholds.medium);
+        expect(schema.confidenceThresholds.high).toBeGreaterThan(
+          schema.confidenceThresholds.medium,
+        );
         expect(schema.confidenceThresholds.medium).toBeGreaterThan(schema.confidenceThresholds.low);
       });
     });

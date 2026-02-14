@@ -34,7 +34,9 @@ export function buildSchemaContext(schema: ReasoningSchema, phase: 'gather' | 'p
       parts.push(`    Then: ${rule.conclusion}`);
     }
 
-    parts.push(`\nConfidence thresholds: high=${schema.confidenceThresholds.high}, medium=${schema.confidenceThresholds.medium}, low=${schema.confidenceThresholds.low}`);
+    parts.push(
+      `\nConfidence thresholds: high=${schema.confidenceThresholds.high}, medium=${schema.confidenceThresholds.medium}, low=${schema.confidenceThresholds.low}`,
+    );
     parts.push('Calibrate your confidence claims against these thresholds.');
   }
 

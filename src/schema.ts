@@ -63,9 +63,17 @@ export const DEFAULT_SCHEMA: ReasoningSchema = {
     'Identify uncertainties and confidence levels',
   ],
   evidenceTypes: [
-    { name: 'empirical', description: 'Data from experiments, studies, or observations', weight: 0.9 },
+    {
+      name: 'empirical',
+      description: 'Data from experiments, studies, or observations',
+      weight: 0.9,
+    },
     { name: 'expert-opinion', description: 'Views from recognized domain experts', weight: 0.7 },
-    { name: 'logical-deduction', description: 'Conclusions derived from logical reasoning', weight: 0.8 },
+    {
+      name: 'logical-deduction',
+      description: 'Conclusions derived from logical reasoning',
+      weight: 0.8,
+    },
     { name: 'analogy', description: 'Reasoning from similar cases or domains', weight: 0.5 },
     { name: 'anecdotal', description: 'Individual experiences or case studies', weight: 0.3 },
   ],
@@ -197,7 +205,8 @@ export function validateSchema(schema: unknown): { valid: boolean; errors: strin
   }
 
   if (!s.name || typeof s.name !== 'string') errors.push('Missing or invalid name');
-  if (!s.description || typeof s.description !== 'string') errors.push('Missing or invalid description');
+  if (!s.description || typeof s.description !== 'string')
+    errors.push('Missing or invalid description');
   if (!Array.isArray(s.decompositionSteps)) errors.push('Missing decompositionSteps array');
   if (!Array.isArray(s.evidenceTypes)) errors.push('Missing evidenceTypes array');
   if (!Array.isArray(s.inferenceRules)) errors.push('Missing inferenceRules array');

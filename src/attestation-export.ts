@@ -52,7 +52,9 @@ export async function loadExportData(
         interventions.push(JSON.parse(await readFile(join(sessionPath, f), 'utf-8')));
       }
     }
-  } catch { /* ok */ }
+  } catch {
+    /* ok */
+  }
 
   // Load uncertainty
   let uncertainty: UncertaintyMetrics | null = null;
@@ -177,11 +179,14 @@ export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array
     if (y - needed < margin) addPage();
   }
 
-  function drawText(text: string, opts: { font?: typeof font; size?: number; color?: ReturnType<typeof rgb> } = {}) {
+  function drawText(
+    text: string,
+    opts: { font?: typeof font; size?: number; color?: ReturnType<typeof rgb> } = {},
+  ) {
     const f = opts.font ?? font;
     const size = opts.size ?? 10;
     const color = opts.color ?? rgb(0, 0, 0);
-    
+
     // Word-wrap
     const words = text.split(' ');
     let line = '';
@@ -210,9 +215,15 @@ export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array
 
   // Metadata
   drawText(`Session: ${data.chain.sessionId}`, { size: 9, color: rgb(0.4, 0.4, 0.4) });
-  drawText(`Date: ${new Date(data.meta.startedAt).toISOString()}`, { size: 9, color: rgb(0.4, 0.4, 0.4) });
+  drawText(`Date: ${new Date(data.meta.startedAt).toISOString()}`, {
+    size: 9,
+    color: rgb(0.4, 0.4, 0.4),
+  });
   drawText(`Profile: ${data.meta.profile}`, { size: 9, color: rgb(0.4, 0.4, 0.4) });
-  drawText(`Providers: ${data.meta.providers.map((p) => p.name).join(', ')}`, { size: 9, color: rgb(0.4, 0.4, 0.4) });
+  drawText(`Providers: ${data.meta.providers.map((p) => p.name).join(', ')}`, {
+    size: 9,
+    color: rgb(0.4, 0.4, 0.4),
+  });
   y -= 5;
 
   // Question
@@ -221,14 +232,21 @@ export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array
   y -= 10;
 
   // Attestation records
-  drawText(`Attestation Chain (${data.chain.records.length} records)`, { font: fontBold, size: 12 });
+  drawText(`Attestation Chain (${data.chain.records.length} records)`, {
+    font: fontBold,
+    size: 12,
+  });
   y -= 5;
 
   for (const rec of data.chain.records) {
     checkSpace(60);
     drawText(`${rec.phase} — ${rec.providerId}`, { font: fontBold, size: 10 });
     drawText(`Hash: ${rec.hash}`, { font: fontMono, size: 7, color: rgb(0.4, 0.4, 0.4) });
-    drawText(`Inputs: ${rec.inputsHash}  Outputs: ${rec.outputsHash}`, { font: fontMono, size: 7, color: rgb(0.4, 0.4, 0.4) });
+    drawText(`Inputs: ${rec.inputsHash}  Outputs: ${rec.outputsHash}`, {
+      font: fontMono,
+      size: 7,
+      color: rgb(0.4, 0.4, 0.4),
+    });
     y -= 5;
   }
 
@@ -242,7 +260,10 @@ export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array
       drawText(`  ${r.provider}: ${r.score} pts${crown}`, { size: 10 });
     }
     if (data.votes.controversial) {
-      drawText('  Warning: Controversial vote — positions closely matched', { size: 9, color: rgb(0.8, 0.4, 0) });
+      drawText('  Warning: Controversial vote — positions closely matched', {
+        size: 9,
+        color: rgb(0.8, 0.4, 0),
+      });
     }
   }
 
@@ -264,7 +285,10 @@ export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array
     drawText('Uncertainty Metrics', { font: fontBold, size: 12 });
     y -= 3;
     drawText(`Overall: ${data.uncertainty.overallUncertainty.toUpperCase()}`, { size: 10 });
-    drawText(`Disagreement: ${(data.uncertainty.disagreementScore * 100).toFixed(0)}% | Drift: ${(data.uncertainty.positionDrift * 100).toFixed(0)}% | Conflicts: ${data.uncertainty.evidenceConflictCount}`, { size: 9 });
+    drawText(
+      `Disagreement: ${(data.uncertainty.disagreementScore * 100).toFixed(0)}% | Drift: ${(data.uncertainty.positionDrift * 100).toFixed(0)}% | Conflicts: ${data.uncertainty.evidenceConflictCount}`,
+      { size: 9 },
+    );
     drawText(data.uncertainty.summary, { size: 9, color: rgb(0.4, 0.4, 0.4) });
   }
 

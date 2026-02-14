@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { exportAttestationHTML, exportAttestationPDF, type ExportData } from './attestation-export.js';
+import {
+  exportAttestationHTML,
+  exportAttestationPDF,
+  type ExportData,
+} from './attestation-export.js';
 
 describe('attestation-export', () => {
   const sampleData: ExportData = {

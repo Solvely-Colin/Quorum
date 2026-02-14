@@ -25,9 +25,7 @@ export interface UncertaintyMetrics {
  * Compute vote disagreement score from rankings.
  * 0 = all voters agree, 1 = maximum disagreement.
  */
-export function computeDisagreement(
-  rankings: Array<{ provider: string; score: number }>,
-): number {
+export function computeDisagreement(rankings: Array<{ provider: string; score: number }>): number {
   if (rankings.length < 2) return 0;
 
   const scores = rankings.map((r) => r.score);
@@ -78,9 +76,7 @@ export function computePositionDrift(
 /**
  * Count evidence conflicts from cross-reference data.
  */
-export function countEvidenceConflicts(
-  crossRefs?: Array<{ contradicted?: boolean }>,
-): number {
+export function countEvidenceConflicts(crossRefs?: Array<{ contradicted?: boolean }>): number {
   if (!crossRefs) return 0;
   return crossRefs.filter((cr) => cr.contradicted).length;
 }
@@ -140,7 +136,8 @@ export function computeUncertaintyMetrics(params: {
     score < 0.3 ? 'low' : score < 0.6 ? 'medium' : 'high';
 
   const parts: string[] = [];
-  if (disagreement > 0.3) parts.push(`high vote disagreement (${(disagreement * 100).toFixed(0)}%)`);
+  if (disagreement > 0.3)
+    parts.push(`high vote disagreement (${(disagreement * 100).toFixed(0)}%)`);
   if (drift > 0.4) parts.push(`significant position drift (${(drift * 100).toFixed(0)}%)`);
   if (conflicts > 0) parts.push(`${conflicts} evidence conflict(s)`);
   if (novelty) parts.push('novel question (no similar prior sessions)');
@@ -167,11 +164,7 @@ export async function saveUncertaintyMetrics(
   sessionDir: string,
   metrics: UncertaintyMetrics,
 ): Promise<void> {
-  await writeFile(
-    join(sessionDir, 'uncertainty.json'),
-    JSON.stringify(metrics, null, 2),
-    'utf-8',
-  );
+  await writeFile(join(sessionDir, 'uncertainty.json'), JSON.stringify(metrics, null, 2), 'utf-8');
 }
 
 /**

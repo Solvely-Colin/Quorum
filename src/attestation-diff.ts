@@ -53,7 +53,8 @@ export function diffAttestationChains(
         const parts: string[] = [];
         if (l.inputsHash !== r.inputsHash) parts.push('inputs differ');
         if (l.outputsHash !== r.outputsHash) parts.push('outputs differ');
-        if (l.providerId !== r.providerId) parts.push(`providers differ (${l.providerId} vs ${r.providerId})`);
+        if (l.providerId !== r.providerId)
+          parts.push(`providers differ (${l.providerId} vs ${r.providerId})`);
         entries.push({
           phase: l.phase,
           status: 'diverged',
@@ -94,16 +95,17 @@ export function diffAttestationChains(
  * Format attestation diff for terminal display.
  */
 export function formatAttestationDiff(diff: AttestationDiffResult): string {
-  const lines: string[] = [
-    `Attestation Diff: ${diff.sessionLeft} ↔ ${diff.sessionRight}`,
-    '',
-  ];
+  const lines: string[] = [`Attestation Diff: ${diff.sessionLeft} ↔ ${diff.sessionRight}`, ''];
 
   for (const entry of diff.entries) {
     const icon =
-      entry.status === 'match' ? '✅' :
-      entry.status === 'diverged' ? '❌' :
-      entry.status === 'only-left' ? '◀️' : '▶️';
+      entry.status === 'match'
+        ? '✅'
+        : entry.status === 'diverged'
+          ? '❌'
+          : entry.status === 'only-left'
+            ? '◀️'
+            : '▶️';
 
     lines.push(`  ${icon} ${entry.phase} — ${entry.status}`);
     if (entry.details) {

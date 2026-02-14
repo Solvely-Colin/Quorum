@@ -3,7 +3,10 @@ import { diffAttestationChains, formatAttestationDiff } from './attestation-diff
 import type { AttestationChain } from './attestation.js';
 
 describe('attestation-diff', () => {
-  const makeChain = (sessionId: string, records: Array<{ phase: string; inputsHash: string; outputsHash: string; providerId: string }>): AttestationChain => ({
+  const makeChain = (
+    sessionId: string,
+    records: Array<{ phase: string; inputsHash: string; outputsHash: string; providerId: string }>,
+  ): AttestationChain => ({
     version: 1,
     sessionId,
     createdAt: Date.now(),

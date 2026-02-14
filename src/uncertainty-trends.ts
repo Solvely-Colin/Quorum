@@ -154,9 +154,13 @@ export function formatTrends(trends: UncertaintyTrend[]): string {
 
   for (const t of trends) {
     const trendIcon =
-      t.trend === 'improving' ? '📉' :
-      t.trend === 'worsening' ? '📈' :
-      t.trend === 'stable' ? '➡️' : '❓';
+      t.trend === 'improving'
+        ? '📉'
+        : t.trend === 'worsening'
+          ? '📈'
+          : t.trend === 'stable'
+            ? '➡️'
+            : '❓';
 
     lines.push(`${trendIcon} ${t.questionPreview}`);
     lines.push(`   Hash: ${t.questionHash} | Trend: ${t.trend} | ${t.entries.length} session(s)`);
@@ -164,9 +168,10 @@ export function formatTrends(trends: UncertaintyTrend[]): string {
     for (const e of t.entries) {
       const date = new Date(e.timestamp).toLocaleDateString();
       const icon =
-        e.overallUncertainty === 'low' ? '🟢' :
-        e.overallUncertainty === 'medium' ? '🟡' : '🔴';
-      lines.push(`     ${date} ${icon} ${e.overallUncertainty} (disagreement: ${(e.disagreementScore * 100).toFixed(0)}%, drift: ${(e.positionDrift * 100).toFixed(0)}%)`);
+        e.overallUncertainty === 'low' ? '🟢' : e.overallUncertainty === 'medium' ? '🟡' : '🔴';
+      lines.push(
+        `     ${date} ${icon} ${e.overallUncertainty} (disagreement: ${(e.disagreementScore * 100).toFixed(0)}%, drift: ${(e.positionDrift * 100).toFixed(0)}%)`,
+      );
     }
     lines.push('');
   }

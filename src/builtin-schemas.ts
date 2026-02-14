@@ -7,7 +7,8 @@ import type { ReasoningSchema } from './schema.js';
 export const LEGAL_SCHEMA: ReasoningSchema = {
   name: 'legal',
   version: 1,
-  description: 'Legal analysis: issue spotting, precedent, statutory interpretation, risk assessment.',
+  description:
+    'Legal analysis: issue spotting, precedent, statutory interpretation, risk assessment.',
   decompositionSteps: [
     'Identify the legal issues and questions presented',
     'Determine applicable jurisdiction and governing law',
@@ -18,11 +19,23 @@ export const LEGAL_SCHEMA: ReasoningSchema = {
     'Consider policy implications and practical effects',
   ],
   evidenceTypes: [
-    { name: 'statutory-text', description: 'Direct language from statutes, regulations, or codes', weight: 0.95 },
+    {
+      name: 'statutory-text',
+      description: 'Direct language from statutes, regulations, or codes',
+      weight: 0.95,
+    },
     { name: 'case-law', description: 'Judicial decisions and precedent', weight: 0.9 },
-    { name: 'legislative-history', description: 'Committee reports, floor debates, intent signals', weight: 0.6 },
+    {
+      name: 'legislative-history',
+      description: 'Committee reports, floor debates, intent signals',
+      weight: 0.6,
+    },
     { name: 'legal-scholarship', description: 'Law review articles and treatises', weight: 0.5 },
-    { name: 'regulatory-guidance', description: 'Agency interpretations and advisory opinions', weight: 0.7 },
+    {
+      name: 'regulatory-guidance',
+      description: 'Agency interpretations and advisory opinions',
+      weight: 0.7,
+    },
   ],
   inferenceRules: [
     {
@@ -63,9 +76,21 @@ export const TECHNICAL_REVIEW_SCHEMA: ReasoningSchema = {
     'Identify testing gaps and suggest improvements',
   ],
   evidenceTypes: [
-    { name: 'code-analysis', description: 'Direct examination of source code and logic', weight: 0.95 },
-    { name: 'benchmark-data', description: 'Performance measurements and profiling results', weight: 0.85 },
-    { name: 'security-audit', description: 'Known vulnerability patterns and CVE references', weight: 0.9 },
+    {
+      name: 'code-analysis',
+      description: 'Direct examination of source code and logic',
+      weight: 0.95,
+    },
+    {
+      name: 'benchmark-data',
+      description: 'Performance measurements and profiling results',
+      weight: 0.85,
+    },
+    {
+      name: 'security-audit',
+      description: 'Known vulnerability patterns and CVE references',
+      weight: 0.9,
+    },
     { name: 'best-practices', description: 'Industry standards and design patterns', weight: 0.7 },
     { name: 'test-coverage', description: 'Existing test results and coverage data', weight: 0.75 },
   ],
@@ -109,11 +134,27 @@ export const RISK_ASSESSMENT_SCHEMA: ReasoningSchema = {
     'Prioritize risks and recommend action items',
   ],
   evidenceTypes: [
-    { name: 'historical-data', description: 'Past incidents, near-misses, and loss data', weight: 0.9 },
-    { name: 'threat-intelligence', description: 'Current threat landscape and emerging risks', weight: 0.85 },
-    { name: 'control-assessment', description: 'Evaluation of existing safeguards and their effectiveness', weight: 0.8 },
+    {
+      name: 'historical-data',
+      description: 'Past incidents, near-misses, and loss data',
+      weight: 0.9,
+    },
+    {
+      name: 'threat-intelligence',
+      description: 'Current threat landscape and emerging risks',
+      weight: 0.85,
+    },
+    {
+      name: 'control-assessment',
+      description: 'Evaluation of existing safeguards and their effectiveness',
+      weight: 0.8,
+    },
     { name: 'expert-judgment', description: 'Domain expert risk estimations', weight: 0.7 },
-    { name: 'industry-benchmarks', description: 'Comparable organization risk profiles and standards', weight: 0.6 },
+    {
+      name: 'industry-benchmarks',
+      description: 'Comparable organization risk profiles and standards',
+      weight: 0.6,
+    },
   ],
   inferenceRules: [
     {
