@@ -198,6 +198,7 @@ program
   .option('--policy <name>', 'Use only the named policy for guardrail checks')
   .option('--interactive', 'Enable constitutional intervention points between phases')
   .option('--schema <name>', 'Use a reasoning schema to guide deliberation')
+  .option('--live', 'Show streaming text from each provider as it arrives')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -524,6 +525,12 @@ program
     // Track phase timing for compact progress
     const phaseStartTimes: Record<string, number> = {};
     const providersDone: Record<string, string[]> = {};
+    const isLive = opts.live ?? false;
+
+    // Live streaming state
+    const liveProviderStarted = new Set<string>(); // providers whose header has been printed
+    const liveProviderStarts: Record<string, number> = {}; // start times per provider
+
     const council = new CouncilV2(adapters, candidateProviders, profile, {
       streaming: true,
       rapid: opts.rapid ?? false,
@@ -558,6 +565,19 @@ program
         ...(opts.topologyHub ? { hub: opts.topologyHub as string } : {}),
         ...(opts.topologyModerator ? { moderator: opts.topologyModerator as string } : {}),
       },
+      onStreamDelta: isLive
+        ? (provider: string, _phase: string, delta: string) => {
+            if (isJSON) return;
+            if (!liveProviderStarted.has(provider)) {
+              liveProviderStarted.add(provider);
+              liveProviderStarts[provider] = Date.now();
+              const model = adapters.find((a) => a.name === provider)?.config?.model ?? '';
+              console.log(chalk.dim(`    ┌ ${provider}${model ? ` (${model})` : ''}`));
+              process.stdout.write(chalk.dim('    │ '));
+            }
+            process.stdout.write(delta);
+          }
+        : undefined,
       onEvent(event, data) {
         if (isJSON) return;
         const d = data as Record<string, unknown>;
@@ -566,18 +586,38 @@ program
             const phase = d.phase as string;
             phaseStartTimes[phase] = Date.now();
             providersDone[phase] = [];
-            process.stdout.write(chalk.bold(`  ▸ ${phase} `));
+            if (isLive) {
+              console.log(chalk.bold(`  ▸ ${phase}`));
+              liveProviderStarted.clear();
+            } else {
+              process.stdout.write(chalk.bold(`  ▸ ${phase} `));
+            }
             break;
           }
           case 'response': {
             const provider = d.provider as string;
-            const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
-            process.stdout.write(`${fallback}${chalk.dim(provider)} `);
+            if (isLive) {
+              if (liveProviderStarted.has(provider)) {
+                // End the streaming line
+                const elapsed = liveProviderStarts[provider]
+                  ? ((Date.now() - liveProviderStarts[provider]) / 1000).toFixed(1)
+                  : '?';
+                const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
+                console.log('');
+                console.log(chalk.dim(`    └ ${fallback} (${elapsed}s)`));
+                console.log('');
+              }
+            } else {
+              const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
+              process.stdout.write(`${fallback}${chalk.dim(provider)} `);
+            }
             break;
           }
           case 'phase:done': {
             const secs = ((d.duration as number) / 1000).toFixed(1);
-            console.log(chalk.dim(`(${secs}s)`));
+            if (!isLive) {
+              console.log(chalk.dim(`(${secs}s)`));
+            }
             break;
           }
           case 'tool': {

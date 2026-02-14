@@ -347,7 +347,7 @@ export class CouncilV2 {
             `\nAvailable tools: ${toolList.join(', ')}. Max 3 tool uses per response.`;
         }
         const sys = this.prompt('gather', gatherSys, adapter.name);
-        let response = await adapter.generate(input, sys);
+        let response = await this.adapterGenerate(adapter, input, sys);
 
         // Tool execution in gather phase
         if (this.profile.tools) {
@@ -368,7 +368,7 @@ export class CouncilV2 {
               .map((tr) => `[${tr.tool}] Input: ${tr.input}\nOutput: ${tr.output}`)
               .join('\n\n');
             const followUp = `Your previous response invoked tools. Here are the results:\n\n${toolSummary}\n\nPlease incorporate these findings into a revised, comprehensive response.`;
-            response = await adapter.generate(followUp, sys);
+            response = await this.adapterGenerate(adapter, followUp, sys);
           }
         }
 
@@ -467,7 +467,7 @@ export class CouncilV2 {
               adapter.name,
             );
             const prompt = `Other council members' initial responses:\n\n${fitted.others}\n\nOutline your argument strategy (bullet points, concise):`;
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           });
         });
 
@@ -515,7 +515,7 @@ export class CouncilV2 {
               `\nNow write your formal position:`,
             ].join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           }, gatherFallbacks);
         });
 
@@ -556,7 +556,7 @@ export class CouncilV2 {
               `\nCritique each position. Address each member directly:`,
             ].join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           });
         });
 
@@ -613,7 +613,7 @@ export class CouncilV2 {
                   `\nCritique each position. Address each member directly:`,
                 ].join('\n');
 
-                return adapter.generate(prompt, sys);
+                return this.adapterGenerate(adapter, prompt, sys);
               });
             },
           );
@@ -685,7 +685,7 @@ export class CouncilV2 {
               `\nYour revised position:`,
             ].join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           }, formulateFallbacks);
         });
 
@@ -800,7 +800,7 @@ export class CouncilV2 {
               `\nYour final rebuttals/concessions (address each member):`,
             ].join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           });
         });
 
@@ -951,7 +951,7 @@ export class CouncilV2 {
               .filter(Boolean)
               .join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           });
         });
 
@@ -1444,7 +1444,7 @@ export class CouncilV2 {
                 const prompt = phase.userPrompt(ctx);
 
                 try {
-                  const response = await adapter.generate(prompt, sys);
+                  const response = await this.adapterGenerate(adapter, prompt, sys);
                   this.emit('response', { provider: providerName, phase: phase.name });
                   return [providerName, response] as const;
                 } catch (err) {
@@ -1490,7 +1490,7 @@ export class CouncilV2 {
               const prompt = phase.userPrompt(ctx);
 
               try {
-                const response = await adapter.generate(prompt, sys);
+                const response = await this.adapterGenerate(adapter, prompt, sys);
                 this.emit('response', { provider: providerName, phase: phase.name });
                 results[providerName] = response;
               } catch (err) {
@@ -1524,7 +1524,7 @@ export class CouncilV2 {
 
           const sys = `Vote on the best position. Rank ALL positions from best to worst. Explain your ranking.`;
           const prompt = `Original question: ${input}\n\n${positionSummaries}\n\nRank all positions. Provide JSON rankings and numbered lines.`;
-          return adapter.generate(prompt, sys);
+          return this.adapterGenerate(adapter, prompt, sys);
         });
       });
       votes = this.tallyVotes(voteOutput.responses);
@@ -1774,7 +1774,7 @@ export class CouncilV2 {
               `\nCritique each position. Address each member directly:`,
             ].join('\n');
 
-            return adapter.generate(prompt, sys);
+            return this.adapterGenerate(adapter, prompt, sys);
           });
         });
 
@@ -1985,6 +1985,7 @@ export class CouncilV2 {
 
   /**
    * Generate with retry + fallback on empty response.
+   * When streaming is enabled and the adapter supports it, uses streaming generation.
    */
   private async generateWithRetry(
     adapter: ProviderAdapter,
@@ -1994,7 +1995,22 @@ export class CouncilV2 {
   ): Promise<string> {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const result = await adapter.generate(prompt, system);
+        let result: string;
+        if (this.streaming && adapter.generateStream) {
+          const start = Date.now();
+          this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
+          result = await adapter.generateStream(prompt, system, (delta) => {
+            this.onStreamDelta(adapter.name, this.currentPhase, delta);
+            this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
+          });
+          this.emit('stream:end', {
+            provider: adapter.name,
+            phase: this.currentPhase,
+            duration: Date.now() - start,
+          });
+        } else {
+          result = await adapter.generate(prompt, system);
+        }
         if (result && result.trim().length > 0) return result;
 
         this.emit('warn', {
@@ -2173,6 +2189,7 @@ export class CouncilV2 {
 
   /**
    * Generate with streaming if available, falling back to non-streaming.
+   * Emits stream:start, stream:delta, stream:end events for external consumers.
    */
   private async generateStreaming(
     adapter: ProviderAdapter,
@@ -2180,9 +2197,40 @@ export class CouncilV2 {
     system: string,
   ): Promise<string> {
     if (this.streaming && adapter.generateStream) {
-      return adapter.generateStream(prompt, system, (delta) => {
+      const start = Date.now();
+      this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
+      const result = await adapter.generateStream(prompt, system, (delta) => {
         this.onStreamDelta(adapter.name, this.currentPhase, delta);
+        this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
       });
+      this.emit('stream:end', {
+        provider: adapter.name,
+        phase: this.currentPhase,
+        duration: Date.now() - start,
+      });
+      return result;
+    }
+    return adapter.generate(prompt, system);
+  }
+
+  /**
+   * Generate for a given adapter — uses streaming when available, otherwise direct.
+   * Intended for use inside parallel() callbacks instead of adapter.generate().
+   */
+  async adapterGenerate(adapter: ProviderAdapter, prompt: string, system: string): Promise<string> {
+    if (this.streaming && adapter.generateStream) {
+      const start = Date.now();
+      this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
+      const result = await adapter.generateStream(prompt, system, (delta) => {
+        this.onStreamDelta(adapter.name, this.currentPhase, delta);
+        this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
+      });
+      this.emit('stream:end', {
+        provider: adapter.name,
+        phase: this.currentPhase,
+        duration: Date.now() - start,
+      });
+      return result;
     }
     return adapter.generate(prompt, system);
   }
