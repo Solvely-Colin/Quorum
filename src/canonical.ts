@@ -92,13 +92,13 @@ export async function buildCanonicalRecord(sessionDir: string): Promise<Canonica
   // Check for extra debate rounds (04-debate-r2.json, etc.)
   try {
     const files = await readdir(sessionDir);
-    const extraDebates = files
-      .filter((f) => /^04-debate-r\d+\.json$/.test(f))
-      .sort();
+    const extraDebates = files.filter((f) => /^04-debate-r\d+\.json$/.test(f)).sort();
     for (const f of extraDebates) {
       phases.push(JSON.parse(await readFile(join(sessionDir, f), 'utf-8')));
     }
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
 
   // Read vote
   const votePath = join(sessionDir, '07-vote.json');
@@ -197,7 +197,8 @@ export function validateCanonicalRecord(record: CanonicalRecord): ValidationResu
       if (!p.name) errors.push(`Phase ${i}: missing name`);
       if (typeof p.timestamp !== 'number') errors.push(`Phase ${i}: missing timestamp`);
       if (typeof p.duration !== 'number') errors.push(`Phase ${i}: missing duration`);
-      if (!p.responses || typeof p.responses !== 'object') errors.push(`Phase ${i}: missing responses`);
+      if (!p.responses || typeof p.responses !== 'object')
+        errors.push(`Phase ${i}: missing responses`);
     }
   }
   if (!Array.isArray(record.hashChain)) {

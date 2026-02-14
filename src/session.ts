@@ -36,9 +36,8 @@ export class SessionStore {
   async writePhase(phase: string, data: PhaseOutput): Promise<void> {
     await writeFile(join(this.dir, `${phase}.json`), JSON.stringify(data, null, 2), 'utf-8');
     // Compute and append hash chain entry
-    const previousHash = this.hashChain.length > 0
-      ? this.hashChain[this.hashChain.length - 1].hash
-      : null;
+    const previousHash =
+      this.hashChain.length > 0 ? this.hashChain[this.hashChain.length - 1].hash : null;
     const hash = computePhaseHash(data, previousHash);
     this.hashChain.push({ phase: data.phase, hash, previousHash, timestamp: data.timestamp });
     await this.writeIntegrity();

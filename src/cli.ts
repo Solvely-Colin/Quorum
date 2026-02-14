@@ -2174,7 +2174,11 @@ program
     try {
       const record = await buildCanonicalRecord(sessionPath);
       if (record.integrity.valid) {
-        console.log(chalk.green(`✅ Integrity verified — ${record.hashChain.length} phases, hash chain intact`));
+        console.log(
+          chalk.green(
+            `✅ Integrity verified — ${record.hashChain.length} phases, hash chain intact`,
+          ),
+        );
         for (const entry of record.hashChain) {
           console.log(chalk.dim(`  ${entry.phase}: ${entry.hash.slice(0, 16)}...`));
         }
