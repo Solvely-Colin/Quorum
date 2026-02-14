@@ -196,6 +196,7 @@ program
   .option('--hitl-checkpoints <list>', 'Comma-separated HITL checkpoint list')
   .option('--hitl-threshold <n>', 'HITL controversy threshold (default 0.5)')
   .option('--policy <name>', 'Use only the named policy for guardrail checks')
+  .option('--interactive', 'Enable constitutional intervention points between phases')
   .action(async (question: string | undefined, opts) => {
     // Read from stdin if no question arg
     if (!question) {
@@ -4582,6 +4583,146 @@ program
   .action(async () => {
     const { startMcpServer } = await import('./mcp.js');
     await startMcpServer();
+  });
+
+// --- quorum attest ---
+program
+  .command('attest')
+  .description('View the attestation chain for a deliberation session')
+  .argument('<session>', 'Session path or "last" for most recent')
+  .option('--json', 'Output as JSON')
+  .option('--cbor <path>', 'Export as binary attestation file')
+  .action(async (sessionArg: string, opts) => {
+    const { buildCanonicalRecord } = await import('./canonical.js');
+    const { buildAttestationChain, verifyAttestationChain, exportAttestationJSON, exportAttestationCBOR } = await import('./attestation.js');
+
+    let sessionPath = sessionArg;
+    if (sessionPath === 'last') {
+      const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
+      const indexPath = pathJoin(sessionsDir, 'index.json');
+      if (existsSync(indexPath)) {
+        try {
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{ sessionId: string }>;
+          if (entries.length > 0) {
+            sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
+          }
+        } catch { /* fall through */ }
+      }
+    }
+
+    const metaPath = pathJoin(sessionPath, 'meta.json');
+    if (!existsSync(metaPath)) {
+      console.error(chalk.red(`Session not found: ${sessionPath}`));
+      process.exit(1);
+    }
+
+    try {
+      const record = await buildCanonicalRecord(sessionPath);
+      const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
+      const phaseData = record.phases.map((p) => ({
+        phase: p.name,
+        input: meta.input,
+        responses: p.responses,
+        providers: Object.keys(p.responses),
+        timestamp: p.timestamp,
+      }));
+
+      const chain = buildAttestationChain(record.sessionId, record.hashChain, phaseData);
+      const verification = verifyAttestationChain(chain);
+
+      if (opts.cbor) {
+        const buf = exportAttestationCBOR(chain);
+        await writeFile(opts.cbor as string, buf);
+        console.log(chalk.green(`✅ Attestation exported to ${opts.cbor} (${buf.length} bytes)`));
+        return;
+      }
+
+      if (opts.json) {
+        console.log(exportAttestationJSON(chain));
+        return;
+      }
+
+      // Pretty print
+      console.log(chalk.bold.cyan(`\n🔏 Attestation Chain — ${record.sessionId}`));
+      console.log(chalk.dim(`  ${chain.records.length} attestation records\n`));
+
+      for (const rec of chain.records) {
+        console.log(`  ${chalk.bold(rec.phase)}`);
+        console.log(chalk.dim(`    Hash:     ${rec.hash.slice(0, 32)}...`));
+        console.log(chalk.dim(`    Inputs:   ${rec.inputsHash.slice(0, 16)}...`));
+        console.log(chalk.dim(`    Outputs:  ${rec.outputsHash.slice(0, 16)}...`));
+        console.log(chalk.dim(`    Provider: ${rec.providerId}`));
+        console.log(chalk.dim(`    Time:     ${new Date(rec.timestamp).toISOString()}`));
+        if (rec.previousAttestationHash) {
+          console.log(chalk.dim(`    Prev:     ${rec.previousAttestationHash.slice(0, 16)}...`));
+        }
+        console.log('');
+      }
+
+      if (verification.valid) {
+        console.log(chalk.green('  ✅ Attestation chain verified'));
+      } else {
+        console.log(chalk.red(`  ❌ Attestation chain INVALID: ${verification.details}`));
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
+    }
+  });
+
+// --- quorum schema ---
+const schemaCmd = program.command('schema').description('Manage reasoning schemas');
+
+schemaCmd
+  .command('list')
+  .description('List available reasoning schemas')
+  .action(async () => {
+    const { listSchemas } = await import('./schema.js');
+    const schemas = await listSchemas();
+    if (schemas.length === 0) {
+      console.log(chalk.dim('No schemas found.'));
+      return;
+    }
+    for (const s of schemas) {
+      console.log(`  ${chalk.bold(s.name)} — ${s.description}`);
+    }
+  });
+
+schemaCmd
+  .command('show <name>')
+  .description('Show a reasoning schema')
+  .option('--json', 'Output as JSON')
+  .action(async (name: string, opts) => {
+    const { loadSchema, formatSchemaDisplay } = await import('./schema.js');
+    const schema = await loadSchema(name);
+    if (!schema) {
+      console.error(chalk.red(`Schema not found: ${name}`));
+      process.exit(1);
+    }
+    if (opts.json) {
+      console.log(JSON.stringify(schema, null, 2));
+    } else {
+      console.log(formatSchemaDisplay(schema));
+    }
+  });
+
+schemaCmd
+  .command('create')
+  .description('Create a new reasoning schema')
+  .requiredOption('--name <name>', 'Schema name')
+  .requiredOption('--description <desc>', 'Schema description')
+  .option('--steps <steps>', 'Comma-separated decomposition steps')
+  .action(async (opts) => {
+    const { createSchema, saveSchema } = await import('./schema.js');
+    const schema = createSchema({
+      name: opts.name as string,
+      description: opts.description as string,
+      decompositionSteps: opts.steps
+        ? (opts.steps as string).split(',').map((s: string) => s.trim())
+        : undefined,
+    });
+    await saveSchema(schema);
+    console.log(chalk.green(`✅ Created schema: ${schema.name}`));
   });
 
 // Ensure clean exit after any command (prevents event-loop hangs from dangling handles)
