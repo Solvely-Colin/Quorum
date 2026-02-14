@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { computePhaseHash, type HashChainEntry } from './integrity.js';
 
 export interface PhaseOutput {
   phase: string;
@@ -17,6 +18,7 @@ export interface PhaseOutput {
 
 export class SessionStore {
   private dir: string;
+  private hashChain: HashChainEntry[] = [];
 
   constructor(sessionId: string, baseDir?: string) {
     const base = baseDir ?? join(homedir(), '.quorum', 'sessions');
@@ -33,6 +35,12 @@ export class SessionStore {
 
   async writePhase(phase: string, data: PhaseOutput): Promise<void> {
     await writeFile(join(this.dir, `${phase}.json`), JSON.stringify(data, null, 2), 'utf-8');
+    // Compute and append hash chain entry
+    const previousHash =
+      this.hashChain.length > 0 ? this.hashChain[this.hashChain.length - 1].hash : null;
+    const hash = computePhaseHash(data, previousHash);
+    this.hashChain.push({ phase: data.phase, hash, previousHash, timestamp: data.timestamp });
+    await this.writeIntegrity();
   }
 
   async readPhase(phase: string): Promise<PhaseOutput | null> {
@@ -47,5 +55,19 @@ export class SessionStore {
 
   async writeSynthesis(synthesis: Record<string, unknown>): Promise<void> {
     await writeFile(join(this.dir, 'synthesis.json'), JSON.stringify(synthesis, null, 2), 'utf-8');
+  }
+
+  /** Persist the current hash chain to disk. */
+  async writeIntegrity(): Promise<void> {
+    await writeFile(
+      join(this.dir, 'integrity.json'),
+      JSON.stringify(this.hashChain, null, 2),
+      'utf-8',
+    );
+  }
+
+  /** Get the current hash chain. */
+  getHashChain(): HashChainEntry[] {
+    return [...this.hashChain];
   }
 }

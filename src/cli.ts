@@ -2077,7 +2077,7 @@ program
   .command('export')
   .description('Export a deliberation session as a formatted document')
   .argument('<session>', 'Session path or "last" for most recent')
-  .option('--format <format>', 'Output format: md or html', 'md')
+  .option('--format <format>', 'Output format: md, html, or canonical', 'md')
   .option('--output <file>', 'Output file path (default: stdout)')
   .action(async (sessionArg: string, opts) => {
     const { exportMarkdown, exportHtml } = await import('./export.js');
@@ -2112,18 +2112,89 @@ program
     }
 
     const format = (opts.format as string).toLowerCase();
-    if (format !== 'md' && format !== 'html') {
-      console.error(chalk.red(`Invalid format: ${format}. Use "md" or "html".`));
+    if (!['md', 'html', 'canonical'].includes(format)) {
+      console.error(chalk.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`));
       process.exit(1);
     }
 
-    const result = format === 'html' ? exportHtml(sessionPath) : exportMarkdown(sessionPath);
+    let result: string;
+    if (format === 'canonical') {
+      const { buildCanonicalRecord } = await import('./canonical.js');
+      const record = await buildCanonicalRecord(sessionPath);
+      result = JSON.stringify(record, null, 2);
+    } else {
+      result = format === 'html' ? exportHtml(sessionPath) : exportMarkdown(sessionPath);
+    }
 
     if (opts.output) {
       await writeFile(opts.output as string, result, 'utf-8');
       console.error(chalk.green(`✅ Exported to ${opts.output}`));
     } else {
       process.stdout.write(result);
+    }
+  });
+
+// --- quorum verify ---
+program
+  .command('verify')
+  .description('Verify the integrity of a deliberation session hash chain')
+  .argument('<session>', 'Session path or "last" for most recent')
+  .action(async (sessionArg: string) => {
+    const { buildCanonicalRecord } = await import('./canonical.js');
+
+    // Resolve session path
+    let sessionPath = sessionArg;
+    if (sessionPath === 'last') {
+      const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
+      const indexPath = pathJoin(sessionsDir, 'index.json');
+      if (existsSync(indexPath)) {
+        try {
+          const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+            sessionId: string;
+          }>;
+          if (entries.length > 0) {
+            sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
+          } else {
+            sessionPath = await resolveLastSession(sessionsDir);
+          }
+        } catch {
+          sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+        }
+      } else {
+        sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+      }
+    }
+
+    const metaPath = pathJoin(sessionPath, 'meta.json');
+    if (!existsSync(metaPath)) {
+      console.error(chalk.red(`Session not found: ${sessionPath}`));
+      process.exit(1);
+    }
+
+    try {
+      const record = await buildCanonicalRecord(sessionPath);
+      if (record.integrity.valid) {
+        console.log(
+          chalk.green(
+            `✅ Integrity verified — ${record.hashChain.length} phases, hash chain intact`,
+          ),
+        );
+        for (const entry of record.hashChain) {
+          console.log(chalk.dim(`  ${entry.phase}: ${entry.hash.slice(0, 16)}...`));
+        }
+      } else {
+        console.error(chalk.red(`❌ Integrity check FAILED`));
+        if (record.integrity.brokenAt) {
+          console.error(chalk.red(`   Broken at phase: ${record.integrity.brokenAt}`));
+        }
+        if (record.integrity.details) {
+          console.error(chalk.red(`   ${record.integrity.details}`));
+        }
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+      process.exit(1);
     }
   });
 
