@@ -20,12 +20,22 @@ export interface VerificationResult {
 }
 
 /**
+ * Deterministic JSON serialization — recursively sorts object keys.
+ */
+function stableStringify(obj: unknown): string {
+  if (obj === null || obj === undefined) return JSON.stringify(obj);
+  if (typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const sorted = Object.keys(obj as Record<string, unknown>).sort();
+  return '{' + sorted.map(k => JSON.stringify(k) + ':' + stableStringify((obj as Record<string, unknown>)[k])).join(',') + '}';
+}
+
+/**
  * Compute SHA-256 hash for a phase output, chained to the previous hash.
  */
 export function computePhaseHash(phase: PhaseOutput, previousHash: string | null): string {
   const h = createHash('sha256');
-  // Deterministic serialization: sort keys
-  h.update(JSON.stringify(phase, Object.keys(phase).sort()));
+  h.update(stableStringify(phase));
   if (previousHash) {
     h.update(previousHash);
   }
