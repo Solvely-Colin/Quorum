@@ -1,4 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
+import { webcrypto } from 'node:crypto';
+
+// Polyfill for Node 18 CI
+if (typeof globalThis.crypto === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).crypto = webcrypto;
+}
+
 import { CouncilV2 } from '../src/council-v2.js';
 import type { ProviderAdapter, ProviderConfig, AgentProfile } from '../src/types.js';
 
