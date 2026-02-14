@@ -4,7 +4,7 @@ import {
   computeTrends,
   formatTrends,
   type UncertaintyLedger,
-  type UncertaintyLedgerEntry,
+  type UncertaintyLedgerEntry as _UncertaintyLedgerEntry,
 } from './uncertainty-trends.js';
 import type { UncertaintyMetrics } from './uncertainty.js';
 

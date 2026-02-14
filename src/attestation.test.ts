@@ -11,7 +11,7 @@ import {
 import type { HashChainEntry } from './integrity.js';
 
 describe('attestation', () => {
-  const sampleEntry: HashChainEntry = {
+  const _sampleEntry: HashChainEntry = {
     phase: 'GATHER',
     hash: 'abc123',
     previousHash: null,

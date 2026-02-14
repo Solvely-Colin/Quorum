@@ -36,7 +36,7 @@ export function computeDisagreement(
   if (max === 0) return 0;
 
   // Normalized spread
-  const range = max - min;
+  const _range = max - min;
   const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
 
   // Coefficient of variation (normalized)

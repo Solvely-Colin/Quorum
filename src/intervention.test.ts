@@ -4,7 +4,7 @@ import {
   createRedirect,
   createInjectEvidence,
   createRequestClarification,
-  type Intervention,
+  type Intervention as _Intervention,
 } from './intervention.js';
 
 describe('intervention', () => {

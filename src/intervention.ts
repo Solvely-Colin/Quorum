@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { writeFile, readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+// existsSync removed — unused
 import { join } from 'node:path';
 
 export type InterventionType = 'halt' | 'redirect' | 'inject-evidence' | 'request-clarification';
