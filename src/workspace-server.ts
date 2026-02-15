@@ -5,7 +5,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -33,7 +33,7 @@ function resolveSessionId(shortId: string): string | null {
   if (existsSync(join(SESSIONS_DIR, shortId))) return shortId;
   // Try prefix match
   try {
-    const dirs = require('node:fs').readdirSync(SESSIONS_DIR) as string[];
+    const dirs = readdirSync(SESSIONS_DIR) as unknown as string[];
     const match = dirs.find((d: string) => d.startsWith(shortId));
     return match ?? null;
   } catch {
