@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Calibration Tracking — Feature #31
  *
  * Logs predictions (risk tier + confidence) vs. actual outcomes over time.

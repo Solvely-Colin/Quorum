@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Adaptive Debate Controller — Feature #32
  * Dynamically adjusts deliberation flow based on provider agreement/disagreement.
  */

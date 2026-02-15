@@ -1,3 +1,6 @@
+/**
+ * @experimental
+ */
 // Cognitive Topology DSL — Core Topology Engine
 // Feature #35: Defines how providers communicate across deliberation phases.
 

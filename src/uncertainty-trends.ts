@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Uncertainty Trend Tracking — track uncertainty scores over time by question hash.
  */
 
