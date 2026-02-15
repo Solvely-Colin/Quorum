@@ -2679,10 +2679,12 @@ program
     console.log(chalk.dim('Press Ctrl+C to stop'));
 
     // Keep process alive
-    process.on('SIGINT', async () => {
-      console.log(chalk.dim('\nShutting down workspace...'));
-      await server.close();
-      process.exit(0);
+    await new Promise<void>((resolve) => {
+      process.on('SIGINT', async () => {
+        console.log(chalk.dim('\nShutting down workspace...'));
+        await server.close();
+        resolve();
+      });
     });
   });
 
@@ -5198,4 +5200,4 @@ program.hook('postAction', (_thisCommand, actionCommand) => {
   process.exit(0);
 });
 
-program.parse();
+program.parseAsync();

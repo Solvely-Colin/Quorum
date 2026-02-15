@@ -29,8 +29,22 @@ export interface WorkspaceEvent {
 
 const SESSIONS_DIR = join(homedir(), '.quorum', 'sessions');
 
+function resolveSessionId(shortId: string): string | null {
+  if (existsSync(join(SESSIONS_DIR, shortId))) return shortId;
+  // Try prefix match
+  try {
+    const dirs = require('node:fs').readdirSync(SESSIONS_DIR) as string[];
+    const match = dirs.find((d: string) => d.startsWith(shortId));
+    return match ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadSessionData(sessionId: string) {
-  const sessionDir = join(SESSIONS_DIR, sessionId);
+  const resolved = resolveSessionId(sessionId);
+  if (!resolved) return null;
+  const sessionDir = join(SESSIONS_DIR, resolved);
   if (!existsSync(sessionDir)) return null;
 
   const meta = await safeReadJSON(join(sessionDir, 'meta.json'));
