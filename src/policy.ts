@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Policy-as-Code Guardrails — Feature #30
  *
  * Defines rules governing deliberation behavior via YAML policy files.

@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Memory Graph - Cross-run deliberation memory system for Quorum
  *
  * Stores structured records of deliberations and enables retrieval

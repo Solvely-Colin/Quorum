@@ -3,11 +3,28 @@
   "version": "0.10.1",
   "description": "Quorum — Multi-AI deliberation framework — diverge, challenge, converge.",
   "type": "module",
+  "main": "./dist/council-v2.js",
+  "types": "./dist/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/council-v2.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
+  },
   "bin": {
     "quorum": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
+    "prepare": "test -f dist/cli.js && chmod +x dist/cli.js || true",
     "test": "vitest run",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli.js",
@@ -38,6 +55,8 @@
     "agents/",
     "action/",
     "action.yml",
+    "docs/",
+    "API.md",
     "LICENSE",
     "README.md"
   ],

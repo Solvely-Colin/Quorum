@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Attestation — Cryptographic attestation records at phase boundaries.
  * Extends the hash chain (integrity.ts) with structured, signed attestation artifacts.
  */

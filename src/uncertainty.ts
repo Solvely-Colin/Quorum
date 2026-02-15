@@ -1,4 +1,5 @@
 /**
+ * @experimental
  * Calibrated Uncertainty Signaling — compute uncertainty metrics after voting.
  */
 

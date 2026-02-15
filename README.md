@@ -1,408 +1,237 @@
 <div align="center">
 
-```
- ██████╗ ██╗   ██╗ ██████╗ ██████╗ ██╗   ██╗███╗   ███╗
-██╔═══██╗██║   ██║██╔═══██╗██╔══██╗██║   ██║████╗ ████║
-██║   ██║██║   ██║██║   ██║██████╔╝██║   ██║██╔████╔██║
-██║▄▄ ██║██║   ██║██║   ██║██╔══██╗██║   ██║██║╚██╔╝██║
-╚██████╔╝╚██████╔╝╚██████╔╝██║  ██║╚██████╔╝██║ ╚═╝ ██║
- ╚══▀▀═╝  ╚═════╝  ╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝
-```
+# Quorum
 
-*Consensus, validated.*
+**Multi-AI deliberation framework — diverge, challenge, converge.**
+
+Ask a question. Multiple AI providers debate, critique, and refine each other's thinking. Get a synthesized answer that's better than any single model.
+
+[![npm version](https://img.shields.io/npm/v/quorum-ai)](https://www.npmjs.com/package/quorum-ai)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 </div>
 
-Multi-AI deliberation framework. Ask a question, get answers from multiple AI providers that debate, critique, and refine each other's positions — then synthesize the best answer.
+---
+
+## Quick Start
+
+```bash
+npm install -g quorum-ai
+quorum init          # auto-detect your AI providers
+quorum ask "What's the best approach for error handling in TypeScript?"
+```
+
+That's it. Quorum finds your API keys, runs a 7-phase deliberation across providers, and returns a synthesized answer with confidence scores.
 
 ## How It Works
 
 Quorum runs a **7-phase deliberation** across your configured AI providers:
 
-1. **GATHER** — Each provider generates an independent response in isolation
-2. **PLAN** — Each sees others' initial takes and plans their argument strategy
-3. **FORMULATE** — Each writes a formal position statement
-4. **DEBATE** — Room-style: every provider critiques ALL other positions simultaneously
-5. **ADJUST** — Each revises their position based on all critiques received
-6. **REBUTTAL** — Final rebuttals/concessions (auto-skipped if consensus reached)
-7. **VOTE** — Each provider ranks all positions; tallied via Borda count (or ranked-choice, approval, Condorcet)
+1. **Gather** — Each provider responds independently, in isolation
+2. **Plan** — Each sees others' takes and plans their argument
+3. **Formulate** — Formal position statements
+4. **Debate** — Every provider critiques all other positions simultaneously
+5. **Adjust** — Each revises based on critiques received
+6. **Rebuttal** — Final rebuttals or concessions (auto-skipped if consensus reached)
+7. **Vote** — Ranked voting via Borda count (or ranked-choice, approval, Condorcet)
 
-A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) merges the best thinking into a definitive answer with a minority report and "What Would Change My Mind" section.
+A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) merges the best thinking into a definitive answer with a minority report.
 
-## Quick Start
+## Features
+
+- **Multi-provider deliberation** — Claude, GPT, Gemini, Kimi, DeepSeek, Mistral, Ollama, and more
+- **Adaptive debate** — Auto-skip or extend rounds based on disagreement
+- **Evidence protocol** — Providers cite sources; claims are cross-validated
+- **Code review** — Review files, staged changes, PRs, or diffs
+- **CI/CD integration** — Structured output, exit codes, auto-commenting
+- **Policy guardrails** — YAML rules that block, warn, or pause deliberations
+- **Deterministic replay** — SHA-256 hash-chained ledger for auditability
+- **Human-in-the-loop** — Pause at any phase to inject guidance
+- **Debate topologies** — Mesh, star, tournament, pipeline, and more
+- **MCP server** — Use Quorum as a tool in Claude Desktop, Cursor, or any MCP client
+- **Red team analysis** — Adversarial attack packs for robustness testing
+
+## Provider Setup
+
+Quorum auto-detects providers from environment variables:
+
+| Provider | Environment Variable | Install |
+|----------|---------------------|---------|
+| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) |
+| Anthropic (Claude) | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| Google (Gemini) | `GOOGLE_GENERATIVE_AI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
+| Kimi (Moonshot) | `KIMI_API_KEY` | [platform.moonshot.cn](https://platform.moonshot.cn) |
+| DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
+| Mistral | `MISTRAL_API_KEY` | [console.mistral.ai](https://console.mistral.ai) |
+| Groq | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) |
+| Ollama | *(local, no key)* | [ollama.com](https://ollama.com) |
 
 ```bash
-# From npm
-npm install -g quorum-ai
-
-# From source
-git clone https://github.com/Solvely-Colin/Quorum.git
-cd Quorum && npm install && npm run build && npm link
+# Set your keys, then:
+quorum init                    # auto-detect everything
+quorum providers list          # see what's configured
+quorum providers test          # verify they work
 ```
 
+Or add manually:
 ```bash
-quorum init                    # auto-detect providers
-quorum ask "Your question"     # full deliberation
+quorum providers add --name deepseek --type deepseek --model deepseek-chat --env DEEPSEEK_API_KEY
 ```
 
-## Usage
+See [docs/providers.md](docs/providers.md) for detailed setup instructions.
+
+## CLI Reference
 
 ```bash
-# Full deliberation
-quorum ask "What's the best approach for error handling in TypeScript?"
+# Deliberation
+quorum ask "question"                        # full 7-phase deliberation
+quorum ask --rapid "question"                # 3-phase: gather → debate → synthesize
+quorum ask -1 "quick question"               # single provider, no deliberation
+quorum ask --evidence strict "question"      # require cited sources
+quorum ask --adaptive balanced "question"    # auto-adjust based on disagreement
+quorum ask --devils-advocate "question"      # force one provider contrarian
+quorum ask --profile decision "question"     # use a named profile
+quorum versus claude kimi "tabs vs spaces"   # head-to-head
 
-# Rapid mode (3-phase: gather → debate → synthesize)
-quorum ask --rapid "Quick comparison of React vs Svelte"
+# Code Review
+quorum review src/auth.ts                    # review specific files
+quorum review --staged                       # review staged changes
+quorum review --pr 42                        # review a GitHub PR
+quorum review --diff main                    # review diff against branch
 
-# Single provider (no deliberation)
-quorum ask -1 "Quick question"
-
-# Evidence-backed claims (providers must cite sources)
-quorum ask --evidence strict "Is Rust faster than Go for web servers?"
-
-# Adaptive debate (auto-skip/extend based on disagreement)
-quorum ask --adaptive balanced "Should we use microservices?"
-
-# Devil's advocate (one provider forced contrarian)
-quorum ask --devils-advocate "Is our architecture correct?"
-
-# Decision matrix (structured scoring grid)
-quorum ask --profile decision "PostgreSQL vs MySQL vs SQLite for our use case"
-
-# Head-to-head
-quorum versus claude kimi "Tabs vs spaces"
-
-# Filter providers, custom profile, pipe input
-echo "Review this" | quorum ask -p claude,openai --profile code-review
-```
-
-## Code Review
-
-```bash
-# Review files
-quorum review src/auth.ts src/utils.ts
-
-# Review staged changes
-quorum review --staged
-
-# Review a PR
-quorum review --pr 42
-
-# Review diff against a branch
-quorum review --diff main
-```
-
-## CI/CD Integration
-
-```bash
-# CI-optimized (structured output, exit codes, auto-comment)
+# CI/CD
 quorum ci --pr 42 --confidence-threshold 0.7 --post-comment
 
-# JSON output for pipelines
-quorum ci --pr 42 --format json
+# Session Management
+quorum history                               # list past sessions
+quorum session last                          # view last session
+quorum follow-up last "what about X?"        # continue deliberation
+quorum export last --format html             # export as HTML
+quorum rerun last --compare                  # re-run and compare
 
-# With evidence and labeling
-quorum ci --pr 42 --evidence strict --label --format github
+# Provider Management
+quorum providers list | add | remove | test | models
+quorum auth login | list | logout
+
+# Advanced
+quorum workspace                             # real-time deliberation UI
+quorum mcp                                   # start MCP server
+quorum watch src/*.ts                        # re-run on file changes
 ```
 
-Exit codes: `0` = pass, `1` = below confidence threshold, `2` = error
+See [docs/cli.md](docs/cli.md) for the complete reference with all flags.
 
-## Adaptive Debate
+## Configuration
 
-The adaptive controller dynamically adjusts deliberation based on disagreement entropy:
-
-```bash
-quorum ask --adaptive fast "question"      # aggressive skipping
-quorum ask --adaptive balanced "question"  # default, up to 2 extra rounds
-quorum ask --adaptive critical "question"  # conservative, never skips debate
-```
-
-- **Low entropy after gather** → skip to vote (providers already agree)
-- **High entropy after debate** → add extra debate rounds
-- **Learns over time** via multi-armed bandit (stored in `~/.quorum/adaptive-stats.json`)
-
-## Evidence Protocol
-
-Providers tag claims with sources. Quorum scores and cross-validates them.
-
-```bash
-# Advisory mode (show scores, don't affect votes)
-quorum ask --evidence advisory "question"
-
-# Strict mode (unsupported claims penalized in voting)
-quorum ask --evidence strict "question"
-
-# Inspect evidence after a run
-quorum evidence last
-quorum evidence last --provider claude --tier A
-```
-
-Source quality tiers: **A** (URL) → **B** (file path) → **C** (data/stats) → **D** (reasoning) → **F** (unsupported)
-
-Cross-provider validation detects corroborated and contradicted claims across providers.
-
-## Policy Guardrails
-
-Define rules that govern deliberation behavior using YAML policies:
-
-```bash
-# Use a built-in policy
-quorum ask --policy strict "Should we deploy on Friday?"
-
-# List available policies
-quorum policy list
-
-# Check a policy against current config
-quorum policy check strict
-```
-
-Policies evaluate pre- and post-deliberation with four action types: `block`, `warn`, `log`, `pause`.
+Config lives at `~/.quorum/config.yaml` (or project-local `quorum.yaml`):
 
 ```yaml
-# ~/.quorum/policies/my-policy.yaml
-name: production
-rules:
-  - condition: confidence < 0.7
-    action: block
-    message: "Confidence too low for production decisions"
-  - condition: evidence_grade < C
-    action: warn
-    message: "Evidence quality below threshold"
-  - condition: providers_count < 3
-    action: pause
-    message: "Consider adding more providers"
+providers:
+  - name: claude
+    provider: anthropic
+    model: claude-sonnet-4-20250514
+    auth:
+      method: env
+      envVar: ANTHROPIC_API_KEY
+  - name: openai
+    provider: openai
+    model: gpt-4o
+    auth:
+      method: env
+      envVar: OPENAI_API_KEY
+
+defaultProfile: default
 ```
 
-Built-in policies: `default` (permissive baseline) and `strict` (production-hardened). Policy files are loaded from `~/.quorum/policies/` or project-local `.quorum/policies/`.
+### Profiles
 
-## Deterministic Replay + Ledger
-
-Every deliberation is recorded in a SHA-256 hash-chained ledger for auditability and reproducibility:
-
-```bash
-# Re-run a previous deliberation
-quorum rerun last
-quorum rerun <session-id> --diff      # show differences vs original
-quorum rerun <session-id> --dry-run   # preview without API calls
-
-# Ledger management
-quorum ledger list                      # show all entries
-quorum ledger verify                    # validate hash chain integrity
-quorum ledger show <id>                 # inspect a specific entry
-quorum ledger export <id>              # export as ADR markdown
-```
-
-The ledger (`~/.quorum/ledger.json`) stores prompts, model versions, votes, and outcomes with tamper-evident hash chaining.
-
-## Human-in-the-Loop Checkpoints
-
-Pause deliberation at configurable phases for human review, guidance injection, or vote overrides:
-
-```bash
-# Enable HITL checkpoints
-quorum ask --hitl "Critical architecture decision"
-
-# Combines with other flags
-quorum ask --hitl --evidence strict --adaptive critical "question"
-```
-
-When paused, you can:
-- **Inject guidance** — add context or steer the deliberation
-- **Override winners** — manually set vote results before synthesis
-- **Resume** — continue with optional modifications
-
-Auto-pause triggers when disagreement entropy exceeds threshold (high controversy).
-
-Profile YAML: `hitl: true`, `hitlPhases: [debate, vote]`
-
-## Eval Arena + Reputation
-
-Track provider performance and use reputation-weighted voting:
-
-```bash
-# Arena commands
-quorum arena leaderboard               # overall provider rankings
-quorum arena show claude               # detailed breakdown for a provider
-quorum arena run                       # run eval suite
-quorum arena reset                     # clear arena data
-
-# Enable reputation-weighted voting
-quorum ask --reputation "question"
-```
-
-Providers build reputation scores based on win rates, evidence quality, and outcome metrics across domains. With `--reputation`, stronger-performing providers get proportionally more vote influence.
-
-Reputation data stored in `~/.quorum/arena.json`.
-
-## Session Tools
-
-```bash
-# Session management
-quorum session list                     # list all sessions
-quorum session show <id>                # show session details
-
-# History
-quorum history
-
-# Follow-up on a previous deliberation
-quorum follow-up last "But what about edge cases?"
-
-# Compare two sessions
-quorum diff <session1> <session2> --analyze
-
-# Meta-analysis
-quorum explain last
-
-# Re-run with different providers
-quorum rerun last --providers claude,deepseek --compare
-
-# Replay debate in real-time
-quorum replay last --speed slow
-
-# Export report
-quorum export last --format html --output report.html
-
-# Provider stats (win rates, patterns)
-quorum stats
-
-# Consensus heatmap
-quorum heatmap last
-
-# Red team attack analysis
-quorum attacks
-
-# List available debate topologies
-quorum topologies                       # or: quorum topo
-
-# OAuth and credential management
-quorum auth
-```
-
-## Profiles
-
-Built-in: `default`, `brainstorm`, `code-review`, `research`, `decision`, `panel`, `quick`, `thorough`, `evidence`, `research-tools`
+Profiles customize deliberation behavior. Built-in: `default`, `brainstorm`, `code-review`, `research`, `decision`, `panel`, `quick`, `thorough`, `evidence`, `research-tools`.
 
 ```yaml
-# ~/.quorum/agents/my-profile.yaml
+# ~/.quorum/agents/security-review.yaml
 name: security-review
 rounds: 1
 focus: [security, authentication, authorization]
 challengeStyle: adversarial
 evidence: strict
 adaptive: balanced
-phases: [gather, debate, adjust, vote, synthesize]
 roles:
   claude: "OWASP security expert"
   kimi: "penetration tester"
-weights:
-  claude: 1.5
 votingMethod: condorcet
-hooks:
-  pre-gather: "./scripts/fetch-context.sh"
-  post-synthesis: "./scripts/notify-slack.sh"
 ```
 
-Project-local config via `.quorumrc` (walks cwd → homedir).
-
-## Advanced Features
-
-| Feature | Flag/Command | Description |
-|---------|-------------|-------------|
-| Weighted providers | `--weight claude=2,kimi=1` | Give providers more/less vote influence |
-| Custom voting | `votingMethod: condorcet` | Borda, ranked-choice, approval, Condorcet |
-| Watch mode | `quorum watch src/*.ts` | Re-run on file save |
-| Tool use | `--tools` | Providers can web search, read files |
-| Plugin hooks | `hooks:` in profile | Pre/post scripts per phase |
-| Dry run | `--dry-run` | Preview prompts without API calls |
-| Inline overrides | `--focus`, `--rounds`, etc. | Override profile fields from CLI |
-| Policy guardrails | `--policy strict` | YAML policy engine with block/warn/log/pause |
-| Ledger + replay | `quorum ledger verify` | SHA-256 hash-chained audit trail |
-| HITL checkpoints | `--hitl` | Pause/resume with human guidance |
-| Reputation voting | `--reputation` | Performance-weighted provider influence |
-| Topology DSL | `--topology tournament` | 7 debate structures (mesh, star, etc.) |
-| Memory graph | `quorum memory search` | Cross-run retrieval + contradiction detection |
-
-## Provider Setup
-
-```bash
-quorum providers list           # show configured
-quorum providers test           # test all
-quorum providers models         # browse available
-quorum providers add --name deepseek --type deepseek --model deepseek-chat --env DEEPSEEK_API_KEY
-```
-
-Auto-detects: OpenAI, Anthropic, Google, Kimi, DeepSeek, Mistral, Ollama, LM Studio, Claude Code OAuth, Gemini CLI.
-
-Config: `~/.quorum/config.yaml`
+See [docs/configuration.md](docs/configuration.md) for all options.
 
 ## Architecture
 
 ```
 src/
-├── cli.ts            # CLI (commander.js)
+├── cli.ts            # CLI entry point (commander.js)
 ├── council-v2.ts     # 7-phase deliberation engine
-├── adaptive.ts       # Adaptive debate controller + bandit learning
-├── arena.ts          # Eval arena, reputation tracking, weighted voting
-├── evidence.ts       # Evidence-backed claims protocol
-├── hitl.ts           # Human-in-the-loop checkpoints, pause/resume
-├── ledger.ts         # Hash-chained ledger, verification, ADR export
-├── memory.ts         # Deliberation memory graph, keyword retrieval
-├── policy.ts         # YAML policy engine, evaluation, built-in policies
-├── topology.ts       # Topology engine, 7 debate topologies
-├── ci.ts             # CI output formatting, risk matrix, patch suggestions
-├── git.ts            # Git/GitHub integration (PR, comments, labels)
+├── providers/base.ts # Provider adapter (via pi-ai)
+├── adaptive.ts       # Adaptive debate controller
+├── evidence.ts       # Evidence protocol & cross-validation
+├── policy.ts         # YAML policy guardrails engine
+├── topology.ts       # 7 debate topologies (mesh, star, etc.)
+├── arena.ts          # Eval arena & reputation system
+├── ledger.ts         # Hash-chained audit trail
+├── hitl.ts           # Human-in-the-loop checkpoints
+├── memory-graph.ts   # Cross-run memory retrieval
 ├── voting.ts         # Pluggable voting algorithms
-├── heatmap.ts        # Consensus heatmap (Spearman correlation)
-├── hooks.ts          # Plugin/hook system
-├── tools.ts          # MCP/tool use (web search, file read, shell)
-├── export.ts         # Report export (markdown, HTML)
-├── providers/base.ts # Provider adapter (all through pi-ai)
+├── mcp.ts            # MCP server integration
+├── config.ts         # YAML config & auto-detection
 ├── session.ts        # File-backed session persistence
-├── config.ts         # YAML config + auto-detection
-├── context.ts        # Token budget management
-├── auth.ts           # OAuth + keychain + credentials
-└── types.ts          # Core types
+└── types.ts          # Core TypeScript types
 ```
 
-All providers route through [`@mariozechner/pi-ai`](https://github.com/nichochar/pi-ai) for unified API access.
+See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough.
 
-## MCP Server (Model Context Protocol)
+## Stability
 
-Quorum can run as an MCP server, exposing its deliberation capabilities as tools for any MCP-compatible client (Claude Desktop, Cursor, OpenClaw, etc.).
+Quorum follows [Semantic Versioning](https://semver.org/). Starting with v1.0:
 
-### Start the MCP server
+- **CLI commands and flags** are stable — no breaking changes in minor releases
+- **Config file format** (`config.yaml`, profile YAML) is stable
+- **Programmatic exports** marked `@experimental` may change in minor releases
+- See [API.md](API.md) for the full public API surface
+
+## MCP Server
+
+Run Quorum as a tool for AI agents:
 
 ```bash
 quorum mcp
 ```
 
-This starts a stdio-based MCP server that exposes the following tools:
-
-| Tool | Description |
-|------|-------------|
-| `quorum_ask` | Run a full multi-AI deliberation on any question |
-| `quorum_review` | Code review via multi-AI deliberation (files, staged, diff, PR) |
-| `quorum_versus` | Head-to-head comparison between two providers |
-| `quorum_providers` | List configured providers with status |
-| `quorum_history` | List recent deliberation sessions |
-
-### Claude Desktop Configuration
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
+Add to Claude Desktop config:
 ```json
 {
   "mcpServers": {
-    "quorum": {
-      "command": "quorum",
-      "args": ["mcp"]
-    }
+    "quorum": { "command": "quorum", "args": ["mcp"] }
   }
 }
 ```
 
-If `quorum` isn't on your PATH, use the full path (e.g. from `which quorum` or `npx quorum`).
+Exposes: `quorum_ask`, `quorum_review`, `quorum_versus`, `quorum_providers`, `quorum_history`.
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Make changes with tests: `npm test`
+4. Use conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
+5. Open a PR
+
+```bash
+git clone https://github.com/Solvely-Colin/Quorum.git
+cd Quorum && npm install
+npm run dev -- ask "test question"   # run from source
+npm test                              # run tests
+npm run lint                          # lint
+npm run format                        # format
+```
 
 ## License
 
-MIT
+[MIT](LICENSE) © Colin Johnson
