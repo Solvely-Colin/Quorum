@@ -20,9 +20,6 @@ scoringWeights:
   novelty: 0.15
   consensus: 0.10
 
-excludeFromDeliberation:
-  - ollama
-
 prompts:
   gather:
     system: |
