@@ -464,6 +464,13 @@ program
       for (const p of candidateProviders) {
         console.log(`  ${chalk.green('✓')} ${chalk.bold(p.name)} ${chalk.dim(`(${p.model})`)}`);
       }
+
+      // Warn about slow local providers
+      const ollamaProviders = candidateProviders.filter((p) => p.provider.toLowerCase() === 'ollama');
+      if (ollamaProviders.length > 0) {
+        const names = ollamaProviders.map((p) => p.name).join(', ');
+        console.log(chalk.yellow(`\n⚠ ${names}: local models can be slow in multi-round deliberations`));
+      }
     }
 
     if (candidateProviders.length < 2) {
