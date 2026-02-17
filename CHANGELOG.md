@@ -4,6 +4,16 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.11.1] — 2026-02-17
+
+### CI Fixes
+- Bump minimum Node from 18 to 20 (transitive dep `@aws-sdk/client-bedrock-runtime` requires it)
+- Drop Node 18 from CI matrix
+- Run Prettier on split CLI modules
+- Fix stale `dist/cli.js` path in streaming test (now `dist/cli/index.js`)
+
+---
+
 ## [0.11.0] — 2026-02-17
 
 ### The "Audit Remediation" Release
