@@ -95,6 +95,12 @@ export async function resolveCredential(config: ProviderConfig): Promise<string 
 
     case 'oauth_keychain':
       return resolveKeychainOAuth(auth.service);
+
+    case 'oauth_piai': {
+      const { getApiKeyFromOAuth } = await import('./oauth.js');
+      const result = await getApiKeyFromOAuth(auth.providerId, auth.credentials);
+      return result?.apiKey ?? null;
+    }
   }
 }
 

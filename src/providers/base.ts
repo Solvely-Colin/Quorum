@@ -182,6 +182,9 @@ function resolveApiDetails(config: ProviderConfig): {
  * Priority: explicit config → env var → CLI OAuth tokens (keychain/creds files)
  */
 async function resolveApiKey(config: ProviderConfig): Promise<string> {
+  // Fast path: explicit API key — skip all detection/probing
+  if (config.auth?.method === 'api_key') return config.auth.apiKey;
+
   // 1. Explicit credential from auth config
   const credential = await resolveCredential(config);
   if (credential) return credential;

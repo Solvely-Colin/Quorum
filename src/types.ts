@@ -2,6 +2,8 @@
  * Core types for Quorum
  */
 
+import type { OAuthCredentials } from '@mariozechner/pi-ai';
+
 // --- Provider ---
 
 export interface ProviderConfig {
@@ -32,6 +34,7 @@ export type AuthConfig =
   | { method: 'api_key'; apiKey: string }
   | { method: 'oauth'; profileName: string } // references stored OAuth token
   | { method: 'oauth_keychain'; service: string } // reads OAuth from macOS keychain (e.g. Claude Code)
+  | { method: 'oauth_piai'; providerId: string; credentials: OAuthCredentials } // pi-ai OAuth credentials
   | { method: 'env'; envVar: string } // reads key from env at runtime
   | { method: 'none' }; // local models (Ollama, LM Studio)
 

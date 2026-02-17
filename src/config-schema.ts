@@ -4,6 +4,19 @@ const AuthConfigSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('api_key'), apiKey: z.string() }).passthrough(),
   z.object({ method: z.literal('oauth'), profileName: z.string() }).passthrough(),
   z.object({ method: z.literal('oauth_keychain'), service: z.string() }).passthrough(),
+  z
+    .object({
+      method: z.literal('oauth_piai'),
+      providerId: z.string(),
+      credentials: z
+        .object({
+          refresh: z.string(),
+          access: z.string(),
+          expires: z.number(),
+        })
+        .passthrough(),
+    })
+    .passthrough(),
   z.object({ method: z.literal('env'), envVar: z.string() }).passthrough(),
   z.object({ method: z.literal('none') }).passthrough(),
 ]);
