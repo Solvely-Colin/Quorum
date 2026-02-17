@@ -146,7 +146,7 @@ describe('CLI --live flag', () => {
   it('is accepted by the CLI parser', async () => {
     const { execSync } = await import('node:child_process');
     const cwd = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-    const result = execSync('node dist/cli.js ask --help', {
+    const result = execSync('node dist/cli/index.js ask --help', {
       cwd,
       encoding: 'utf-8',
     });
