@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { loadConfig, loadProjectConfig, loadAgentProfile } from '../config.js';
 import { CouncilV2 } from '../council-v2.js';
 import type { AdaptivePreset } from '../adaptive.js';
@@ -70,19 +70,29 @@ export function registerAskCommand(program: Command): void {
     .option('--interactive', 'Enable constitutional intervention points between phases')
     .option('--schema <name>', 'Use a reasoning schema to guide deliberation')
     .option('--live', 'Show streaming text from each provider as it arrives')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum ask "What is the best database for this use case?"')}
+${pc.dim('  $ quorum ask -r "Quick question about React hooks"')}
+${pc.dim('  $ quorum ask --evidence strict "Is this approach secure?"')}
+${pc.dim('  $ quorum ask --topology tournament --providers claude,openai,gemini "Compare REST vs GraphQL"')}
+`,
+    )
     .action(async (question: string | undefined, opts) => {
       // Read from stdin if no question arg
       if (!question) {
         if (process.stdin.isTTY) {
           throw new CLIError(
-            chalk.red('No question provided. Usage: quorum ask "your question"') +
+            pc.red('No question provided. Usage: quorum ask "your question"') +
               '\n' +
-              chalk.dim('Or pipe: echo "question" | quorum ask'),
+              pc.dim('Or pipe: echo "question" | quorum ask'),
           );
         }
         question = await readStdin();
         if (!question.trim()) {
-          throw new CLIError(chalk.red('Empty input.'));
+          throw new CLIError(pc.red('Empty input.'));
         }
       }
 
@@ -90,7 +100,7 @@ export function registerAskCommand(program: Command): void {
       const projectConfig = await loadProjectConfig();
 
       if (config.providers.length === 0) {
-        throw new CLIError(chalk.red('No providers configured. Run: quorum init'));
+        throw new CLIError(pc.red('No providers configured. Run: quorum init'));
       }
 
       // Apply project config defaults (CLI flags will override later)
@@ -121,7 +131,7 @@ export function registerAskCommand(program: Command): void {
       if (timeoutOverride !== undefined) {
         if (isNaN(timeoutOverride) || timeoutOverride <= 0) {
           throw new CLIError(
-            chalk.red(
+            pc.red(
               `Invalid --timeout value: "${opts.timeout}". Must be a positive number of seconds.`,
             ),
           );
@@ -138,9 +148,9 @@ export function registerAskCommand(program: Command): void {
         providers = config.providers.filter((p) => names.includes(p.name));
         if (providers.length === 0) {
           throw new CLIError(
-            chalk.red(`No matching providers: ${opts.providers}`) +
+            pc.red(`No matching providers: ${opts.providers}`) +
               '\n' +
-              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+              pc.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
           );
         }
       }
@@ -173,11 +183,9 @@ export function registerAskCommand(program: Command): void {
           }
         }
         throw new CLIError(
-          chalk.red(`Profile not found: ${opts.profile}`) +
+          pc.red(`Profile not found: ${opts.profile}`) +
             '\n' +
-            chalk.dim(
-              `Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`,
-            ),
+            pc.dim(`Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`),
         );
       }
 
@@ -186,7 +194,7 @@ export function registerAskCommand(program: Command): void {
         const style = opts.challengeStyle as string;
         if (!['adversarial', 'collaborative', 'socratic'].includes(style)) {
           throw new CLIError(
-            chalk.red(
+            pc.red(
               `Invalid --challenge-style: "${style}". Must be adversarial, collaborative, or socratic.`,
             ),
           );
@@ -203,7 +211,7 @@ export function registerAskCommand(program: Command): void {
         const val = parseFloat(opts.convergence as string);
         if (isNaN(val) || val < 0 || val > 1) {
           throw new CLIError(
-            chalk.red(`Invalid --convergence: "${opts.convergence}". Must be 0.0-1.0.`),
+            pc.red(`Invalid --convergence: "${opts.convergence}". Must be 0.0-1.0.`),
           );
         }
         profile.convergenceThreshold = val;
@@ -212,7 +220,7 @@ export function registerAskCommand(program: Command): void {
         const val = parseInt(opts.rounds as string);
         if (isNaN(val) || val <= 0) {
           throw new CLIError(
-            chalk.red(`Invalid --rounds: "${opts.rounds}". Must be a positive integer.`),
+            pc.red(`Invalid --rounds: "${opts.rounds}". Must be a positive integer.`),
           );
         }
         profile.rounds = val;
@@ -231,7 +239,7 @@ export function registerAskCommand(program: Command): void {
         const mode = opts.evidence as string;
         if (!['off', 'advisory', 'strict'].includes(mode)) {
           throw new CLIError(
-            chalk.red(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`),
+            pc.red(`Invalid --evidence: "${mode}". Must be off, advisory, or strict.`),
           );
         }
         profile.evidence = mode as 'off' | 'advisory' | 'strict';
@@ -245,7 +253,7 @@ export function registerAskCommand(program: Command): void {
           const [name, val] = pair.split('=');
           if (!name || !val || isNaN(parseFloat(val))) {
             throw new CLIError(
-              chalk.red(`Invalid --weight entry: "${pair}". Expected format: name=number`),
+              pc.red(`Invalid --weight entry: "${pair}". Expected format: name=number`),
             );
           }
           weights[name.trim()] = parseFloat(val);
@@ -261,7 +269,7 @@ export function registerAskCommand(program: Command): void {
         const vm = opts.votingMethod as string;
         if (!['borda', 'ranked-choice', 'approval', 'condorcet'].includes(vm)) {
           throw new CLIError(
-            chalk.red(
+            pc.red(
               `Invalid --voting-method: "${vm}". Must be borda, ranked-choice, approval, or condorcet.`,
             ),
           );
@@ -280,11 +288,11 @@ export function registerAskCommand(program: Command): void {
         const targetName = typeof opts.single === 'string' ? opts.single : providers[0]?.name;
         const target = config.providers.find((p) => p.name === targetName) ?? providers[0];
         if (!target) {
-          throw new CLIError(chalk.red('No provider available.'));
+          throw new CLIError(pc.red('No provider available.'));
         }
         const adapter = await createProvider(target);
         if (!isJSON) {
-          console.log(chalk.dim(`[${target.name}/${target.model}]`));
+          console.log(pc.dim(`[${target.name}/${target.model}]`));
           console.log('');
         }
         try {
@@ -306,7 +314,7 @@ export function registerAskCommand(program: Command): void {
             }
           }
         } catch (err) {
-          throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+          throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
         }
         return;
       }
@@ -329,10 +337,10 @@ export function registerAskCommand(program: Command): void {
 
       if (!isJSON) {
         console.log('');
-        console.log(chalk.bold.cyan(`🏛️  ${profile.name}`));
-        console.log(chalk.dim('Configured providers:'));
+        console.log(pc.bold(pc.cyan(`🏛️  ${profile.name}`)));
+        console.log(pc.dim('Configured providers:'));
         for (const p of candidateProviders) {
-          console.log(`  ${chalk.green('✓')} ${chalk.bold(p.name)} ${chalk.dim(`(${p.model})`)}`);
+          console.log(`  ${pc.green('✓')} ${pc.bold(p.name)} ${pc.dim(`(${p.model})`)}`);
         }
 
         // Warn about slow local providers
@@ -342,7 +350,7 @@ export function registerAskCommand(program: Command): void {
         if (ollamaProviders.length > 0) {
           const names = ollamaProviders.map((p) => p.name).join(', ');
           console.log(
-            chalk.yellow(`\n⚠ ${names}: local models can be slow in multi-round deliberations`),
+            pc.yellow(`\n⚠ ${names}: local models can be slow in multi-round deliberations`),
           );
         }
       }
@@ -351,7 +359,7 @@ export function registerAskCommand(program: Command): void {
         if (candidateProviders.length === 1) {
           // Auto-enable single provider mode instead of blocking
           if (!isJSON) {
-            console.log(chalk.yellow(`\n⚡ Single provider detected — running in direct mode.\n`));
+            console.log(pc.yellow(`\n⚡ Single provider detected — running in direct mode.\n`));
           }
           opts.single = candidateProviders[0].name;
         } else {
@@ -362,14 +370,14 @@ export function registerAskCommand(program: Command): void {
             .map((p) => p.name);
           if (excludedNames.length > 0) {
             throw new CLIError(
-              chalk.red(
+              pc.red(
                 `\nNeed at least 1 provider (${excludedNames.join(', ')} excluded by profile).`,
               ) +
                 '\n' +
-                chalk.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`),
+                pc.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`),
             );
           } else {
-            throw new CLIError(chalk.red(`\nNo providers configured. Run: quorum providers add`));
+            throw new CLIError(pc.red(`\nNo providers configured. Run: quorum providers add`));
           }
         }
       }
@@ -380,7 +388,7 @@ export function registerAskCommand(program: Command): void {
       if (!isJSON) {
         console.log('');
         console.log(
-          chalk.dim(`${adapters.length} providers ready | Style: ${profile.challengeStyle}`),
+          pc.dim(`${adapters.length} providers ready | Style: ${profile.challengeStyle}`),
         );
         console.log('');
       }
@@ -393,13 +401,13 @@ export function registerAskCommand(program: Command): void {
         if (!activeSchema) {
           const available = await listSchemas();
           throw new CLIError(
-            chalk.red(`Schema not found: ${opts.schema}`) +
+            pc.red(`Schema not found: ${opts.schema}`) +
               '\n' +
-              chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`),
+              pc.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`),
           );
         }
         if (!isJSON) {
-          console.log(chalk.dim(`Schema: ${activeSchema.name}`));
+          console.log(pc.dim(`Schema: ${activeSchema.name}`));
         }
       }
 
@@ -455,8 +463,8 @@ export function registerAskCommand(program: Command): void {
                 liveProviderStarted.add(provider);
                 liveProviderStarts[provider] = Date.now();
                 const model = adapters.find((a) => a.name === provider)?.config?.model ?? '';
-                console.log(chalk.dim(`    ┌ ${provider}${model ? ` (${model})` : ''}`));
-                process.stdout.write(chalk.dim('    │ '));
+                console.log(pc.dim(`    ┌ ${provider}${model ? ` (${model})` : ''}`));
+                process.stdout.write(pc.dim('    │ '));
               }
               process.stdout.write(delta);
             }
@@ -470,10 +478,10 @@ export function registerAskCommand(program: Command): void {
               phaseStartTimes[phase] = Date.now();
               providersDone[phase] = [];
               if (isLive) {
-                console.log(chalk.bold(`  ▸ ${phase}`));
+                console.log(pc.bold(`  ▸ ${phase}`));
                 liveProviderStarted.clear();
               } else {
-                process.stdout.write(chalk.bold(`  ▸ ${phase} `));
+                process.stdout.write(pc.bold(`  ▸ ${phase} `));
               }
               break;
             }
@@ -485,27 +493,27 @@ export function registerAskCommand(program: Command): void {
                   const elapsed = liveProviderStarts[provider]
                     ? ((Date.now() - liveProviderStarts[provider]) / 1000).toFixed(1)
                     : '?';
-                  const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
+                  const fallback = d.fallback ? pc.yellow('⚠') : pc.green('✓');
                   console.log('');
-                  console.log(chalk.dim(`    └ ${fallback} (${elapsed}s)`));
+                  console.log(pc.dim(`    └ ${fallback} (${elapsed}s)`));
                   console.log('');
                 }
               } else {
-                const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
-                process.stdout.write(`${fallback}${chalk.dim(provider)} `);
+                const fallback = d.fallback ? pc.yellow('⚠') : pc.green('✓');
+                process.stdout.write(`${fallback}${pc.dim(provider)} `);
               }
               break;
             }
             case 'phase:done': {
               const secs = ((d.duration as number) / 1000).toFixed(1);
               if (!isLive) {
-                console.log(chalk.dim(`(${secs}s)`));
+                console.log(pc.dim(`(${secs}s)`));
               }
               break;
             }
             case 'tool': {
               const toolInput = String(d.input).slice(0, 60);
-              console.log(chalk.dim(`  🔧 ${d.provider} → ${d.tool}(${toolInput})`));
+              console.log(pc.dim(`  🔧 ${d.provider} → ${d.tool}(${toolInput})`));
               break;
             }
             case 'evidence': {
@@ -517,7 +525,7 @@ export function registerAskCommand(program: Command): void {
                 evidenceScore: number;
               };
               console.log(
-                chalk.dim(
+                pc.dim(
                   `  📋 ${report.provider}: ${report.supportedClaims}/${report.totalClaims} claims supported (${Math.round(report.evidenceScore * 100)}%)`,
                 ),
               );
@@ -533,7 +541,7 @@ export function registerAskCommand(program: Command): void {
                 // Don't clutter output for continue decisions
               } else {
                 console.log(
-                  chalk.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`),
+                  pc.yellow(`  ⚡ ADAPTIVE: ${decision.reason} (entropy: ${entropyPct}%)`),
                 );
               }
               break;
@@ -551,25 +559,23 @@ export function registerAskCommand(program: Command): void {
                 phases: number;
               };
               console.log(
-                chalk.cyan(`\n🔷 Topology: ${topology} — ${description} (${phases} phases)`),
+                pc.cyan(`\n🔷 Topology: ${topology} — ${description} (${phases} phases)`),
               );
               break;
             }
             case 'devilsAdvocate':
-              console.log(chalk.magenta(`  😈 Devil's advocate: ${d.provider}`));
+              console.log(pc.magenta(`  😈 Devil's advocate: ${d.provider}`));
               break;
             case 'synthesizer':
-              console.log(chalk.dim(`  ℹ Synthesizer: ${d.provider} (${d.reason})`));
+              console.log(pc.dim(`  ℹ Synthesizer: ${d.provider} (${d.reason})`));
               break;
             case 'memory':
-              console.log(
-                chalk.dim(`  🧠 Found ${(d as any).count} relevant prior deliberation(s)`),
-              );
+              console.log(pc.dim(`  🧠 Found ${(d as any).count} relevant prior deliberation(s)`));
               break;
             case 'contradictions':
-              console.log(chalk.yellow('\n  ⚠ Contradictions with prior deliberations:'));
+              console.log(pc.yellow('\n  ⚠ Contradictions with prior deliberations:'));
               for (const c of (d as any).contradictions) {
-                console.log(chalk.yellow(`    → ${c}`));
+                console.log(pc.yellow(`    → ${c}`));
               }
               break;
             case 'votes': {
@@ -579,19 +585,19 @@ export function registerAskCommand(program: Command): void {
                 controversial: boolean;
               };
               console.log('');
-              console.log(chalk.bold('  🗳️  Results'));
+              console.log(pc.bold('  🗳️  Results'));
               const maxScore = v.rankings[0]?.score || 1;
               for (const r of v.rankings) {
                 const bar = '█'.repeat(Math.round((r.score / maxScore) * 12));
                 const crown = r.provider === v.winner ? ' 👑' : '';
                 console.log(
-                  `     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`,
+                  `     ${pc.dim(r.provider.padEnd(10))} ${pc.cyan(bar)} ${r.score}${crown}`,
                 );
               }
               if (v.controversial)
-                console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
+                console.log(pc.yellow('     ⚠ Close vote — positions nearly tied'));
               if ((v as any).votingDetails) {
-                console.log(chalk.dim(`     Method: ${(v as any).votingDetails.split('\n')[0]}`));
+                console.log(pc.dim(`     Method: ${(v as any).votingDetails.split('\n')[0]}`));
               }
               break;
             }
@@ -601,25 +607,25 @@ export function registerAskCommand(program: Command): void {
               }
               break;
             case 'complete':
-              console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+              console.log(pc.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
               break;
             case 'hook': {
               const hookOutput = d.output ? `: ${String(d.output).slice(0, 80)}` : '';
-              console.log(chalk.dim(`  🪝 ${d.name}${hookOutput}`));
+              console.log(pc.dim(`  🪝 ${d.name}${hookOutput}`));
               break;
             }
             case 'hitl:pause':
               // Interactive handler will display the checkpoint
               break;
             case 'hitl:resume':
-              console.log(chalk.cyan(`  ▶ HITL resumed (${d.action})`));
+              console.log(pc.cyan(`  ▶ HITL resumed (${d.action})`));
               break;
             case 'hitl:override':
-              console.log(chalk.yellow(`  🔄 HITL: Winner overridden to ${d.winner}`));
+              console.log(pc.yellow(`  🔄 HITL: Winner overridden to ${d.winner}`));
               break;
             case 'warn':
               if (opts.verbose) {
-                console.log(chalk.yellow(`\n  ⚠ ${d.message}`));
+                console.log(pc.yellow(`\n  ⚠ ${d.message}`));
               }
               break;
           }
@@ -651,7 +657,7 @@ export function registerAskCommand(program: Command): void {
         } else {
           // ── Final output ──
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           console.log('');
 
           // Strip metadata sections from synthesis content for clean display
@@ -669,25 +675,25 @@ export function registerAskCommand(program: Command): void {
             result.synthesis.minorityReport.trim()
           ) {
             console.log('');
-            console.log(chalk.bold.yellow('── Minority Report ──'));
+            console.log(pc.bold(pc.yellow('── Minority Report ──')));
             console.log(result.synthesis.minorityReport);
           }
 
           if (result.synthesis.whatWouldChange && result.synthesis.whatWouldChange.trim()) {
             console.log('');
-            console.log(chalk.bold.magenta('── What Would Change My Mind ──'));
+            console.log(pc.bold(pc.magenta('── What Would Change My Mind ──')));
             console.log(result.synthesis.whatWouldChange);
           }
 
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           const meta = [
             `Winner: ${result.votes.winner}`,
             `Synthesized by: ${result.synthesis.synthesizer}`,
             `Consensus: ${result.synthesis.consensusScore}`,
             `Confidence: ${result.synthesis.confidenceScore}`,
           ].join(' | ');
-          console.log(chalk.dim(meta));
+          console.log(pc.dim(meta));
           // Evidence summary
           if (profile.evidence && profile.evidence !== 'off') {
             try {
@@ -702,7 +708,7 @@ export function registerAskCommand(program: Command): void {
                       `${r.provider} ${Math.round(r.evidenceScore * 100)}%`,
                   )
                   .join(', ');
-                console.log(chalk.dim(`Evidence scores: ${summary}`));
+                console.log(pc.dim(`Evidence scores: ${summary}`));
               }
             } catch {
               /* no evidence report */
@@ -719,25 +725,25 @@ export function registerAskCommand(program: Command): void {
               };
               const nonContinue = adaptiveData.decisions.filter((d) => d.action !== 'continue');
               if (nonContinue.length > 0) {
-                console.log(chalk.yellow(`\nAdaptive decisions: ${nonContinue.length}`));
+                console.log(pc.yellow(`\nAdaptive decisions: ${nonContinue.length}`));
                 for (const d of nonContinue) {
-                  console.log(chalk.dim(`  ⚡ ${d.action}: ${d.reason}`));
+                  console.log(pc.dim(`  ⚡ ${d.action}: ${d.reason}`));
                 }
               }
             } catch {
               /* no adaptive data */
             }
           }
-          console.log(chalk.dim(`Session: ${result.sessionPath}`));
+          console.log(pc.dim(`Session: ${result.sessionPath}`));
           console.log('');
         }
 
         if (opts.audit) {
           await writeFile(opts.audit as string, JSON.stringify(result, null, 2), 'utf-8');
-          if (!isJSON) console.log(chalk.dim(`Audit saved to ${opts.audit}`));
+          if (!isJSON) console.log(pc.dim(`Audit saved to ${opts.audit}`));
         }
       } catch (err) {
-        throw new CLIError(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`\nError: ${err instanceof Error ? err.message : err}`));
       }
     });
 }

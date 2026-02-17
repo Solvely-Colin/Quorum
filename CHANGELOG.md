@@ -4,6 +4,35 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.12.0] — 2026-02-17
+
+### The "Lean & Clean" Release
+
+Dependency diet, config safety, CLI discoverability, and provider layer simplification.
+
+#### Dependency Changes
+- **chalk → picocolors** — replaced 15KB color library with 3KB alternative across all 8 CLI modules; no chaining API (uses `pc.bold(pc.cyan())` nesting instead)
+- **pdf-lib → optionalDependencies** — saves ~2.5MB for users who never export PDF attestations; graceful error with install instructions on missing dep
+- **Added zod** — runtime config validation for catching malformed `~/.quorum/config.yaml` early
+
+#### Config Validation
+- **Zod schema for CounselConfig** — validates provider array shape, auth discriminated union (5 methods), provider enum (12 values), with `.passthrough()` for forward compatibility
+- **Soft validation** — `loadConfig()` warns on malformed configs but doesn't crash, so older config files still work
+
+#### CLI Discoverability
+- **--help examples on 14 commands** — practical usage examples via `addHelpText('after', ...)` on `ask`, `review`, `ci`, `versus`, `follow-up`, `watch`, `replay`, `rerun`, `explain`, `diff`, `stats`, `init`, `memory search`, `arena run`
+
+#### Provider Layer Simplification
+- **`mapProvider()` reduced** — from 12-entry record to 4-case switch; only keeps Quorum-specific remaps (`gemini-cli`→`google`, `custom`→`openai`, `kimi`→`kimi-coding`, `codex`→`openai-codex`); all other providers pass through to pi-ai natively
+- **`resolveApiDetails()` reduced** — from 12-case switch to 3 hardcoded cases + pi-ai delegation; queries pi-ai's model registry for base URLs instead of hardcoding them
+- **Bug fix** — groq, xai, and mistral were previously mapped to `openai`, preventing pi-ai from finding their models; now passed through correctly
+
+#### Fixes
+- Fixed stale `eslint-disable` directive in `attestation-export.ts`
+- Fixed type errors in `streaming.test.ts` (`provider: 'test'` → `'custom'`, corrected `AgentProfile` and `ScoringWeights` shapes)
+
+---
+
 ## [0.11.1] — 2026-02-17
 
 ### CI Fixes

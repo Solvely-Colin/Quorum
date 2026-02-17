@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { listOAuthProfiles, removeOAuthProfile, startDeviceFlow } from '../auth.js';
 
 export function registerAuthCommand(program: Command): void {
@@ -13,19 +13,19 @@ export function registerAuthCommand(program: Command): void {
       try {
         const flow = await startDeviceFlow(provider, opts.clientId as string | undefined);
         console.log('');
-        console.log(chalk.bold('🔐 OAuth Login'));
-        console.log(`  Open: ${chalk.cyan(flow.verificationUrl)}`);
-        console.log(`  Code: ${chalk.bold.yellow(flow.userCode)}`);
+        console.log(pc.bold('🔐 OAuth Login'));
+        console.log(`  Open: ${pc.cyan(flow.verificationUrl)}`);
+        console.log(`  Code: ${pc.bold(pc.yellow(flow.userCode))}`);
         console.log('');
         console.log('Waiting for authorization...');
         const token = await flow.poll();
         if (token) {
-          console.log(chalk.green(`✅ Authenticated with ${provider}`));
+          console.log(pc.green(`✅ Authenticated with ${provider}`));
         } else {
-          console.log(chalk.red('❌ Authorization expired or denied'));
+          console.log(pc.red('❌ Authorization expired or denied'));
         }
       } catch (err) {
-        console.error(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        console.error(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -36,14 +36,12 @@ export function registerAuthCommand(program: Command): void {
       const tokens = await listOAuthProfiles();
       const entries = Object.entries(tokens);
       if (entries.length === 0) {
-        console.log(chalk.dim('No OAuth tokens. Use: quorum auth login <provider>'));
+        console.log(pc.dim('No OAuth tokens. Use: quorum auth login <provider>'));
         return;
       }
       for (const [name, token] of entries) {
         const expired = token.expiresAt && Date.now() > token.expiresAt;
-        console.log(
-          `  ${chalk.bold(name)} — ${expired ? chalk.red('expired') : chalk.green('active')}`,
-        );
+        console.log(`  ${pc.bold(name)} — ${expired ? pc.red('expired') : pc.green('active')}`);
       }
     });
 
@@ -52,6 +50,6 @@ export function registerAuthCommand(program: Command): void {
     .description('Remove OAuth token')
     .action(async (provider: string) => {
       await removeOAuthProfile(provider);
-      console.log(chalk.green(`✅ Removed ${provider}`));
+      console.log(pc.green(`✅ Removed ${provider}`));
     });
 }

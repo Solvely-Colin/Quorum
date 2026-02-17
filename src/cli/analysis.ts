@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
@@ -16,6 +16,15 @@ export function registerAnalysisCommands(program: Command): void {
     .description('Meta-analyze a deliberation session')
     .argument('<session>', 'Session path or "last" for most recent')
     .option('--provider <name>', 'Provider to use for analysis (default: first configured)')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum explain last')}
+${pc.dim('  $ quorum explain last --provider claude')}
+${pc.dim('  $ quorum explain ~/.quorum/sessions/abc123')}
+`,
+    )
     .action(async (sessionArg: string, opts) => {
       // Resolve session path
       let sessionPath = sessionArg;
@@ -43,7 +52,7 @@ export function registerAnalysisCommands(program: Command): void {
       // Read session files
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
 
       const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
@@ -76,7 +85,7 @@ export function registerAnalysisCommands(program: Command): void {
       // Pick provider
       const config = await loadConfig();
       if (config.providers.length === 0) {
-        throw new CLIError(chalk.red('No providers configured. Run: quorum init'));
+        throw new CLIError(pc.red('No providers configured. Run: quorum init'));
       }
 
       let providerConfig: ProviderConfig;
@@ -84,9 +93,9 @@ export function registerAnalysisCommands(program: Command): void {
         const found = config.providers.find((p) => p.name === (opts.provider as string));
         if (!found) {
           throw new CLIError(
-            chalk.red(`Provider not found: ${opts.provider}`) +
+            pc.red(`Provider not found: ${opts.provider}`) +
               '\n' +
-              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+              pc.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
           );
         }
         providerConfig = found;
@@ -102,9 +111,9 @@ export function registerAnalysisCommands(program: Command): void {
       const systemPrompt = `Analyze this AI deliberation session. Why did the winner win? What was the key turning point in the debate? Where did the council fail to resolve disagreement? What patterns do you see in how the providers argued?`;
 
       console.log('');
-      console.log(chalk.bold.cyan('🔍 Meta-Analysis'));
-      console.log(chalk.dim(`Session: ${sessionPath}`));
-      console.log(chalk.dim(`Analyzer: ${providerConfig.name} (${providerConfig.model})`));
+      console.log(pc.bold(pc.cyan('🔍 Meta-Analysis')));
+      console.log(pc.dim(`Session: ${sessionPath}`));
+      console.log(pc.dim(`Analyzer: ${providerConfig.name} (${providerConfig.model})`));
       console.log('');
 
       try {
@@ -118,7 +127,7 @@ export function registerAnalysisCommands(program: Command): void {
           console.log(result);
         }
       } catch (err) {
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
 
       console.log('');
@@ -131,6 +140,15 @@ export function registerAnalysisCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .option('--analyze', 'Use a provider to generate a narrative comparison of syntheses')
     .option('--provider <name>', 'Provider to use for --analyze (default: first configured)')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum diff ~/.quorum/sessions/abc123 ~/.quorum/sessions/def456')}
+${pc.dim('  $ quorum diff session1 session2 --analyze --provider claude')}
+${pc.dim('  $ quorum diff session1 session2 --json')}
+`,
+    )
     .action(async (session1: string, session2: string, opts) => {
       const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
 
@@ -162,7 +180,7 @@ export function registerAnalysisCommands(program: Command): void {
       async function loadSession(sp: string) {
         const metaPath = pathJoin(sp, 'meta.json');
         if (!existsSync(metaPath)) {
-          throw new CLIError(chalk.red(`Session not found: ${sp}`));
+          throw new CLIError(pc.red(`Session not found: ${sp}`));
         }
         const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
 
@@ -210,13 +228,13 @@ export function registerAnalysisCommands(program: Command): void {
       if (opts.analyze && synthContent1 && synthContent2) {
         const config = await loadConfig();
         if (config.providers.length === 0) {
-          throw new CLIError(chalk.red('No providers configured for --analyze. Run: quorum init'));
+          throw new CLIError(pc.red('No providers configured for --analyze. Run: quorum init'));
         }
         let providerConfig: ProviderConfig;
         if (opts.provider) {
           const found = config.providers.find((p) => p.name === (opts.provider as string));
           if (!found) {
-            throw new CLIError(chalk.red(`Provider not found: ${opts.provider}`));
+            throw new CLIError(pc.red(`Provider not found: ${opts.provider}`));
           }
           providerConfig = found;
         } else {
@@ -234,7 +252,7 @@ export function registerAnalysisCommands(program: Command): void {
         ].join('\n');
 
         if (!opts.json) {
-          console.log(chalk.dim(`Analyzing with ${providerConfig.name}...`));
+          console.log(pc.dim(`Analyzing with ${providerConfig.name}...`));
         }
         try {
           analysisNarrative = await adapter.generate(
@@ -244,7 +262,7 @@ export function registerAnalysisCommands(program: Command): void {
         } catch (err) {
           if (!opts.json) {
             console.error(
-              chalk.yellow(`Analysis failed: ${err instanceof Error ? err.message : err}`),
+              pc.yellow(`Analysis failed: ${err instanceof Error ? err.message : err}`),
             );
           }
         }
@@ -284,50 +302,50 @@ export function registerAnalysisCommands(program: Command): void {
 
       // Display comparison
       console.log('');
-      console.log(chalk.bold.cyan('📊 Session Diff'));
-      console.log(chalk.dim('━'.repeat(60)));
+      console.log(pc.bold(pc.cyan('📊 Session Diff')));
+      console.log(pc.dim('━'.repeat(60)));
 
       // Questions
       console.log('');
-      console.log(chalk.bold('Question:'));
+      console.log(pc.bold('Question:'));
       if (q1 === q2) {
         console.log(`  ${q1}`);
       } else {
-        console.log(`  ${chalk.dim('S1:')} ${q1}`);
-        console.log(`  ${chalk.dim('S2:')} ${q2}`);
+        console.log(`  ${pc.dim('S1:')} ${q1}`);
+        console.log(`  ${pc.dim('S2:')} ${q2}`);
       }
 
       // Providers
       console.log('');
-      console.log(chalk.bold('Providers:'));
+      console.log(pc.bold('Providers:'));
       if (onlyIn1.length === 0 && onlyIn2.length === 0) {
-        console.log(`  ${chalk.green('Same:')} ${providers1.join(', ')}`);
+        console.log(`  ${pc.green('Same:')} ${providers1.join(', ')}`);
       } else {
-        console.log(`  ${chalk.dim('Common:')} ${common.join(', ') || '(none)'}`);
-        if (onlyIn1.length) console.log(`  ${chalk.red('Only S1:')} ${onlyIn1.join(', ')}`);
-        if (onlyIn2.length) console.log(`  ${chalk.red('Only S2:')} ${onlyIn2.join(', ')}`);
+        console.log(`  ${pc.dim('Common:')} ${common.join(', ') || '(none)'}`);
+        if (onlyIn1.length) console.log(`  ${pc.red('Only S1:')} ${onlyIn1.join(', ')}`);
+        if (onlyIn2.length) console.log(`  ${pc.red('Only S2:')} ${onlyIn2.join(', ')}`);
       }
 
       // Winner
       console.log('');
-      console.log(chalk.bold('Winner:'));
+      console.log(pc.bold('Winner:'));
       if (winner1 === winner2) {
-        console.log(`  ${chalk.green(winner1)} (unchanged)`);
+        console.log(`  ${pc.green(winner1)} (unchanged)`);
       } else {
         console.log(
-          `  ${chalk.dim('S1:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('S2:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`,
+          `  ${pc.dim('S1:')} ${pc.yellow(winner1)}  →  ${pc.dim('S2:')} ${pc.yellow(winner2)}  ${pc.red('(changed)')}`,
         );
       }
 
       // Scores
       console.log('');
-      console.log(chalk.bold('Scores:'));
+      console.log(pc.bold('Scores:'));
       const fmtScore = (v: number | null) => (v != null ? v.toFixed(2) : '—');
       const fmtDelta = (a: number | null, b: number | null) => {
         if (a == null || b == null) return '';
         const d = b - a;
         const sign = d >= 0 ? '+' : '';
-        const color = d > 0 ? chalk.green : d < 0 ? chalk.red : chalk.dim;
+        const color = d > 0 ? pc.green : d < 0 ? pc.red : pc.dim;
         return color(` (${sign}${d.toFixed(2)})`);
       };
       console.log(
@@ -339,7 +357,7 @@ export function registerAnalysisCommands(program: Command): void {
 
       // Vote rankings
       console.log('');
-      console.log(chalk.bold('Vote Rankings:'));
+      console.log(pc.bold('Vote Rankings:'));
       const maxRankings = Math.max(rankings1.length, rankings2.length);
       if (maxRankings > 0) {
         console.log(`  ${'#'.padEnd(3)} ${'Session 1'.padEnd(25)} ${'Session 2'.padEnd(25)}`);
@@ -352,19 +370,19 @@ export function registerAnalysisCommands(program: Command): void {
           console.log(`  ${String(i + 1).padEnd(3)} ${left.padEnd(25)} ${right.padEnd(25)}`);
         }
       } else {
-        console.log(chalk.dim('  No vote data available'));
+        console.log(pc.dim('  No vote data available'));
       }
 
       // Analysis narrative
       if (analysisNarrative) {
         console.log('');
-        console.log(chalk.bold.magenta('── Analysis ──'));
+        console.log(pc.bold(pc.magenta('── Analysis ──')));
         console.log(analysisNarrative);
       }
 
       console.log('');
-      console.log(chalk.dim(`S1: ${path1}`));
-      console.log(chalk.dim(`S2: ${path2}`));
+      console.log(pc.dim(`S1: ${path1}`));
+      console.log(pc.dim(`S2: ${path2}`));
       console.log('');
     });
 
@@ -373,6 +391,14 @@ export function registerAnalysisCommands(program: Command): void {
     .command('stats')
     .description('Show provider statistics across all sessions')
     .option('--json', 'Output as JSON')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum stats')}
+${pc.dim('  $ quorum stats --json')}
+`,
+    )
     .action(async (opts) => {
       const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
       const indexPath = pathJoin(sessionsDir, 'index.json');
@@ -398,8 +424,8 @@ export function registerAnalysisCommands(program: Command): void {
           console.log(JSON.stringify({ sessions: 0, message: 'No sessions found.' }));
         } else {
           console.log('');
-          console.log(chalk.dim('No deliberation sessions found yet.'));
-          console.log(chalk.dim('Run: quorum ask "your question" to get started.'));
+          console.log(pc.dim('No deliberation sessions found yet.'));
+          console.log(pc.dim('Run: quorum ask "your question" to get started.'));
           console.log('');
         }
         return;
@@ -497,38 +523,35 @@ export function registerAnalysisCommands(program: Command): void {
 
       // Display
       console.log('');
-      console.log(chalk.bold.cyan('📊 Provider Statistics'));
-      console.log(chalk.dim('━'.repeat(50)));
+      console.log(pc.bold(pc.cyan('📊 Provider Statistics')));
+      console.log(pc.dim('━'.repeat(50)));
       console.log('');
-      console.log(`  Sessions: ${chalk.bold(String(entries.length))}`);
-      console.log(
-        `  Total deliberation time: ${chalk.bold((totalDuration / 1000).toFixed(1) + 's')}`,
-      );
-      if (avgConsensus != null)
-        console.log(`  Avg consensus: ${chalk.bold(avgConsensus.toFixed(2))}`);
+      console.log(`  Sessions: ${pc.bold(String(entries.length))}`);
+      console.log(`  Total deliberation time: ${pc.bold((totalDuration / 1000).toFixed(1) + 's')}`);
+      if (avgConsensus != null) console.log(`  Avg consensus: ${pc.bold(avgConsensus.toFixed(2))}`);
       if (avgConfidence != null)
-        console.log(`  Avg confidence: ${chalk.bold(avgConfidence.toFixed(2))}`);
+        console.log(`  Avg confidence: ${pc.bold(avgConfidence.toFixed(2))}`);
       console.log('');
 
       // Provider table
-      console.log(chalk.bold('  Provider Win Rates:'));
+      console.log(pc.bold('  Provider Win Rates:'));
       console.log('');
       for (const p of providerStats) {
         const pct = (p.winRate * 100).toFixed(0);
         const bar = '█'.repeat(Math.round(p.winRate * 20));
         console.log(
-          `    ${p.name.padEnd(12)} ${chalk.cyan(bar.padEnd(20))} ${pct}%  (${p.wins}/${p.participated} sessions)`,
+          `    ${p.name.padEnd(12)} ${pc.cyan(bar.padEnd(20))} ${pct}%  (${p.wins}/${p.participated} sessions)`,
         );
       }
 
       if (mostControversial) {
         console.log('');
-        console.log(chalk.bold('  Most Controversial:'));
+        console.log(pc.bold('  Most Controversial:'));
         console.log(
-          `    ${chalk.yellow(mostControversial.question.slice(0, 80))}${mostControversial.question.length > 80 ? '...' : ''}`,
+          `    ${pc.yellow(mostControversial.question.slice(0, 80))}${mostControversial.question.length > 80 ? '...' : ''}`,
         );
-        console.log(`    Consensus: ${chalk.red(mostControversial.consensus.toFixed(2))}`);
-        console.log(`    ${chalk.dim(pathJoin(sessionsDir, mostControversial.sessionId))}`);
+        console.log(`    Consensus: ${pc.red(mostControversial.consensus.toFixed(2))}`);
+        console.log(`    ${pc.dim(pathJoin(sessionsDir, mostControversial.sessionId))}`);
       }
 
       console.log('');
@@ -570,9 +593,9 @@ export function registerAnalysisCommands(program: Command): void {
       const reportPath = pathJoin(sessionPath, 'evidence-report.json');
       if (!existsSync(reportPath)) {
         throw new CLIError(
-          chalk.red(`No evidence report found at ${reportPath}`) +
+          pc.red(`No evidence report found at ${reportPath}`) +
             '\n' +
-            chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'),
+            pc.dim('Run a deliberation with --evidence advisory or --evidence strict first.'),
         );
       }
 
@@ -621,7 +644,7 @@ export function registerAnalysisCommands(program: Command): void {
         const name = opts.provider as string;
         reports = reports.filter((r) => r.provider.toLowerCase() === name.toLowerCase());
         if (reports.length === 0) {
-          throw new CLIError(chalk.red(`No report found for provider: ${name}`));
+          throw new CLIError(pc.red(`No report found for provider: ${name}`));
         }
       }
 
@@ -630,7 +653,7 @@ export function registerAnalysisCommands(program: Command): void {
         ? ((opts.tier as string).toUpperCase() as SourceTier)
         : undefined;
       if (tierFilter && !['A', 'B', 'C', 'D', 'F'].includes(tierFilter)) {
-        throw new CLIError(chalk.red(`Invalid tier: ${opts.tier}. Must be A, B, C, D, or F.`));
+        throw new CLIError(pc.red(`Invalid tier: ${opts.tier}. Must be A, B, C, D, or F.`));
       }
 
       // Grade calculation
@@ -656,7 +679,7 @@ export function registerAnalysisCommands(program: Command): void {
       const sessionId = sessionPath.split('/').pop() ?? sessionPath;
 
       console.log('');
-      console.log(chalk.bold(`📋 Evidence Report — Session ${sessionId}`));
+      console.log(pc.bold(`📋 Evidence Report — Session ${sessionId}`));
       console.log('');
 
       // Summary table
@@ -695,14 +718,14 @@ export function registerAnalysisCommands(program: Command): void {
 
         const gradeColor =
           grade === 'A'
-            ? chalk.green
+            ? pc.green
             : grade === 'B'
-              ? chalk.cyan
+              ? pc.cyan
               : grade === 'C'
-                ? chalk.yellow
+                ? pc.yellow
                 : grade === 'D'
-                  ? chalk.red
-                  : chalk.bgRed;
+                  ? pc.red
+                  : pc.bgRed;
 
         console.log(
           `│ ${pad(r.provider, colProvider)} │ ${padC(score, colScore)} │ ${padC(weighted, colWeighted)} │ ${padC(claims, colClaims)} │ ${pad(tierStr, colTier)} │ ${padC(gradeColor(grade), colGrade)} │`,
@@ -714,16 +737,16 @@ export function registerAnalysisCommands(program: Command): void {
       // Cross-references
       if (crossRefs.length > 0) {
         console.log('');
-        console.log(chalk.bold('Cross-References:'));
+        console.log(pc.bold('Cross-References:'));
         for (const cr of crossRefs) {
           if (cr.corroborated) {
             console.log(
-              `  ${chalk.green('✅')} "${cr.claimText}" — ${cr.providers.join(', ')} (tier ${cr.bestSourceTier})`,
+              `  ${pc.green('✅')} "${cr.claimText}" — ${cr.providers.join(', ')} (tier ${cr.bestSourceTier})`,
             );
           } else if (cr.contradicted) {
             const details = cr.contradictions?.join('; ') ?? '';
             console.log(
-              `  ${chalk.yellow('⚠️')}  "${cr.claimText}" — ${details || cr.providers.join(' vs ')}`,
+              `  ${pc.yellow('⚠️')}  "${cr.claimText}" — ${details || cr.providers.join(' vs ')}`,
             );
           }
         }
@@ -738,17 +761,17 @@ export function registerAnalysisCommands(program: Command): void {
         if (claims.length === 0) continue;
 
         console.log('');
-        console.log(chalk.bold(`Provider Detail — ${r.provider}:`));
+        console.log(pc.bold(`Provider Detail — ${r.provider}:`));
 
         for (const c of claims) {
           const icon =
             c.sourceTier === 'A' || c.sourceTier === 'B'
-              ? chalk.green('✅')
+              ? pc.green('✅')
               : c.sourceTier === 'C' || c.sourceTier === 'D'
-                ? chalk.yellow('⚠️')
-                : chalk.red('❌');
+                ? pc.yellow('⚠️')
+                : pc.red('❌');
           const sourceInfo = c.source ? ` [source: ${c.source}]` : '';
-          console.log(`  ${icon} [${c.sourceTier}] "${c.claim}"${chalk.dim(sourceInfo)}`);
+          console.log(`  ${icon} [${c.sourceTier}] "${c.claim}"${pc.dim(sourceInfo)}`);
         }
       }
 

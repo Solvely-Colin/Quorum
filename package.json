@@ -1,6 +1,6 @@
 {
   "name": "quorum-ai",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Quorum — Multi-AI deliberation framework — diverge, challenge, converge.",
   "type": "module",
   "main": "./dist/council-v2.js",
@@ -65,13 +65,16 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.5.0",
     "@mariozechner/pi-ai": "^0.52.9",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "chalk": "^5.4.0",
     "commander": "^13.1.0",
-    "@inquirer/prompts": "^7.5.0",
-    "pdf-lib": "^1.17.1",
-    "yaml": "^2.7.0"
+    "picocolors": "^1.1.1",
+    "yaml": "^2.7.0",
+    "zod": "^4.3.6"
+  },
+  "optionalDependencies": {
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

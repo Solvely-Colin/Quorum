@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { loadConfig, saveConfig, detectProviders, CONFIG_PATH } from '../config.js';
 import { createProvider } from '../providers/base.js';
 import type { ProviderConfig } from '../types.js';
@@ -11,25 +11,33 @@ export function registerProvidersCommand(program: Command): void {
     .command('init')
     .description('Detect and configure AI providers')
     .option('--non-interactive', 'Skip prompts, auto-configure detected providers')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum init')}
+${pc.dim('  $ quorum init --non-interactive')}
+`,
+    )
     .action(async (opts) => {
       console.log('');
-      console.log(chalk.bold.cyan('👋 Welcome to Quorum.'));
+      console.log(pc.bold(pc.cyan('👋 Welcome to Quorum.')));
       console.log('');
       console.log('Scanning for AI providers...');
 
       const detected = await detectProviders();
 
       if (detected.length === 0) {
-        console.log(chalk.yellow('\nNo providers detected.'));
-        console.log(chalk.dim('Set API keys in env (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)'));
-        console.log(chalk.dim('Or install Ollama: https://ollama.ai'));
-        console.log(chalk.dim('Or install Claude CLI: npm i -g @anthropic-ai/claude-code'));
+        console.log(pc.yellow('\nNo providers detected.'));
+        console.log(pc.dim('Set API keys in env (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)'));
+        console.log(pc.dim('Or install Ollama: https://ollama.ai'));
+        console.log(pc.dim('Or install Claude CLI: npm i -g @anthropic-ai/claude-code'));
         return;
       }
 
-      console.log(chalk.green(`\nFound ${detected.length} provider(s):`));
+      console.log(pc.green(`\nFound ${detected.length} provider(s):`));
       for (const p of detected) {
-        console.log(`  ${chalk.green('✅')} ${chalk.bold(p.name)} — ${p.model}`);
+        console.log(`  ${pc.green('✅')} ${pc.bold(p.name)} — ${p.model}`);
       }
 
       if (opts.nonInteractive) {
@@ -37,14 +45,14 @@ export function registerProvidersCommand(program: Command): void {
         const config = await loadConfig();
         config.providers = detected;
         await saveConfig(config);
-        console.log(chalk.green(`\n✅ Saved ${detected.length} providers to ${CONFIG_PATH}`));
+        console.log(pc.green(`\n✅ Saved ${detected.length} providers to ${CONFIG_PATH}`));
       } else {
         // Interactive mode — try inquirer, fall back to auto if not TTY
         if (!process.stdin.isTTY) {
           const config = await loadConfig();
           config.providers = detected;
           await saveConfig(config);
-          console.log(chalk.green(`\n✅ Auto-saved (non-TTY). Edit ${CONFIG_PATH} to customize.`));
+          console.log(pc.green(`\n✅ Auto-saved (non-TTY). Edit ${CONFIG_PATH} to customize.`));
         } else {
           const { select, confirm } = await import('@inquirer/prompts');
           const action = await select({
@@ -69,11 +77,11 @@ export function registerProvidersCommand(program: Command): void {
           const config = await loadConfig();
           config.providers = providers;
           await saveConfig(config);
-          console.log(chalk.green(`\n✅ Saved ${providers.length} providers to ${CONFIG_PATH}`));
+          console.log(pc.green(`\n✅ Saved ${providers.length} providers to ${CONFIG_PATH}`));
         }
       }
 
-      console.log(chalk.dim('Run: quorum ask "your question"'));
+      console.log(pc.dim('Run: quorum ask "your question"'));
       console.log('');
     });
 
@@ -86,12 +94,12 @@ export function registerProvidersCommand(program: Command): void {
     .action(async () => {
       const config = await loadConfig();
       if (config.providers.length === 0) {
-        console.log(chalk.dim('No providers. Run: quorum init'));
+        console.log(pc.dim('No providers. Run: quorum init'));
         return;
       }
       for (const p of config.providers) {
         const authType = p.auth ? p.auth.method : p.apiKey ? 'api_key' : 'none';
-        console.log(`  ${chalk.bold(p.name)} — ${p.provider}/${p.model} (${authType})`);
+        console.log(`  ${pc.bold(p.name)} — ${p.provider}/${p.model} (${authType})`);
       }
     });
 
@@ -126,7 +134,7 @@ export function registerProvidersCommand(program: Command): void {
       config.providers = config.providers.filter((p) => p.name !== provider.name);
       config.providers.push(provider);
       await saveConfig(config);
-      console.log(chalk.green(`✅ Added ${provider.name}`));
+      console.log(pc.green(`✅ Added ${provider.name}`));
     });
 
   providersCmd
@@ -152,12 +160,12 @@ export function registerProvidersCommand(program: Command): void {
         try {
           const models = getModels(p as any);
           if (models.length === 0) continue;
-          console.log(chalk.bold(`\n${p}`) + chalk.dim(` (${models.length} models)`));
+          console.log(pc.bold(`\n${p}`) + pc.dim(` (${models.length} models)`));
           for (const m of models) {
             const ctx = m.contextWindow
-              ? chalk.dim(` ${(m.contextWindow / 1000).toFixed(0)}k ctx`)
+              ? pc.dim(` ${(m.contextWindow / 1000).toFixed(0)}k ctx`)
               : '';
-            const cost = m.cost?.input ? chalk.dim(` $${m.cost.input}/M in`) : '';
+            const cost = m.cost?.input ? pc.dim(` $${m.cost.input}/M in`) : '';
             console.log(`  ${m.id}${ctx}${cost}`);
           }
         } catch {
@@ -174,10 +182,10 @@ export function registerProvidersCommand(program: Command): void {
       const before = config.providers.length;
       config.providers = config.providers.filter((p) => p.name !== name);
       if (config.providers.length === before) {
-        throw new CLIError(chalk.red(`Provider not found: ${name}`));
+        throw new CLIError(pc.red(`Provider not found: ${name}`));
       }
       await saveConfig(config);
-      console.log(chalk.green(`✅ Removed ${name}`));
+      console.log(pc.green(`✅ Removed ${name}`));
     });
 
   providersCmd
@@ -193,11 +201,9 @@ export function registerProvidersCommand(program: Command): void {
             'Say "OK" in one word.',
             'You are a helpful assistant. Reply concisely.',
           );
-          console.log(chalk.green(`✅ "${response.slice(0, 50)}"`));
+          console.log(pc.green(`✅ "${response.slice(0, 50)}"`));
         } catch (err) {
-          console.log(
-            chalk.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`),
-          );
+          console.log(pc.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`));
         }
       }
     });

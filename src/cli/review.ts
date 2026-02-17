@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join as pathJoin, extname } from 'node:path';
@@ -58,6 +58,16 @@ export function registerReviewCommands(program: Command): void {
     )
     .option('--card-detailed', 'Output a detailed summary card (no char limit)')
     .option('--annotations', 'Output GitHub Actions annotations')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum review src/api.ts src/utils.ts')}
+${pc.dim('  $ quorum review --staged')}
+${pc.dim('  $ quorum review --diff main')}
+${pc.dim('  $ quorum review --pr 42 --rapid')}
+`,
+    )
     .action(async (files: string[], opts) => {
       // If --card is requested, delegate to ci command for structured output
       const wantsCard =
@@ -98,30 +108,30 @@ export function registerReviewCommands(program: Command): void {
         try {
           const diff = await getGitDiff({ staged: true });
           if (!diff.trim()) {
-            console.log(chalk.yellow('No staged changes found.'));
+            console.log(pc.yellow('No staged changes found.'));
             return;
           }
           content = `## Git Diff (staged changes)\n${gitContextStr ? `\n${gitContextStr}\n` : ''}\n\`\`\`diff\n${diff}\n\`\`\`\n`;
         } catch (err) {
-          throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+          throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
         }
       } else if (opts.diff !== undefined) {
         try {
           const ref = typeof opts.diff === 'string' ? opts.diff : 'HEAD';
           const diff = await getGitDiff({ ref });
           if (!diff.trim()) {
-            console.log(chalk.yellow(`No diff found against ${ref}.`));
+            console.log(pc.yellow(`No diff found against ${ref}.`));
             return;
           }
           content = `## Git Diff (vs ${ref})\n${gitContextStr ? `\n${gitContextStr}\n` : ''}\n\`\`\`diff\n${diff}\n\`\`\`\n`;
         } catch (err) {
-          throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+          throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
         }
       } else if (opts.pr) {
         try {
           const pr = await getPrDiff(opts.pr as string);
           if (!pr.diff.trim()) {
-            console.log(chalk.yellow(`PR #${opts.pr} has no diff.`));
+            console.log(pc.yellow(`PR #${opts.pr} has no diff.`));
             return;
           }
           content = `## Pull Request #${opts.pr}: ${pr.title}\n${gitContextStr ? `\n${gitContextStr}\n` : ''}`;
@@ -130,7 +140,7 @@ export function registerReviewCommands(program: Command): void {
           }
           content += `\n### Diff\n\`\`\`diff\n${pr.diff}\n\`\`\`\n`;
         } catch (err) {
-          throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+          throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
         }
       } else {
         // Original behavior: piped input or file arguments
@@ -144,7 +154,7 @@ export function registerReviewCommands(program: Command): void {
         if (files.length > 0) {
           for (const filePath of files) {
             if (!existsSync(filePath)) {
-              throw new CLIError(chalk.red(`File not found: ${filePath}`));
+              throw new CLIError(pc.red(`File not found: ${filePath}`));
             }
             const fileContent = await readFile(filePath, 'utf-8');
             const ext = extname(filePath).slice(1) || 'text';
@@ -155,13 +165,13 @@ export function registerReviewCommands(program: Command): void {
         if (!content.trim()) {
           throw new CLIError(
             [
-              chalk.red(
+              pc.red(
                 'No input provided. Pass file paths, pipe content, or use --staged/--diff/--pr.',
               ),
-              chalk.dim('Usage: quorum review src/api.ts src/utils.ts'),
-              chalk.dim('   or: quorum review --staged'),
-              chalk.dim('   or: quorum review --diff main'),
-              chalk.dim('   or: quorum review --pr 42'),
+              pc.dim('Usage: quorum review src/api.ts src/utils.ts'),
+              pc.dim('   or: quorum review --staged'),
+              pc.dim('   or: quorum review --diff main'),
+              pc.dim('   or: quorum review --pr 42'),
             ].join('\n'),
           );
         }
@@ -274,6 +284,15 @@ export function registerReviewCommands(program: Command): void {
     )
     .option('--card-detailed', 'Output a detailed summary card (no char limit)')
     .option('--annotations', 'Output GitHub Actions annotations')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum ci --pr 42 --format github --post-comment')}
+${pc.dim('  $ quorum ci --staged --confidence-threshold 0.7')}
+${pc.dim('  $ quorum ci --pr 42 --card --card-format html --annotations')}
+`,
+    )
     .action(async (opts) => {
       // --- Resolve diff content ---
       let content = '';

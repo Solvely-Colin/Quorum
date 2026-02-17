@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import type { ProviderConfig, AgentProfile } from '../types.js';
 import { PROVIDER_LIMITS, availableInput } from '../context.js';
 
@@ -38,7 +38,7 @@ export async function readStdin(timeoutMs = 5000): Promise<string> {
 
 export async function resolveLastSession(sessionsDir: string): Promise<string> {
   if (!existsSync(sessionsDir)) {
-    throw new CLIError(chalk.red('No sessions found.'));
+    throw new CLIError(pc.red('No sessions found.'));
   }
   const dirEntries = await readdir(sessionsDir, { withFileTypes: true });
   let latest = '';
@@ -58,7 +58,7 @@ export async function resolveLastSession(sessionsDir: string): Promise<string> {
     }
   }
   if (!latest) {
-    throw new CLIError(chalk.red('No sessions found.'));
+    throw new CLIError(pc.red('No sessions found.'));
   }
   return latest;
 }
@@ -147,17 +147,17 @@ export function displayDryRun(
   projectConfigPath?: string,
 ): void {
   console.log('');
-  console.log(chalk.bold.cyan('🔍 Dry Run Preview'));
+  console.log(pc.bold(pc.cyan('🔍 Dry Run Preview')));
   console.log('');
 
   if (projectConfigPath) {
-    console.log(chalk.dim(`📁 Project config loaded: ${projectConfigPath}`));
+    console.log(pc.dim(`📁 Project config loaded: ${projectConfigPath}`));
     console.log('');
   }
 
   // Profile info
-  console.log(chalk.bold('Profile:'));
-  console.log(`  Name: ${chalk.green(profile.name)}`);
+  console.log(pc.bold('Profile:'));
+  console.log(`  Name: ${pc.green(profile.name)}`);
   console.log(`  Challenge style: ${profile.challengeStyle}`);
   console.log(`  Focus: ${profile.focus.join(', ') || '(none)'}`);
   console.log(`  Rounds: ${profile.rounds}`);
@@ -177,15 +177,13 @@ export function displayDryRun(
   console.log('');
 
   // Providers
-  console.log(chalk.bold('Providers:'));
+  console.log(pc.bold('Providers:'));
   for (const p of providers) {
     const limits = PROVIDER_LIMITS[p.provider] ?? { contextLength: 32_000, outputReserve: 4_096 };
     const inputBudget = availableInput(p.provider, 500);
     const inputBudgetK = (inputBudget / 1000).toFixed(0);
     const ctxK = (limits.contextLength / 1000).toFixed(0);
-    console.log(
-      `  ${chalk.green('✓')} ${chalk.bold(p.name)} ${chalk.dim(`(${p.provider}/${p.model})`)}`,
-    );
+    console.log(`  ${pc.green('✓')} ${pc.bold(p.name)} ${pc.dim(`(${p.provider}/${p.model})`)}`);
     console.log(
       `    Context: ${ctxK}k tokens | Output reserve: ${limits.outputReserve} | Input budget: ~${inputBudgetK}k tokens`,
     );
@@ -195,7 +193,7 @@ export function displayDryRun(
 
   // Phase pipeline
   if (singleMode) {
-    console.log(chalk.bold('Pipeline:'));
+    console.log(pc.bold('Pipeline:'));
     console.log('  Single provider mode — direct query, no deliberation');
   } else {
     const phases = [
@@ -208,15 +206,15 @@ export function displayDryRun(
       'VOTE',
       'SYNTHESIZE',
     ];
-    console.log(chalk.bold('Phase Pipeline:'));
+    console.log(pc.bold('Phase Pipeline:'));
     for (let i = 0; i < phases.length; i++) {
       const arrow = i < phases.length - 1 ? ' →' : '';
       console.log(`  ${i + 1}. ${phases[i]}${arrow}`);
     }
-    console.log(chalk.dim(`  (REBUTTAL may be skipped if convergence threshold met)`));
+    console.log(pc.dim(`  (REBUTTAL may be skipped if convergence threshold met)`));
   }
 
   console.log('');
-  console.log(chalk.dim('No API calls were made.'));
+  console.log(pc.dim('No API calls were made.'));
   console.log('');
 }
