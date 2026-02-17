@@ -4,6 +4,48 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.13.0] — 2026-02-17
+
+### The "Public API" Release
+
+Stable public API for web consumers — dynamic provider/model registry, OAuth passthrough, and clean package exports.
+
+#### Provider Registry (`quorum-ai/registry`)
+- **`getProviderRegistry()`** — returns all 22 pi-ai providers with full model metadata (pricing, context windows, capabilities, reasoning support)
+- **`getProviderModels(provider)`** — models for a single provider with quorum↔pi-ai name mapping
+- **`getAvailableProviders()`** — flat list of provider IDs
+- **`ModelInfo`** — plain, serializable interface (no generics) with id, name, cost, contextWindow, maxTokens, reasoning, input modalities
+- **`ProviderInfo`** — provider ID + display name + models array
+- Consolidates quorum↔pi-ai name mapping (`kimi`→`kimi-coding`, `codex`→`openai-codex`, `gemini-cli`→`google`)
+
+#### OAuth Passthrough (`quorum-ai/oauth`)
+- **`listOAuthProviders()`** — 5 OAuth providers with web-compatibility metadata
+- **`startOAuthLogin(providerId, callbacks)`** — initiate OAuth login flow via pi-ai
+- **`refreshOAuthCredentials(providerId, credentials)`** — refresh expired tokens
+- **`getApiKeyFromOAuth(providerId, credentials)`** — extract API key with auto-refresh
+- **`getOAuthProviderById(id)`** — access underlying pi-ai OAuth provider interface
+- Re-exports pi-ai types: `OAuthCredentials`, `OAuthLoginCallbacks`, `OAuthProviderInterface`
+- All 5 providers work in web contexts via `onManualCodeInput` callback
+
+#### New Auth Method: `oauth_piai`
+- New `AuthConfig` variant: `{ method: 'oauth_piai', providerId, credentials }` — passes pi-ai OAuth credentials through the standard `ProviderConfig`
+- Auto-refreshes tokens and extracts API keys via pi-ai's OAuth system
+- Enables web apps to store encrypted OAuth credentials and pass them at deliberation time
+
+#### Clean Package Exports
+- **`quorum-ai/providers`** — `createProvider()` (was only accessible via `dist/` path)
+- **`quorum-ai/registry`** — provider/model discovery
+- **`quorum-ai/oauth`** — OAuth login, refresh, API key extraction
+- Web apps migrate from `quorum-ai/dist/providers/base.js` → `quorum-ai/providers`
+
+#### Auth Fast Path
+- Explicit short-circuit in `resolveApiKey()` for `auth.method === 'api_key'` — skips all env var scanning, keychain probing, and local service detection
+
+#### Tests
+- 19 new tests (15 registry + 4 OAuth) — 210 total, all passing
+
+---
+
 ## [0.12.0] — 2026-02-17
 
 ### The "Lean & Clean" Release

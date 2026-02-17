@@ -1,6 +1,6 @@
 {
   "name": "quorum-ai",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Quorum — Multi-AI deliberation framework — diverge, challenge, converge.",
   "type": "module",
   "main": "./dist/council-v2.js",
@@ -17,6 +17,18 @@
     "./types": {
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
+    },
+    "./providers": {
+      "types": "./dist/providers/base.d.ts",
+      "import": "./dist/providers/base.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js"
+    },
+    "./oauth": {
+      "types": "./dist/oauth.d.ts",
+      "import": "./dist/oauth.js"
     }
   },
   "bin": {
