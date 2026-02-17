@@ -108,6 +108,20 @@ export async function detectProviders(): Promise<ProviderConfig[]> {
       preferredModels: ['k2p5', 'kimi-k2-thinking'],
     },
     {
+      env: 'GROQ_API_KEY',
+      name: 'groq',
+      provider: 'groq',
+      piaiProvider: 'groq',
+      preferredModels: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768'],
+    },
+    {
+      env: 'XAI_API_KEY',
+      name: 'xai',
+      provider: 'xai',
+      piaiProvider: 'xai',
+      preferredModels: ['grok-3', 'grok-2'],
+    },
+    {
       env: 'CODEX_ACCESS_TOKEN',
       name: 'codex',
       provider: 'codex' as ProviderConfig['provider'],

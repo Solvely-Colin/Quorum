@@ -16,6 +16,8 @@ export interface ProviderConfig {
     | 'mistral'
     | 'deepseek'
     | 'kimi'
+    | 'groq'
+    | 'xai'
     | 'custom';
   model: string;
   auth?: AuthConfig;

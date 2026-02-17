@@ -155,7 +155,7 @@ export async function promptIntervention(prompt: InterventionPrompt): Promise<In
   // This requires TTY — check first
   if (!process.stdin.isTTY) return null;
 
-  const inquirer = await import('inquirer');
+  const { select, input } = await import('@inquirer/prompts');
 
   console.log('');
   console.log(`\n🛑 Intervention point after ${prompt.phase}`);
@@ -164,40 +164,30 @@ export async function promptIntervention(prompt: InterventionPrompt): Promise<In
     console.log(`  [${provider}]: ${response.slice(0, 120)}...`);
   }
 
-  const { action } = await inquirer.default.prompt<{ action: string }>([
-    {
-      type: 'list',
-      name: 'action',
-      message: 'Choose an action:',
-      choices: [
-        { name: '▶ Continue (no intervention)', value: 'continue' },
-        { name: '⏸ Halt — pause for external input', value: 'halt' },
-        { name: '🔄 Redirect — reframe with new constraints', value: 'redirect' },
-        { name: '📎 Inject Evidence — add new data/context', value: 'inject-evidence' },
-        {
-          name: '❓ Request Clarification — force uncertainty signaling',
-          value: 'request-clarification',
-        },
-      ],
-    },
-  ]);
+  const action = await select({
+    message: 'Choose an action:',
+    choices: [
+      { name: '▶ Continue (no intervention)', value: 'continue' },
+      { name: '⏸ Halt — pause for external input', value: 'halt' },
+      { name: '🔄 Redirect — reframe with new constraints', value: 'redirect' },
+      { name: '📎 Inject Evidence — add new data/context', value: 'inject-evidence' },
+      {
+        name: '❓ Request Clarification — force uncertainty signaling',
+        value: 'request-clarification',
+      },
+    ],
+  });
 
   if (action === 'continue') return null;
 
   if (action === 'halt') {
-    const { reason } = await inquirer.default.prompt<{ reason: string }>([
-      { type: 'input', name: 'reason', message: 'Reason for halt:' },
-    ]);
+    const reason = await input({ message: 'Reason for halt:' });
     return createHalt(prompt.phase, reason);
   }
 
   if (action === 'redirect') {
-    const { reason } = await inquirer.default.prompt<{ reason: string }>([
-      { type: 'input', name: 'reason', message: 'Redirect reason:' },
-    ]);
-    const { constraints } = await inquirer.default.prompt<{ constraints: string }>([
-      { type: 'input', name: 'constraints', message: 'New constraints (comma-separated):' },
-    ]);
+    const reason = await input({ message: 'Redirect reason:' });
+    const constraints = await input({ message: 'New constraints (comma-separated):' });
     return createRedirect(
       prompt.phase,
       reason,
@@ -209,12 +199,8 @@ export async function promptIntervention(prompt: InterventionPrompt): Promise<In
   }
 
   if (action === 'inject-evidence') {
-    const { description } = await inquirer.default.prompt<{ description: string }>([
-      { type: 'input', name: 'description', message: 'Evidence description:' },
-    ]);
-    const { data } = await inquirer.default.prompt<{ data: string }>([
-      { type: 'input', name: 'data', message: 'Evidence data (JSON):' },
-    ]);
+    const description = await input({ message: 'Evidence description:' });
+    const data = await input({ message: 'Evidence data (JSON):' });
     let evidence: Record<string, unknown> = {};
     try {
       evidence = JSON.parse(data);
@@ -225,9 +211,7 @@ export async function promptIntervention(prompt: InterventionPrompt): Promise<In
   }
 
   if (action === 'request-clarification') {
-    const { question } = await inquirer.default.prompt<{ question: string }>([
-      { type: 'input', name: 'question', message: 'Clarification question:' },
-    ]);
+    const question = await input({ message: 'Clarification question:' });
     return createRequestClarification(prompt.phase, question);
   }
 

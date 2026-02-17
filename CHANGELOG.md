@@ -4,6 +4,37 @@ All notable changes to Quorum will be documented in this file.
 
 ---
 
+## [0.11.0] — 2026-02-17
+
+### The "Audit Remediation" Release
+
+Comprehensive code audit and remediation — bug fixes, major refactoring, dependency cleanup, and test coverage.
+
+#### Bug Fixes
+- **Version mismatch** — CLI was reporting `0.4.1` instead of `0.10.2`; now reads version dynamically from package.json
+- **Groq/xAI provider routing** — both providers were in the type system but missing from `mapProvider()`, `resolveApiDetails()`, `detectProviders()`, and the CLI menu; now fully routed
+- **Gemini CLI error message** — pointed users to the wrong npm package for installation
+- **macOS Keychain** — added explicit platform guard (`process.platform !== 'darwin'`) instead of relying on catch block
+
+#### Major Refactoring
+- **CLI monolith split** — decomposed `src/cli.ts` (5,214 lines) into 9 focused modules in `src/cli/`:
+  `index.ts`, `helpers.ts`, `ask.ts`, `review.ts`, `providers.ts`, `auth.ts`, `session.ts`, `analysis.ts`, `governance.ts`
+- **CLIError pattern** — replaced 120 of 123 `process.exit()` calls with a `CLIError` class caught at the top level, enabling testability and graceful shutdown
+- **inquirer → @inquirer/prompts** — migrated to lighter, tree-shakeable prompt library (only 4 functions used: `select`, `confirm`, `input`, `password`)
+
+#### Testing
+- **19 CLI integration tests** — first-ever CLI command tests covering `--version`, `--help`, provider management, error paths, and all subcommand help output
+- **Vitest config** — added `vitest.config.ts` to prevent double-running tests from `dist/` (172 actual tests, was reporting 319)
+- **Type-check script** — `tsconfig.check.json` + `npm run typecheck` covers both `src/` and `tests/`
+
+#### Packaging & Build
+- **Cleaned dist/** — removed 26 stale `.test.js` files that shipped to npm
+- **.npmignore** — comprehensive exclusion list (test files, configs, docs, benchmarks)
+- **.npmrc** — `engine-strict=true` enforces Node >= 18
+- **Deleted dead code** — removed untracked draft CLI split (5,269 lines, never wired up)
+
+---
+
 ## [0.6.0] — 2026-02-13
 
 ### 🔌 The "MCP Server" Release

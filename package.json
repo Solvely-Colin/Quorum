@@ -1,6 +1,6 @@
 {
   "name": "quorum-ai",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "description": "Quorum — Multi-AI deliberation framework — diverge, challenge, converge.",
   "type": "module",
   "main": "./dist/council-v2.js",
@@ -20,18 +20,19 @@
     }
   },
   "bin": {
-    "quorum": "./dist/cli.js"
+    "quorum": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/cli.js",
-    "prepare": "test -f dist/cli.js && chmod +x dist/cli.js || true",
+    "build": "tsc && chmod +x dist/cli/index.js",
+    "prepare": "test -f dist/cli/index.js && chmod +x dist/cli/index.js || true",
     "test": "vitest run",
-    "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js",
+    "dev": "tsx src/cli/index.ts",
+    "start": "node dist/cli/index.js",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/",
-    "format:check": "prettier --check src/"
+    "format:check": "prettier --check src/",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json"
   },
   "keywords": [
     "ai",
@@ -68,7 +69,7 @@
     "@modelcontextprotocol/sdk": "^1.26.0",
     "chalk": "^5.4.0",
     "commander": "^13.1.0",
-    "inquirer": "^12.4.0",
+    "@inquirer/prompts": "^7.5.0",
     "pdf-lib": "^1.17.1",
     "yaml": "^2.7.0"
   },

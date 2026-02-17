@@ -16,8 +16,13 @@ import type {
 /**
  * Read Claude Code's OAuth token from macOS Keychain.
  * Returns sk-ant-oat-* token which pi-ai handles natively (Bearer auth).
+ *
+ * Platform: macOS only — uses the `security` CLI (Keychain Services).
+ * On Linux/Windows this returns null (no keychain available).
  */
 async function resolveClaudeOAuthToken(): Promise<string | null> {
+  // macOS-only: `security` CLI is not available on Linux/Windows
+  if (process.platform !== 'darwin') return null;
   try {
     const { execFileSync } = await import('node:child_process');
     const raw = execFileSync(
@@ -102,6 +107,8 @@ function mapProvider(p: ProviderConfig['provider']): string {
     kimi: 'kimi-coding',
     deepseek: 'openai', // OpenAI-compatible
     mistral: 'openai', // OpenAI-compatible
+    groq: 'openai', // OpenAI-compatible
+    xai: 'openai', // OpenAI-compatible
     ollama: 'openai', // OpenAI-compatible
     custom: 'openai', // OpenAI-compatible
     codex: 'openai-codex',
@@ -161,6 +168,18 @@ function resolveApiDetails(config: ProviderConfig): {
         api: 'openai-completions',
         provider: 'openai',
         baseUrl: config.baseUrl || 'https://api.mistral.ai/v1',
+      };
+    case 'groq':
+      return {
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'https://api.groq.com/openai/v1',
+      };
+    case 'xai':
+      return {
+        api: 'openai-completions',
+        provider: 'openai',
+        baseUrl: config.baseUrl || 'https://api.x.ai/v1',
       };
     case 'ollama':
       return {
@@ -381,6 +400,17 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
 // ============================================================================
 
 async function createGeminiCli(config: ProviderConfig): Promise<ProviderAdapter> {
+  // Verify gemini CLI is installed before creating the adapter
+  const { execFileSync } = await import('node:child_process');
+  try {
+    execFileSync('which', ['gemini'], { stdio: 'pipe' });
+  } catch {
+    throw new Error(
+      'gemini CLI not found. Install it: npm i -g @google/gemini-cli\n' +
+        'Or set GOOGLE_API_KEY to use the Google AI Studio API directly.',
+    );
+  }
+
   const timeoutMs = (config.timeout ?? 120) * 1000;
   return {
     name: config.name,

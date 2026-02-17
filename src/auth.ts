@@ -330,8 +330,13 @@ const KEYCHAIN_REFRESH_CONFIG: Record<string, { tokenUrl: string; clientId: stri
 /**
  * Read OAuth token from macOS Keychain, auto-refresh if expired.
  * Supports Claude Code and any future keychain-stored OAuth.
+ *
+ * Platform: macOS only — uses the `security` CLI (Keychain Services).
+ * On Linux/Windows this returns null (no keychain available).
  */
 async function resolveKeychainOAuth(service: string): Promise<string | null> {
+  // macOS-only: `security` CLI is not available on Linux/Windows
+  if (process.platform !== 'darwin') return null;
   try {
     const { execFileSync } = await import('node:child_process');
     const raw = execFileSync('security', ['find-generic-password', '-s', service, '-w'], {
