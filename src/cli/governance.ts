@@ -9,7 +9,7 @@ import { createProvider } from '../providers/base.js';
 import { listTopologies } from '../topology.js';
 import { loadPolicies, validatePolicy } from '../policy.js';
 import { listAttackPacks, loadAttackPack } from '../redteam.js';
-import { CLIError, resolveLastSession } from './helpers.js';
+import { CLIError } from './helpers.js';
 
 export function registerGovernanceCommands(program: Command): void {
   // --- quorum attacks ---

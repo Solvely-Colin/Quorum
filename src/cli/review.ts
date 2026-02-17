@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import chalk from 'chalk';
 import { existsSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join as pathJoin, extname } from 'node:path';
 import { loadConfig, loadProjectConfig, loadAgentProfile } from '../config.js';
 import { CouncilV2 } from '../council-v2.js';

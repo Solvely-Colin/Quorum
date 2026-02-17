@@ -4,7 +4,7 @@ import { loadConfig, loadProjectConfig, loadAgentProfile } from '../config.js';
 import { CouncilV2 } from '../council-v2.js';
 import type { AdaptivePreset } from '../adaptive.js';
 import { createProvider } from '../providers/base.js';
-import { writeFile, readFile, readdir } from 'node:fs/promises';
+import { writeFile, readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
 import { homedir } from 'node:os';
 import type { AgentProfile } from '../types.js';
@@ -668,7 +668,6 @@ export function registerAskCommand(program: Command): void {
           if (profile.evidence && profile.evidence !== 'off') {
             try {
               const { readFile: rf } = await import('node:fs/promises');
-              const { join: pjoin } = await import('node:path');
               const reportData = JSON.parse(
                 await rf(pathJoin(result.sessionPath, 'evidence-report.json'), 'utf-8'),
               ) as Array<{ provider: string; evidenceScore: number }>;
@@ -688,7 +687,6 @@ export function registerAskCommand(program: Command): void {
           if (opts.adaptive && opts.adaptive !== 'off') {
             try {
               const { readFile: rf } = await import('node:fs/promises');
-              const { join: pjoin } = await import('node:path');
               const adaptiveData = JSON.parse(
                 await rf(pathJoin(result.sessionPath, 'adaptive-decisions.json'), 'utf-8'),
               ) as {

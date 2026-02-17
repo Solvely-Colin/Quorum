@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import chalk from 'chalk';
 import { existsSync } from 'node:fs';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
 import { homedir } from 'node:os';
 import { loadConfig } from '../config.js';

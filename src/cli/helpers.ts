@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
-import { homedir } from 'node:os';
 import chalk from 'chalk';
 import type { ProviderConfig, AgentProfile } from '../types.js';
 import { PROVIDER_LIMITS, availableInput } from '../context.js';
