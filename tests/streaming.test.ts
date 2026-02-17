@@ -13,7 +13,7 @@ import type { ProviderAdapter, ProviderConfig, AgentProfile } from '../src/types
 function makeAdapter(name: string, opts?: { stream?: boolean }): ProviderAdapter {
   const adapter: ProviderAdapter = {
     name,
-    config: { name, provider: 'test', model: `${name}-model`, auth: { method: 'none' as const } },
+    config: { name, provider: 'custom' as const, model: `${name}-model`, auth: { method: 'none' as const } },
     async generate() {
       return `Response from ${name}`;
     },
@@ -33,18 +33,20 @@ function makeAdapter(name: string, opts?: { stream?: boolean }): ProviderAdapter
 function makeProfile(): AgentProfile {
   return {
     name: 'test',
-    description: 'test profile',
     focus: ['testing'],
     challengeStyle: 'collaborative',
     rounds: 1,
     convergenceThreshold: 0.7,
+    scoringWeights: { accuracy: 0.25, reasoning: 0.25, completeness: 0.25, novelty: 0.15, consensus: 0.1 },
+    isolation: false,
+    blindReview: false,
   };
 }
 
 function makeProviderConfigs(names: string[]): ProviderConfig[] {
   return names.map((name) => ({
     name,
-    provider: 'test',
+    provider: 'custom' as const,
     model: `${name}-model`,
     auth: { method: 'none' as const },
   }));

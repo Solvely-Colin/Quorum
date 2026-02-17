@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join as pathJoin } from 'node:path';
@@ -18,15 +18,15 @@ export function registerGovernanceCommands(program: Command): void {
     .description('List available red team attack packs')
     .action(async () => {
       const packs = await listAttackPacks();
-      console.log(chalk.bold('\nAvailable attack packs:\n'));
+      console.log(pc.bold('\nAvailable attack packs:\n'));
       for (const name of packs) {
         const pack = await loadAttackPack(name);
         console.log(
-          `  ${chalk.red('🔴')} ${chalk.bold(name)} — ${pack.description} (${pack.vectors.length} vectors)`,
+          `  ${pc.red('🔴')} ${pc.bold(name)} — ${pack.description} (${pack.vectors.length} vectors)`,
         );
       }
       console.log('');
-      console.log(chalk.dim('Usage: quorum ask --red-team --attack-pack security,code "question"'));
+      console.log(pc.dim('Usage: quorum ask --red-team --attack-pack security,code "question"'));
     });
 
   // --- quorum memory ---
@@ -40,14 +40,14 @@ export function registerGovernanceCommands(program: Command): void {
         const { loadMemoryGraph } = await import('../memory-graph.js');
         const graph = await loadMemoryGraph();
         if (graph.nodes.length === 0) {
-          console.log(chalk.dim('No memories stored.'));
+          console.log(pc.dim('No memories stored.'));
           return;
         }
         console.log('');
-        console.log(chalk.bold('📚 Stored Memories'));
+        console.log(pc.bold('📚 Stored Memories'));
         console.log('');
         console.log(
-          `${chalk.dim('Date')}       | ${chalk.dim('Consensus')} | ${chalk.dim('Winner')}   | ${chalk.dim('Question')}`,
+          `${pc.dim('Date')}       | ${pc.dim('Consensus')} | ${pc.dim('Winner')}   | ${pc.dim('Question')}`,
         );
         for (const node of graph.nodes) {
           const date = new Date(node.timestamp).toISOString().slice(0, 10);
@@ -59,7 +59,7 @@ export function registerGovernanceCommands(program: Command): void {
         console.log('');
       } catch (err) {
         console.error(
-          chalk.red(`Error loading memories: ${err instanceof Error ? err.message : err}`),
+          pc.red(`Error loading memories: ${err instanceof Error ? err.message : err}`),
         );
       }
     });
@@ -68,21 +68,29 @@ export function registerGovernanceCommands(program: Command): void {
     .command('search')
     .description('Search memories by keyword')
     .argument('<query>', 'Search query')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum memory search "database architecture"')}
+${pc.dim('  $ quorum memory search "security review"')}
+`,
+    )
     .action(async (query: string) => {
       try {
         const { findRelevantMemories } = await import('../memory-graph.js');
         const memories = await findRelevantMemories(query, 10);
         if (memories.length === 0) {
-          console.log(chalk.dim('No matching memories found.'));
+          console.log(pc.dim('No matching memories found.'));
           return;
         }
         console.log('');
-        console.log(chalk.bold(`🔍 Search Results (${memories.length})`));
+        console.log(pc.bold(`🔍 Search Results (${memories.length})`));
         console.log('');
         for (const m of memories) {
           const date = new Date(m.timestamp).toISOString().slice(0, 10);
           console.log(
-            `  ${chalk.dim(date)} ${chalk.bold(m.input.slice(0, 60))}${m.input.length > 60 ? '...' : ''}`,
+            `  ${pc.dim(date)} ${pc.bold(m.input.slice(0, 60))}${m.input.length > 60 ? '...' : ''}`,
           );
           console.log(
             `     Consensus: ${m.consensusScore?.toFixed(2) ?? '—'} | Winner: ${m.winner ?? '—'}`,
@@ -91,7 +99,7 @@ export function registerGovernanceCommands(program: Command): void {
         }
       } catch (err) {
         console.error(
-          chalk.red(`Error searching memories: ${err instanceof Error ? err.message : err}`),
+          pc.red(`Error searching memories: ${err instanceof Error ? err.message : err}`),
         );
       }
     });
@@ -108,17 +116,17 @@ export function registerGovernanceCommands(program: Command): void {
           default: false,
         });
         if (!confirmed) {
-          console.log(chalk.dim('Cancelled.'));
+          console.log(pc.dim('Cancelled.'));
           return;
         }
       }
       try {
         const { clearMemoryGraph } = await import('../memory-graph.js');
         await clearMemoryGraph();
-        console.log(chalk.green('✅ Memory graph cleared.'));
+        console.log(pc.green('✅ Memory graph cleared.'));
       } catch (err) {
         console.error(
-          chalk.red(`Error clearing memories: ${err instanceof Error ? err.message : err}`),
+          pc.red(`Error clearing memories: ${err instanceof Error ? err.message : err}`),
         );
       }
     });
@@ -131,7 +139,7 @@ export function registerGovernanceCommands(program: Command): void {
         const { loadMemoryGraph } = await import('../memory-graph.js');
         const graph = await loadMemoryGraph();
         if (graph.nodes.length === 0) {
-          console.log(chalk.dim('No memories stored.'));
+          console.log(pc.dim('No memories stored.'));
           return;
         }
         const timestamps = graph.nodes.map((n) => n.timestamp).sort((a, b) => a - b);
@@ -150,22 +158,20 @@ export function registerGovernanceCommands(program: Command): void {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 10);
         console.log('');
-        console.log(chalk.bold('📊 Memory Graph Stats'));
+        console.log(pc.bold('📊 Memory Graph Stats'));
         console.log('');
-        console.log(`  Total memories: ${chalk.bold(String(graph.nodes.length))}`);
-        console.log(`  Date range: ${chalk.dim(earliest)} → ${chalk.dim(latest)}`);
+        console.log(`  Total memories: ${pc.bold(String(graph.nodes.length))}`);
+        console.log(`  Date range: ${pc.dim(earliest)} → ${pc.dim(latest)}`);
         if (topTags.length > 0) {
           console.log('');
-          console.log(chalk.dim('  Top topics:'));
+          console.log(pc.dim('  Top topics:'));
           for (const [tag, count] of topTags) {
             console.log(`    ${tag}: ${count}`);
           }
         }
         console.log('');
       } catch (err) {
-        console.error(
-          chalk.red(`Error loading stats: ${err instanceof Error ? err.message : err}`),
-        );
+        console.error(pc.red(`Error loading stats: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -176,13 +182,13 @@ export function registerGovernanceCommands(program: Command): void {
     .description('List available debate topologies')
     .action(async () => {
       const topos = listTopologies();
-      console.log(chalk.bold('\nAvailable topologies:\n'));
+      console.log(pc.bold('\nAvailable topologies:\n'));
       for (const t of topos) {
-        console.log(`  ${chalk.cyan('🔷')} ${chalk.bold(t.name.padEnd(20))} ${t.description}`);
-        console.log(chalk.dim(`     Best for: ${t.bestFor}`));
+        console.log(`  ${pc.cyan('🔷')} ${pc.bold(t.name.padEnd(20))} ${t.description}`);
+        console.log(pc.dim(`     Best for: ${t.bestFor}`));
       }
       console.log('');
-      console.log(chalk.dim('Usage: quorum ask --topology tournament "question"'));
+      console.log(pc.dim('Usage: quorum ask --topology tournament "question"'));
     });
 
   // --- quorum policy ---
@@ -195,23 +201,23 @@ export function registerGovernanceCommands(program: Command): void {
       try {
         const policies = await loadPolicies();
         if (policies.length === 0) {
-          console.log(chalk.yellow('No policies found.'));
-          console.log(chalk.dim('Place YAML files in ~/.quorum/policies/ or agents/policies/'));
+          console.log(pc.yellow('No policies found.'));
+          console.log(pc.dim('Place YAML files in ~/.quorum/policies/ or agents/policies/'));
           return;
         }
         for (const p of policies) {
           console.log(
-            `${chalk.bold(p.name)} ${chalk.dim(`v${p.version}`)} — ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`,
+            `${pc.bold(p.name)} ${pc.dim(`v${p.version}`)} — ${p.rules.length} rule${p.rules.length === 1 ? '' : 's'}`,
           );
           for (const r of p.rules) {
             const actionColor =
               r.action === 'block'
-                ? chalk.red
+                ? pc.red
                 : r.action === 'warn'
-                  ? chalk.yellow
+                  ? pc.yellow
                   : r.action === 'pause'
-                    ? chalk.magenta
-                    : chalk.dim;
+                    ? pc.magenta
+                    : pc.dim;
             console.log(
               `  ${actionColor(r.action.padEnd(5))} ${r.type}${r.value !== undefined ? ` (${r.value})` : ''}${r.message ? ` — ${r.message}` : ''}`,
             );
@@ -219,7 +225,7 @@ export function registerGovernanceCommands(program: Command): void {
         }
       } catch (err) {
         throw new CLIError(
-          chalk.red(`Error loading policies: ${err instanceof Error ? err.message : err}`),
+          pc.red(`Error loading policies: ${err instanceof Error ? err.message : err}`),
         );
       }
     });
@@ -234,22 +240,20 @@ export function registerGovernanceCommands(program: Command): void {
         const parsed = parseYaml(raw);
         const errors = validatePolicy(parsed);
         if (errors.length === 0) {
-          console.log(chalk.green(`✓ ${file} is valid`));
+          console.log(pc.green(`✓ ${file} is valid`));
           console.log(
-            chalk.dim(
+            pc.dim(
               `  Policy: ${parsed.name} v${parsed.version} — ${parsed.rules?.length ?? 0} rules`,
             ),
           );
         } else {
           throw new CLIError(
-            [chalk.red(`✗ ${file} has errors:`), ...errors.map((e) => chalk.red(`  - ${e}`))].join(
-              '\n',
-            ),
+            [pc.red(`✗ ${file} has errors:`), ...errors.map((e) => pc.red(`  - ${e}`))].join('\n'),
           );
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -261,10 +265,10 @@ export function registerGovernanceCommands(program: Command): void {
       const { initPolicyFile } = await import('../policy-controls.js');
       try {
         const filePath = await initPolicyFile(opts.path as string | undefined);
-        console.log(chalk.green(`✅ Created policy file: ${filePath}`));
-        console.log(chalk.dim('Edit the file to customize risk tier thresholds and actions.'));
+        console.log(pc.green(`✅ Created policy file: ${filePath}`));
+        console.log(pc.dim('Edit the file to customize risk tier thresholds and actions.'));
       } catch (err) {
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -279,7 +283,7 @@ export function registerGovernanceCommands(program: Command): void {
         console.log('');
         console.log(formatPolicyConfig(config));
       } catch (err) {
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -299,17 +303,15 @@ export function registerGovernanceCommands(program: Command): void {
         const parsed = parseYaml(raw);
         const errors = validatePolicyConfig(parsed);
         if (errors.length === 0) {
-          console.log(chalk.green(`✓ ${path} is valid`));
+          console.log(pc.green(`✓ ${path} is valid`));
         } else {
           throw new CLIError(
-            [chalk.red(`✗ ${path} has errors:`), ...errors.map((e) => chalk.red(`  - ${e}`))].join(
-              '\n',
-            ),
+            [pc.red(`✗ ${path} has errors:`), ...errors.map((e) => pc.red(`  - ${e}`))].join('\n'),
           );
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -322,8 +324,8 @@ export function registerGovernanceCommands(program: Command): void {
       try {
         const store = await loadCalibrationStore();
         if (store.entries.length === 0) {
-          console.log(chalk.yellow('No calibration data yet.'));
-          console.log(chalk.dim('Run deliberations with --policy to start tracking.'));
+          console.log(pc.yellow('No calibration data yet.'));
+          console.log(pc.dim('Run deliberations with --policy to start tracking.'));
           return;
         }
         const stats = computeCalibrationStats(store);
@@ -331,7 +333,7 @@ export function registerGovernanceCommands(program: Command): void {
         console.log(formatCalibrationStats(stats));
         console.log('');
       } catch (err) {
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -350,18 +352,16 @@ export function registerGovernanceCommands(program: Command): void {
       const limit = parseInt(opts.limit as string, 10) || 20;
       const entries = ledger.entries.slice(-limit);
       if (entries.length === 0) {
-        console.log(chalk.dim('No ledger entries yet.'));
+        console.log(pc.dim('No ledger entries yet.'));
         return;
       }
-      console.log(
-        chalk.bold(`\n📒 Ledger (${entries.length} of ${ledger.entries.length} entries)\n`),
-      );
+      console.log(pc.bold(`\n📒 Ledger (${entries.length} of ${ledger.entries.length} entries)\n`));
       for (const e of entries) {
         const date = new Date(e.timestamp).toLocaleString();
         const preview = e.input.length > 60 ? e.input.slice(0, 57) + '...' : e.input;
-        console.log(`  ${chalk.dim(date)} ${chalk.bold(e.id.slice(0, 8))} ${preview}`);
+        console.log(`  ${pc.dim(date)} ${pc.bold(e.id.slice(0, 8))} ${preview}`);
         console.log(
-          `    Winner: ${chalk.green(e.votes.winner)} | Consensus: ${e.synthesis.consensusScore.toFixed(2)} | ${chalk.dim(e.topology)}`,
+          `    Winner: ${pc.green(e.votes.winner)} | Consensus: ${e.synthesis.consensusScore.toFixed(2)} | ${pc.dim(e.topology)}`,
         );
       }
       console.log('');
@@ -374,11 +374,11 @@ export function registerGovernanceCommands(program: Command): void {
       const { verifyLedgerIntegrity } = await import('../ledger.js');
       const result = await verifyLedgerIntegrity();
       if (result.valid) {
-        console.log(chalk.green(`✓ ${result.message}`));
+        console.log(pc.green(`✓ ${result.message}`));
       } else {
-        const parts = [chalk.red(`✗ ${result.message}`)];
+        const parts = [pc.red(`✗ ${result.message}`)];
         if (result.brokenAt !== undefined) {
-          parts.push(chalk.red(`  Broken at entry index: ${result.brokenAt}`));
+          parts.push(pc.red(`  Broken at entry index: ${result.brokenAt}`));
         }
         throw new CLIError(parts.join('\n'));
       }
@@ -392,7 +392,7 @@ export function registerGovernanceCommands(program: Command): void {
       const { getLedgerEntry } = await import('../ledger.js');
       const entry = await getLedgerEntry(sessionId);
       if (!entry) {
-        throw new CLIError(chalk.red(`Entry not found: ${sessionId}`));
+        throw new CLIError(pc.red(`Entry not found: ${sessionId}`));
       }
       console.log(JSON.stringify(entry, null, 2));
     });
@@ -406,7 +406,7 @@ export function registerGovernanceCommands(program: Command): void {
       const { getLedgerEntry, exportLedgerADR } = await import('../ledger.js');
       const entry = await getLedgerEntry(sessionId);
       if (!entry) {
-        throw new CLIError(chalk.red(`Entry not found: ${sessionId}`));
+        throw new CLIError(pc.red(`Entry not found: ${sessionId}`));
       }
       if (opts.format === 'json') {
         console.log(JSON.stringify(entry, null, 2));
@@ -427,21 +427,21 @@ export function registerGovernanceCommands(program: Command): void {
       const { getLedgerEntry } = await import('../ledger.js');
       const entry = await getLedgerEntry(sessionId);
       if (!entry) {
-        throw new CLIError(chalk.red(`Ledger entry not found: ${sessionId}`));
+        throw new CLIError(pc.red(`Ledger entry not found: ${sessionId}`));
       }
 
-      console.log(chalk.bold.cyan('\n🔄 Replay'));
-      console.log(chalk.dim(`Original session: ${entry.id}`));
-      console.log(chalk.dim(`Input: ${entry.input.slice(0, 200)}`));
-      console.log(chalk.dim(`Profile: ${entry.profile}`));
-      console.log(chalk.dim(`Topology: ${entry.topology}`));
+      console.log(pc.bold(pc.cyan('\n🔄 Replay')));
+      console.log(pc.dim(`Original session: ${entry.id}`));
+      console.log(pc.dim(`Input: ${entry.input.slice(0, 200)}`));
+      console.log(pc.dim(`Profile: ${entry.profile}`));
+      console.log(pc.dim(`Topology: ${entry.topology}`));
       console.log(
-        chalk.dim(`Providers: ${entry.providers.map((p) => `${p.name}(${p.model})`).join(', ')}`),
+        pc.dim(`Providers: ${entry.providers.map((p) => `${p.name}(${p.model})`).join(', ')}`),
       );
       console.log('');
 
       if (opts.dryRun) {
-        console.log(chalk.yellow('DRY RUN — would replay with the above config. Exiting.'));
+        console.log(pc.yellow('DRY RUN — would replay with the above config. Exiting.'));
         return;
       }
 
@@ -460,11 +460,11 @@ export function registerGovernanceCommands(program: Command): void {
         : config.providers.filter((p) => entry.providers.some((ep) => ep.name === p.name));
 
       if (candidateProviders.length < 2) {
-        throw new CLIError(chalk.red('Need 2+ providers for replay.'));
+        throw new CLIError(pc.red('Need 2+ providers for replay.'));
       }
 
       if (!profile) {
-        throw new CLIError(chalk.red(`Profile not found: ${entry.profile}`));
+        throw new CLIError(pc.red(`Profile not found: ${entry.profile}`));
       }
 
       const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
@@ -476,28 +476,28 @@ export function registerGovernanceCommands(program: Command): void {
         redTeam: entry.options.redTeam || undefined,
         onEvent(event, data) {
           const d = data as Record<string, unknown>;
-          if (event === 'phase') process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+          if (event === 'phase') process.stdout.write(pc.bold(`  ▸ ${d.phase} `));
           if (event === 'response')
-            process.stdout.write(chalk.green('✓') + chalk.dim(String(d.provider)) + ' ');
+            process.stdout.write(pc.green('✓') + pc.dim(String(d.provider)) + ' ');
           if (event === 'phase:done')
-            console.log(chalk.dim(`(${((d.duration as number) / 1000).toFixed(1)}s)`));
+            console.log(pc.dim(`(${((d.duration as number) / 1000).toFixed(1)}s)`));
           if (event === 'complete')
-            console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+            console.log(pc.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
         },
       });
 
       const result = await council.deliberate(entry.input);
 
-      console.log(chalk.bold.green('\n═══ SYNTHESIS ═══\n'));
+      console.log(pc.bold(pc.green('\n═══ SYNTHESIS ═══\n')));
       console.log(result.synthesis.content);
       console.log(
-        `\nWinner: ${chalk.bold(result.votes.winner)} | Consensus: ${result.synthesis.consensusScore.toFixed(2)}`,
+        `\nWinner: ${pc.bold(result.votes.winner)} | Consensus: ${result.synthesis.consensusScore.toFixed(2)}`,
       );
 
       if (opts.diff) {
-        console.log(chalk.bold.yellow('\n═══ DIFF ═══\n'));
-        console.log(chalk.red('--- Original'));
-        console.log(chalk.green('+++ Replay'));
+        console.log(pc.bold(pc.yellow('\n═══ DIFF ═══\n')));
+        console.log(pc.red('--- Original'));
+        console.log(pc.green('+++ Replay'));
         console.log('');
         const origLines = entry.synthesis.content.split('\n');
         const newLines = result.synthesis.content.split('\n');
@@ -506,8 +506,8 @@ export function registerGovernanceCommands(program: Command): void {
           const orig = origLines[i] ?? '';
           const newL = newLines[i] ?? '';
           if (orig !== newL) {
-            if (orig) console.log(chalk.red(`- ${orig}`));
-            if (newL) console.log(chalk.green(`+ ${newL}`));
+            if (orig) console.log(pc.red(`- ${orig}`));
+            if (newL) console.log(pc.green(`+ ${newL}`));
           } else {
             console.log(`  ${orig}`);
           }
@@ -536,7 +536,7 @@ export function registerGovernanceCommands(program: Command): void {
       const { getReputation, formatProviderCard } = await import('../arena.js');
       const rep = await getReputation(provider);
       if (!rep) {
-        console.log(chalk.yellow(`No data for provider: ${provider}`));
+        console.log(pc.yellow(`No data for provider: ${provider}`));
         return;
       }
       console.log(formatProviderCard(rep));
@@ -547,6 +547,14 @@ export function registerGovernanceCommands(program: Command): void {
     .description('Run an eval suite (deliberate each case, record results)')
     .option('-p, --providers <names>', 'Comma-separated provider names')
     .option('--profile <name>', 'Agent profile', 'default')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum arena run general-knowledge')}
+${pc.dim('  $ quorum arena run coding --providers claude,openai,gemini')}
+`,
+    )
     .action(async (suiteName: string, opts) => {
       const { loadEvalSuite, recordResult: arRecord } = await import('../arena.js');
       const { CouncilV2 } = await import('../council-v2.js');
@@ -555,7 +563,7 @@ export function registerGovernanceCommands(program: Command): void {
       try {
         suite = await loadEvalSuite(suiteName);
       } catch (err) {
-        throw new CLIError(chalk.red(`${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`${err instanceof Error ? err.message : err}`));
       }
 
       const config = await loadConfig();
@@ -565,12 +573,12 @@ export function registerGovernanceCommands(program: Command): void {
         providers = config.providers.filter((p) => names.includes(p.name));
       }
       if (providers.length < 2) {
-        throw new CLIError(chalk.red('Need 2+ providers.'));
+        throw new CLIError(pc.red('Need 2+ providers.'));
       }
 
       const profile = await loadAgentProfile(opts.profile as string);
       if (!profile) {
-        throw new CLIError(chalk.red(`Profile not found: ${opts.profile}`));
+        throw new CLIError(pc.red(`Profile not found: ${opts.profile}`));
       }
 
       const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
@@ -579,16 +587,16 @@ export function registerGovernanceCommands(program: Command): void {
       );
 
       console.log(
-        chalk.bold.cyan(
-          `\n🏟️  Arena: Running "${suite.name}" v${suite.version} (${suite.cases.length} cases)\n`,
+        pc.bold(
+          pc.cyan(
+            `\n🏟️  Arena: Running "${suite.name}" v${suite.version} (${suite.cases.length} cases)\n`,
+          ),
         ),
       );
 
       for (const evalCase of suite.cases) {
-        console.log(
-          chalk.bold(`  Case ${evalCase.id} [${evalCase.category}/${evalCase.difficulty}]`),
-        );
-        console.log(chalk.dim(`    ${evalCase.question.slice(0, 80)}...`));
+        console.log(pc.bold(`  Case ${evalCase.id} [${evalCase.category}/${evalCase.difficulty}]`));
+        console.log(pc.dim(`    ${evalCase.question.slice(0, 80)}...`));
 
         try {
           const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
@@ -615,18 +623,18 @@ export function registerGovernanceCommands(program: Command): void {
           }
 
           console.log(
-            chalk.green(
+            pc.green(
               `    Winner: ${result.votes.winner} (${(result.duration / 1000).toFixed(1)}s)`,
             ),
           );
         } catch (err) {
-          console.log(chalk.red(`    Failed: ${err instanceof Error ? err.message : err}`));
+          console.log(pc.red(`    Failed: ${err instanceof Error ? err.message : err}`));
         }
       }
 
       const { getAllReputations, formatLeaderboard } = await import('../arena.js');
       const reps = await getAllReputations();
-      console.log(chalk.bold('\n📊 Updated Leaderboard:'));
+      console.log(pc.bold('\n📊 Updated Leaderboard:'));
       console.log(formatLeaderboard(reps));
     });
 
@@ -636,7 +644,7 @@ export function registerGovernanceCommands(program: Command): void {
     .action(async () => {
       const { saveArenaState } = await import('../arena.js');
       await saveArenaState({ version: 1, results: [], reputations: {} });
-      console.log(chalk.green('✅ Arena state cleared.'));
+      console.log(pc.green('✅ Arena state cleared.'));
     });
 
   // --- quorum mcp ---
@@ -686,7 +694,7 @@ export function registerGovernanceCommands(program: Command): void {
 
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
 
       try {
@@ -706,7 +714,7 @@ export function registerGovernanceCommands(program: Command): void {
         if (opts.cbor) {
           const buf = exportAttestationCBOR(chain);
           await writeFile(opts.cbor as string, buf);
-          console.log(chalk.green(`✅ Attestation exported to ${opts.cbor} (${buf.length} bytes)`));
+          console.log(pc.green(`✅ Attestation exported to ${opts.cbor} (${buf.length} bytes)`));
           return;
         }
 
@@ -716,30 +724,30 @@ export function registerGovernanceCommands(program: Command): void {
         }
 
         // Pretty print
-        console.log(chalk.bold.cyan(`\n🔏 Attestation Chain — ${record.sessionId}`));
-        console.log(chalk.dim(`  ${chain.records.length} attestation records\n`));
+        console.log(pc.bold(pc.cyan(`\n🔏 Attestation Chain — ${record.sessionId}`)));
+        console.log(pc.dim(`  ${chain.records.length} attestation records\n`));
 
         for (const rec of chain.records) {
-          console.log(`  ${chalk.bold(rec.phase)}`);
-          console.log(chalk.dim(`    Hash:     ${rec.hash.slice(0, 32)}...`));
-          console.log(chalk.dim(`    Inputs:   ${rec.inputsHash.slice(0, 16)}...`));
-          console.log(chalk.dim(`    Outputs:  ${rec.outputsHash.slice(0, 16)}...`));
-          console.log(chalk.dim(`    Provider: ${rec.providerId}`));
-          console.log(chalk.dim(`    Time:     ${new Date(rec.timestamp).toISOString()}`));
+          console.log(`  ${pc.bold(rec.phase)}`);
+          console.log(pc.dim(`    Hash:     ${rec.hash.slice(0, 32)}...`));
+          console.log(pc.dim(`    Inputs:   ${rec.inputsHash.slice(0, 16)}...`));
+          console.log(pc.dim(`    Outputs:  ${rec.outputsHash.slice(0, 16)}...`));
+          console.log(pc.dim(`    Provider: ${rec.providerId}`));
+          console.log(pc.dim(`    Time:     ${new Date(rec.timestamp).toISOString()}`));
           if (rec.previousAttestationHash) {
-            console.log(chalk.dim(`    Prev:     ${rec.previousAttestationHash.slice(0, 16)}...`));
+            console.log(pc.dim(`    Prev:     ${rec.previousAttestationHash.slice(0, 16)}...`));
           }
           console.log('');
         }
 
         if (verification.valid) {
-          console.log(chalk.green('  ✅ Attestation chain verified'));
+          console.log(pc.green('  ✅ Attestation chain verified'));
         } else {
-          console.log(chalk.red(`  ❌ Attestation chain INVALID: ${verification.details}`));
+          console.log(pc.red(`  ❌ Attestation chain INVALID: ${verification.details}`));
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -758,7 +766,7 @@ export function registerGovernanceCommands(program: Command): void {
       async function buildChain(sessionPath: string) {
         const metaPath = pathJoin(sessionPath, 'meta.json');
         if (!existsSync(metaPath)) {
-          throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+          throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
         }
         const record = await buildCanonicalRecord(sessionPath);
         const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
@@ -781,12 +789,12 @@ export function registerGovernanceCommands(program: Command): void {
           console.log(JSON.stringify(diff, null, 2));
         } else {
           console.log('');
-          console.log(chalk.bold.cyan('🔍 Attestation Diff'));
+          console.log(pc.bold(pc.cyan('🔍 Attestation Diff')));
           console.log(formatAttestationDiff(diff));
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -822,7 +830,7 @@ export function registerGovernanceCommands(program: Command): void {
 
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
 
       try {
@@ -844,7 +852,7 @@ export function registerGovernanceCommands(program: Command): void {
           const json = exportAttestationJSON(chain);
           if (opts.output) {
             await writeFile(opts.output as string, json, 'utf-8');
-            console.error(chalk.green(`✅ Exported JSON to ${opts.output}`));
+            console.error(pc.green(`✅ Exported JSON to ${opts.output}`));
           } else {
             console.log(json);
           }
@@ -852,7 +860,7 @@ export function registerGovernanceCommands(program: Command): void {
           const html = exportAttestationHTML(data);
           if (opts.output) {
             await writeFile(opts.output as string, html, 'utf-8');
-            console.error(chalk.green(`✅ Exported HTML to ${opts.output}`));
+            console.error(pc.green(`✅ Exported HTML to ${opts.output}`));
           } else {
             console.log(html);
           }
@@ -860,13 +868,13 @@ export function registerGovernanceCommands(program: Command): void {
           const outputPath = (opts.output as string) ?? 'attestation.pdf';
           const pdfBytes = await exportAttestationPDF(data);
           await writeFile(outputPath, pdfBytes);
-          console.log(chalk.green(`✅ Exported PDF to ${outputPath} (${pdfBytes.length} bytes)`));
+          console.log(pc.green(`✅ Exported PDF to ${outputPath} (${pdfBytes.length} bytes)`));
         } else {
-          throw new CLIError(chalk.red(`Invalid format: ${format}. Use json, html, or pdf.`));
+          throw new CLIError(pc.red(`Invalid format: ${format}. Use json, html, or pdf.`));
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -880,11 +888,11 @@ export function registerGovernanceCommands(program: Command): void {
       const { listSchemas } = await import('../schema.js');
       const schemas = await listSchemas();
       if (schemas.length === 0) {
-        console.log(chalk.dim('No schemas found.'));
+        console.log(pc.dim('No schemas found.'));
         return;
       }
       for (const s of schemas) {
-        console.log(`  ${chalk.bold(s.name)} — ${s.description}`);
+        console.log(`  ${pc.bold(s.name)} — ${s.description}`);
       }
     });
 
@@ -896,7 +904,7 @@ export function registerGovernanceCommands(program: Command): void {
       const { loadSchema, formatSchemaDisplay } = await import('../schema.js');
       const schema = await loadSchema(name);
       if (!schema) {
-        throw new CLIError(chalk.red(`Schema not found: ${name}`));
+        throw new CLIError(pc.red(`Schema not found: ${name}`));
       }
       if (opts.json) {
         console.log(JSON.stringify(schema, null, 2));
@@ -921,7 +929,7 @@ export function registerGovernanceCommands(program: Command): void {
           : undefined,
       });
       await saveSchema(schema);
-      console.log(chalk.green(`✅ Created schema: ${schema.name}`));
+      console.log(pc.green(`✅ Created schema: ${schema.name}`));
     });
 
   schemaCmd
@@ -933,9 +941,9 @@ export function registerGovernanceCommands(program: Command): void {
       for (const schema of BUILTIN_SCHEMAS) {
         const now = Date.now();
         await saveSchema({ ...schema, createdAt: now, updatedAt: now });
-        console.log(chalk.green(`  ✅ ${schema.name} — ${schema.description}`));
+        console.log(pc.green(`  ✅ ${schema.name} — ${schema.description}`));
       }
-      console.log(chalk.green(`\nInitialized ${BUILTIN_SCHEMAS.length} built-in schemas.`));
+      console.log(pc.green(`\nInitialized ${BUILTIN_SCHEMAS.length} built-in schemas.`));
     });
 
   // --- quorum uncertainty trends ---
@@ -956,7 +964,7 @@ export function registerGovernanceCommands(program: Command): void {
         console.log(JSON.stringify(trends, null, 2));
       } else {
         console.log('');
-        console.log(chalk.bold('📊 ' + formatTrends(trends)));
+        console.log(pc.bold('📊 ' + formatTrends(trends)));
       }
     });
 }

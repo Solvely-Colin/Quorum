@@ -155,7 +155,12 @@ ${u.summary}
  * Export as PDF certificate using pdf-lib.
  */
 export async function exportAttestationPDF(data: ExportData): Promise<Uint8Array> {
-  const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+  let PDFDocument: any, StandardFonts: any, rgb: any;
+  try {
+    ({ PDFDocument, StandardFonts, rgb } = await import('pdf-lib'));
+  } catch {
+    throw new Error('pdf-lib is required for PDF export. Install it with: npm install pdf-lib');
+  }
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);

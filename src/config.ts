@@ -6,6 +6,7 @@ import { parse, stringify } from 'yaml';
 import { getModels } from '@mariozechner/pi-ai';
 import type { KnownProvider } from '@mariozechner/pi-ai';
 import type { AgentProfile, CounselConfig, ProviderConfig } from './types.js';
+import { CounselConfigSchema } from './config-schema.js';
 
 // Prefer ~/.quorum/, fall back to legacy ~/.counsel/ for backward compat
 const LEGACY_CONFIG_DIR = join(homedir(), '.counsel');
@@ -31,7 +32,17 @@ export async function loadConfig(): Promise<CounselConfig> {
   if (!existsSync(path)) return { ...DEFAULT_CONFIG };
 
   const raw = await readFile(path, 'utf-8');
-  return { ...DEFAULT_CONFIG, ...parse(raw) };
+  const parsed = { ...DEFAULT_CONFIG, ...parse(raw) };
+
+  const result = CounselConfigSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
+    console.warn(`[quorum] Config validation warnings (${path}):\n${issues}`);
+  }
+
+  return parsed as CounselConfig;
 }
 
 export async function saveConfig(config: CounselConfig): Promise<void> {

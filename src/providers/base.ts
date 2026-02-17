@@ -97,89 +97,46 @@ function resolveModel(config: ProviderConfig): Model<Api> {
   } as Model<Api>;
 }
 
-/** Map our provider names to pi-ai provider keys */
+/**
+ * Map Quorum provider names to pi-ai provider keys.
+ * Most providers pass through directly — pi-ai handles them natively
+ * (anthropic, openai, google, xai, groq, mistral, deepseek, ollama, etc.).
+ * Only remap names that differ between Quorum config and pi-ai's registry.
+ */
 function mapProvider(p: ProviderConfig['provider']): string {
-  const map: Record<string, string> = {
-    openai: 'openai',
-    anthropic: 'anthropic',
-    google: 'google',
-    'gemini-cli': 'google', // resolved as CLI shim, not pi-ai
-    kimi: 'kimi-coding',
-    deepseek: 'openai', // OpenAI-compatible
-    mistral: 'openai', // OpenAI-compatible
-    groq: 'openai', // OpenAI-compatible
-    xai: 'openai', // OpenAI-compatible
-    ollama: 'openai', // OpenAI-compatible
-    custom: 'openai', // OpenAI-compatible
-    codex: 'openai-codex',
-  };
-  return map[p] ?? p;
+  switch (p) {
+    case 'gemini-cli':
+      return 'google'; // Quorum CLI shim; not a real pi-ai provider
+    case 'custom':
+      return 'openai'; // OpenAI-compatible custom endpoints
+    case 'kimi':
+      return 'kimi-coding'; // pi-ai's name for this provider
+    case 'codex':
+      return 'openai-codex'; // pi-ai's name for this provider
+    default:
+      return p; // pi-ai handles directly
+  }
 }
 
-/** Resolve the pi-ai api type + baseUrl for a provider */
+/**
+ * Resolve API type + provider + baseUrl for a model not found in pi-ai's registry.
+ * Delegates to pi-ai for known providers (anthropic, openai, google, xai, groq,
+ * mistral, kimi-coding, openai-codex, etc.) by reading defaults from any registered
+ * model. This keeps Quorum in sync as pi-ai adds providers or updates base URLs.
+ * Only falls back to hardcoded values for providers pi-ai doesn't cover.
+ */
 function resolveApiDetails(config: ProviderConfig): {
   api: Api;
   provider: string;
   baseUrl: string;
 } {
+  // Handle providers pi-ai doesn't cover before attempting registry lookup
   switch (config.provider) {
-    case 'anthropic':
-      return {
-        api: 'anthropic-messages',
-        provider: 'anthropic',
-        baseUrl: config.baseUrl || 'https://api.anthropic.com',
-      };
-    case 'openai':
-      return {
-        api: 'openai-responses',
-        provider: 'openai',
-        baseUrl: config.baseUrl || 'https://api.openai.com/v1',
-      };
-    case 'google':
-      return {
-        api: 'google-generative-ai',
-        provider: 'google',
-        baseUrl: config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta',
-      };
-    case 'kimi':
-      return {
-        api: 'anthropic-messages',
-        provider: 'kimi-coding',
-        baseUrl:
-          config.baseUrl ||
-          (config.apiKey?.startsWith('sk-kimi-')
-            ? 'https://api.kimi.com/coding'
-            : 'https://api.moonshot.cn/v1'),
-      };
-    case 'codex':
-      return {
-        api: 'openai-codex-responses',
-        provider: 'openai-codex',
-        baseUrl: config.baseUrl || 'https://chatgpt.com/backend-api',
-      };
     case 'deepseek':
       return {
         api: 'openai-completions',
         provider: 'openai',
         baseUrl: config.baseUrl || 'https://api.deepseek.com/v1',
-      };
-    case 'mistral':
-      return {
-        api: 'openai-completions',
-        provider: 'openai',
-        baseUrl: config.baseUrl || 'https://api.mistral.ai/v1',
-      };
-    case 'groq':
-      return {
-        api: 'openai-completions',
-        provider: 'openai',
-        baseUrl: config.baseUrl || 'https://api.groq.com/openai/v1',
-      };
-    case 'xai':
-      return {
-        api: 'openai-completions',
-        provider: 'openai',
-        baseUrl: config.baseUrl || 'https://api.x.ai/v1',
       };
     case 'ollama':
       return {
@@ -188,14 +145,32 @@ function resolveApiDetails(config: ProviderConfig): {
         baseUrl: config.baseUrl || 'http://localhost:11434/v1',
       };
     case 'custom':
+      // Custom endpoints use /v1/chat/completions (not responses) for broadest compat
       return { api: 'openai-completions', provider: 'openai', baseUrl: config.baseUrl || '' };
-    default:
-      return {
-        api: 'openai-completions',
-        provider: config.provider,
-        baseUrl: config.baseUrl || '',
-      };
   }
+
+  // Delegate to pi-ai: infer api/baseUrl from a registered model for this provider.
+  const piProvider = mapProvider(config.provider);
+  try {
+    const models = getModels(piProvider as KnownProvider);
+    if (models.length > 0) {
+      const ref = models[0];
+      return {
+        api: ref.api,
+        provider: ref.provider,
+        baseUrl: config.baseUrl || ref.baseUrl,
+      };
+    }
+  } catch {
+    // Not a known pi-ai provider — fall through to default
+  }
+
+  // Unknown provider — assume OpenAI-compatible. Requires explicit baseUrl in config.
+  return {
+    api: 'openai-completions',
+    provider: config.provider,
+    baseUrl: config.baseUrl || '',
+  };
 }
 
 // ============================================================================

@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { existsSync } from 'node:fs';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join as pathJoin, extname } from 'node:path';
@@ -17,6 +17,15 @@ export function registerSessionCommands(program: Command): void {
     .option(
       '--phase <name>',
       'View a specific phase (gather, plan, formulate, debate, adjust, rebuttal, vote, synthesis)',
+    )
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum session last')}
+${pc.dim('  $ quorum session last --phase debate')}
+${pc.dim('  $ quorum session ~/.quorum/sessions/abc123 --phase synthesis')}
+`,
     )
     .action(async (sessionPath: string, opts) => {
       // Resolve "last" to most recent session
@@ -48,11 +57,11 @@ export function registerSessionCommands(program: Command): void {
         if (phaseName === 'synthesis') {
           const synthPath = `${sessionPath}/synthesis.json`;
           if (!existsSync(synthPath)) {
-            throw new CLIError(chalk.red(`No synthesis found at ${synthPath}`));
+            throw new CLIError(pc.red(`No synthesis found at ${synthPath}`));
           }
           const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
           console.log('');
-          console.log(chalk.bold.green('═══ SYNTHESIS ═══'));
+          console.log(pc.bold(pc.green('═══ SYNTHESIS ═══')));
           console.log(synth.content);
           console.log('');
           return;
@@ -71,26 +80,26 @@ export function registerSessionCommands(program: Command): void {
         const fileKey = phaseFiles[phaseName.toLowerCase()];
         if (!fileKey) {
           throw new CLIError(
-            chalk.red(`Unknown phase: ${phaseName}`) +
+            pc.red(`Unknown phase: ${phaseName}`) +
               '\n' +
-              chalk.dim(`Available: ${Object.keys(phaseFiles).join(', ')}, synthesis`),
+              pc.dim(`Available: ${Object.keys(phaseFiles).join(', ')}, synthesis`),
           );
         }
         const phasePath = `${sessionPath}/${fileKey}.json`;
         if (!existsSync(phasePath)) {
-          throw new CLIError(chalk.red(`Phase file not found: ${phasePath}`));
+          throw new CLIError(pc.red(`Phase file not found: ${phasePath}`));
         }
         const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
         console.log('');
         console.log(
-          chalk.bold.cyan(`═══ ${phase.phase} ═══`) +
-            chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
+          pc.bold(pc.cyan(`═══ ${phase.phase} ═══`)) +
+            pc.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
         );
         // Support both old "entries" and new "responses" field names
         const entries = phase.responses ?? phase.entries ?? {};
         for (const [provider, content] of Object.entries(entries)) {
           console.log('');
-          console.log(chalk.bold.yellow(`── ${provider} ──`));
+          console.log(pc.bold(pc.yellow(`── ${provider} ──`)));
           console.log(String(content));
         }
         console.log('');
@@ -102,10 +111,10 @@ export function registerSessionCommands(program: Command): void {
       if (existsSync(metaPath)) {
         const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
         console.log('');
-        console.log(chalk.bold.cyan('═══ Session ═══'));
-        console.log(chalk.dim(`Question: ${String(meta.input).slice(0, 200)}`));
+        console.log(pc.bold(pc.cyan('═══ Session ═══')));
+        console.log(pc.dim(`Question: ${String(meta.input).slice(0, 200)}`));
         console.log(
-          chalk.dim(
+          pc.dim(
             `Profile: ${meta.profile} | Providers: ${meta.providers?.map((p: any) => p.name).join(', ')}`,
           ),
         );
@@ -127,14 +136,13 @@ export function registerSessionCommands(program: Command): void {
         const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
         console.log('');
         console.log(
-          chalk.bold.cyan(`═══ ${name} ═══`) +
-            chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
+          pc.bold(pc.cyan(`═══ ${name} ═══`)) + pc.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
         );
         const entries = phase.responses ?? phase.entries ?? {};
         for (const [provider, content] of Object.entries(entries)) {
           const text = String(content);
           console.log(
-            `  ${chalk.bold(provider)}: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`,
+            `  ${pc.bold(provider)}: ${text.slice(0, 150)}${text.length > 150 ? '...' : ''}`,
           );
         }
       }
@@ -144,11 +152,11 @@ export function registerSessionCommands(program: Command): void {
       if (existsSync(synthPath)) {
         const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
         console.log('');
-        console.log(chalk.bold.green('═══ SYNTHESIS ═══'));
+        console.log(pc.bold(pc.green('═══ SYNTHESIS ═══')));
         console.log(synth.content);
         if (synth.votes) {
           console.log('');
-          console.log(chalk.bold('🗳️  Votes'));
+          console.log(pc.bold('🗳️  Votes'));
           for (const r of synth.votes.rankings) {
             console.log(
               `  ${r.provider}: ${r.score} pts${r.provider === synth.votes.winner ? ' 👑' : ''}`,
@@ -164,7 +172,7 @@ export function registerSessionCommands(program: Command): void {
         const uncertainty = await loadUncertaintyMetrics(sessionPath);
         if (uncertainty) {
           console.log('');
-          console.log(chalk.bold('📊 Uncertainty'));
+          console.log(pc.bold('📊 Uncertainty'));
           console.log(formatUncertaintyDisplay(uncertainty));
         }
       } catch {
@@ -182,7 +190,7 @@ export function registerSessionCommands(program: Command): void {
     .action(async (opts) => {
       const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
       if (!existsSync(sessionsDir)) {
-        console.log(chalk.dim('No sessions found.'));
+        console.log(pc.dim('No sessions found.'));
         return;
       }
 
@@ -204,7 +212,7 @@ export function registerSessionCommands(program: Command): void {
             entries.sort((a, b) => b.timestamp - a.timestamp);
             console.log('');
             console.log(
-              chalk.bold(
+              pc.bold(
                 `📜 Session History (${Math.min(entries.length, limit)} of ${entries.length})`,
               ),
             );
@@ -213,10 +221,10 @@ export function registerSessionCommands(program: Command): void {
               const date = new Date(e.timestamp).toLocaleString();
               const dur = (e.duration / 1000).toFixed(1);
               console.log(
-                `  ${chalk.dim(date)} ${chalk.bold(e.question)}${e.question.length >= 100 ? '...' : ''}`,
+                `  ${pc.dim(date)} ${pc.bold(e.question)}${e.question.length >= 100 ? '...' : ''}`,
               );
-              console.log(`    Winner: ${chalk.green(e.winner)} | ${chalk.dim(`${dur}s`)}`);
-              console.log(`    ${chalk.dim(pathJoin(sessionsDir, e.sessionId))}`);
+              console.log(`    Winner: ${pc.green(e.winner)} | ${pc.dim(`${dur}s`)}`);
+              console.log(`    ${pc.dim(pathJoin(sessionsDir, e.sessionId))}`);
               console.log('');
             }
             return;
@@ -251,28 +259,24 @@ export function registerSessionCommands(program: Command): void {
       sessions.sort((a, b) => (b.meta.startedAt ?? 0) - (a.meta.startedAt ?? 0));
 
       if (sessions.length === 0) {
-        console.log(chalk.dim('No sessions found.'));
+        console.log(pc.dim('No sessions found.'));
         return;
       }
 
       console.log('');
       console.log(
-        chalk.bold(
-          `📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`,
-        ),
+        pc.bold(`📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`),
       );
       console.log('');
 
       for (const s of sessions.slice(0, limit)) {
         const date = s.meta.startedAt ? new Date(s.meta.startedAt).toLocaleString() : '?';
         const question = String(s.meta.input ?? '').slice(0, 60);
-        const winner = s.synth?.votes?.winner ?? chalk.dim('(incomplete)');
+        const winner = s.synth?.votes?.winner ?? pc.dim('(incomplete)');
         const providers = s.meta.providers?.map((p: any) => p.name).join(', ') ?? '';
-        console.log(
-          `  ${chalk.dim(date)} ${chalk.bold(question)}${question.length >= 60 ? '...' : ''}`,
-        );
-        console.log(`    Winner: ${chalk.green(winner)} | Providers: ${chalk.dim(providers)}`);
-        console.log(`    ${chalk.dim(s.dir)}`);
+        console.log(`  ${pc.dim(date)} ${pc.bold(question)}${question.length >= 60 ? '...' : ''}`);
+        console.log(`    Winner: ${pc.green(winner)} | Providers: ${pc.dim(providers)}`);
+        console.log(`    ${pc.dim(s.dir)}`);
         console.log('');
       }
     });
@@ -291,6 +295,15 @@ export function registerSessionCommands(program: Command): void {
     .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
     .option('-r, --rapid', 'Rapid mode')
     .option('--devils-advocate', "Assign one provider as devil's advocate")
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum follow-up last "What about the security implications?"')}
+${pc.dim('  $ quorum follow-up ~/.quorum/sessions/abc123 "Elaborate on option B"')}
+${pc.dim('  $ quorum follow-up last -r "Quick clarification on costs"')}
+`,
+    )
     .action(async (session: string, question: string | undefined, opts) => {
       // Resolve session path
       let sessionPath = session;
@@ -318,7 +331,7 @@ export function registerSessionCommands(program: Command): void {
       // Read synthesis from previous session
       const synthPath = pathJoin(sessionPath, 'synthesis.json');
       if (!existsSync(synthPath)) {
-        throw new CLIError(chalk.red(`No synthesis found at ${synthPath}`));
+        throw new CLIError(pc.red(`No synthesis found at ${synthPath}`));
       }
       const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
       const priorContext = synth.content as string;
@@ -327,27 +340,27 @@ export function registerSessionCommands(program: Command): void {
       if (!question) {
         if (process.stdin.isTTY) {
           throw new CLIError(
-            chalk.red('No follow-up question provided.') +
+            pc.red('No follow-up question provided.') +
               '\n' +
-              chalk.dim('Usage: quorum follow-up <session> "your question"'),
+              pc.dim('Usage: quorum follow-up <session> "your question"'),
           );
         }
         question = await readStdin();
         if (!question.trim()) {
-          throw new CLIError(chalk.red('Empty input.'));
+          throw new CLIError(pc.red('Empty input.'));
         }
       }
 
       // Now run deliberation with priorContext — reuse ask logic
       const config = await loadConfig();
       if (config.providers.length === 0) {
-        throw new CLIError(chalk.red('No providers configured. Run: quorum init'));
+        throw new CLIError(pc.red('No providers configured. Run: quorum init'));
       }
 
       const timeoutOverride = opts.timeout ? parseInt(opts.timeout as string) : undefined;
       if (timeoutOverride !== undefined) {
         if (isNaN(timeoutOverride) || timeoutOverride <= 0) {
-          throw new CLIError(chalk.red(`Invalid --timeout value.`));
+          throw new CLIError(pc.red(`Invalid --timeout value.`));
         }
         for (const p of config.providers) p.timeout = timeoutOverride;
       }
@@ -357,14 +370,14 @@ export function registerSessionCommands(program: Command): void {
         const names = (opts.providers as string).split(',').map((s) => s.trim());
         providers = config.providers.filter((p) => names.includes(p.name));
         if (providers.length === 0) {
-          throw new CLIError(chalk.red(`No matching providers: ${opts.providers}`));
+          throw new CLIError(pc.red(`No matching providers: ${opts.providers}`));
         }
       }
 
       const isJSON = opts.json;
       const profile = await loadAgentProfile(opts.profile as string);
       if (!profile) {
-        throw new CLIError(chalk.red(`Profile not found: ${opts.profile}`));
+        throw new CLIError(pc.red(`Profile not found: ${opts.profile}`));
       }
 
       const excluded = new Set(profile.excludeFromDeliberation?.map((s) => s.toLowerCase()) ?? []);
@@ -373,15 +386,15 @@ export function registerSessionCommands(program: Command): void {
       );
 
       if (candidateProviders.length < 2) {
-        throw new CLIError(chalk.red(`Need 2+ providers for deliberation.`));
+        throw new CLIError(pc.red(`Need 2+ providers for deliberation.`));
       }
 
       const adapters = await Promise.all(candidateProviders.map((p) => createProvider(p)));
 
       if (!isJSON) {
         console.log('');
-        console.log(chalk.bold.cyan(`🔄 Follow-up on previous deliberation`));
-        console.log(chalk.dim(`Prior session: ${sessionPath}`));
+        console.log(pc.bold(pc.cyan(`🔄 Follow-up on previous deliberation`)));
+        console.log(pc.dim(`Prior session: ${sessionPath}`));
         console.log('');
       }
 
@@ -395,20 +408,20 @@ export function registerSessionCommands(program: Command): void {
           const d = data as Record<string, unknown>;
           switch (event) {
             case 'phase':
-              process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+              process.stdout.write(pc.bold(`  ▸ ${d.phase} `));
               break;
             case 'response': {
-              const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
-              process.stdout.write(`${fallback}${chalk.dim(d.provider as string)} `);
+              const fallback = d.fallback ? pc.yellow('⚠') : pc.green('✓');
+              process.stdout.write(`${fallback}${pc.dim(d.provider as string)} `);
               break;
             }
             case 'phase:done': {
               const secs = ((d.duration as number) / 1000).toFixed(1);
-              console.log(chalk.dim(`(${secs}s)`));
+              console.log(pc.dim(`(${secs}s)`));
               break;
             }
             case 'complete':
-              console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+              console.log(pc.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
               break;
           }
         },
@@ -435,7 +448,7 @@ export function registerSessionCommands(program: Command): void {
           );
         } else {
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           console.log('');
           let displayContent = result.synthesis.content;
           for (const heading of ['## Minority Report', '## Scores', '## Minority']) {
@@ -445,8 +458,8 @@ export function registerSessionCommands(program: Command): void {
           displayContent = displayContent.replace(/^##\s*Synthesis\s*\n+/i, '');
           console.log(displayContent);
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
-          console.log(chalk.dim(`Session: ${result.sessionPath}`));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
+          console.log(pc.dim(`Session: ${result.sessionPath}`));
           console.log('');
         }
 
@@ -454,7 +467,7 @@ export function registerSessionCommands(program: Command): void {
           await writeFile(opts.audit as string, JSON.stringify(result, null, 2), 'utf-8');
         }
       } catch (err) {
-        throw new CLIError(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`\nError: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -467,24 +480,32 @@ export function registerSessionCommands(program: Command): void {
     .argument('[question]', 'Question (or pipe via stdin)')
     .option('--json', 'Output result as JSON')
     .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum versus claude openai "Which is better: Rust or Go for CLI tools?"')}
+${pc.dim('  $ quorum versus gemini claude "Explain quantum computing" --json')}
+`,
+    )
     .action(async (provider1: string, provider2: string, question: string | undefined, opts) => {
       if (!question) {
         if (process.stdin.isTTY) {
           throw new CLIError(
-            chalk.red('No question provided.') +
+            pc.red('No question provided.') +
               '\n' +
-              chalk.dim('Usage: quorum versus <provider1> <provider2> "question"'),
+              pc.dim('Usage: quorum versus <provider1> <provider2> "question"'),
           );
         }
         question = await readStdin();
         if (!question.trim()) {
-          throw new CLIError(chalk.red('Empty input.'));
+          throw new CLIError(pc.red('Empty input.'));
         }
       }
 
       const config = await loadConfig();
       if (config.providers.length === 0) {
-        throw new CLIError(chalk.red('No providers configured. Run: quorum init'));
+        throw new CLIError(pc.red('No providers configured. Run: quorum init'));
       }
 
       const timeoutOverride = opts.timeout ? parseInt(opts.timeout as string) : undefined;
@@ -496,16 +517,16 @@ export function registerSessionCommands(program: Command): void {
       const cfg2 = config.providers.find((p) => p.name === provider2);
       if (!cfg1) {
         throw new CLIError(
-          chalk.red(`Provider not found: ${provider1}`) +
+          pc.red(`Provider not found: ${provider1}`) +
             '\n' +
-            chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+            pc.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
         );
       }
       if (!cfg2) {
         throw new CLIError(
-          chalk.red(`Provider not found: ${provider2}`) +
+          pc.red(`Provider not found: ${provider2}`) +
             '\n' +
-            chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+            pc.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
         );
       }
 
@@ -520,9 +541,9 @@ export function registerSessionCommands(program: Command): void {
 
       if (!isJSON) {
         console.log('');
-        console.log(chalk.bold.cyan(`⚔️  ${provider1} vs ${provider2}`));
+        console.log(pc.bold(pc.cyan(`⚔️  ${provider1} vs ${provider2}`)));
         if (judgeAdapter) {
-          console.log(chalk.dim(`Judge: ${judgeAdapter.name}`));
+          console.log(pc.dim(`Judge: ${judgeAdapter.name}`));
         }
         console.log('');
       }
@@ -539,10 +560,10 @@ export function registerSessionCommands(program: Command): void {
                 const d = data as Record<string, unknown>;
                 switch (event) {
                   case 'phase':
-                    process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+                    process.stdout.write(pc.bold(`  ▸ ${d.phase} `));
                     break;
                   case 'response':
-                    process.stdout.write(chalk.green('✓') + chalk.dim(d.provider as string) + ' ');
+                    process.stdout.write(pc.green('✓') + pc.dim(d.provider as string) + ' ');
                     break;
                   case 'phase:done':
                     console.log('');
@@ -566,15 +587,15 @@ export function registerSessionCommands(program: Command): void {
           );
         } else {
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           console.log('');
           console.log(comparison);
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           console.log('');
         }
       } catch (err) {
-        throw new CLIError(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`\nError: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -613,14 +634,12 @@ export function registerSessionCommands(program: Command): void {
 
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
 
       const format = (opts.format as string).toLowerCase();
       if (!['md', 'html', 'canonical'].includes(format)) {
-        throw new CLIError(
-          chalk.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`),
-        );
+        throw new CLIError(pc.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`));
       }
 
       let result: string;
@@ -634,7 +653,7 @@ export function registerSessionCommands(program: Command): void {
 
       if (opts.output) {
         await writeFile(opts.output as string, result, 'utf-8');
-        console.error(chalk.green(`✅ Exported to ${opts.output}`));
+        console.error(pc.green(`✅ Exported to ${opts.output}`));
       } else {
         process.stdout.write(result);
       }
@@ -673,33 +692,33 @@ export function registerSessionCommands(program: Command): void {
 
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
 
       try {
         const record = await buildCanonicalRecord(sessionPath);
         if (record.integrity.valid) {
           console.log(
-            chalk.green(
+            pc.green(
               `✅ Integrity verified — ${record.hashChain.length} phases, hash chain intact`,
             ),
           );
           for (const entry of record.hashChain) {
-            console.log(chalk.dim(`  ${entry.phase}: ${entry.hash.slice(0, 16)}...`));
+            console.log(pc.dim(`  ${entry.phase}: ${entry.hash.slice(0, 16)}...`));
           }
         } else {
-          const parts = [chalk.red(`❌ Integrity check FAILED`)];
+          const parts = [pc.red(`❌ Integrity check FAILED`)];
           if (record.integrity.brokenAt) {
-            parts.push(chalk.red(`   Broken at phase: ${record.integrity.brokenAt}`));
+            parts.push(pc.red(`   Broken at phase: ${record.integrity.brokenAt}`));
           }
           if (record.integrity.details) {
-            parts.push(chalk.red(`   ${record.integrity.details}`));
+            parts.push(pc.red(`   ${record.integrity.details}`));
           }
           throw new CLIError(parts.join('\n'));
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
-        throw new CLIError(chalk.red(`Error: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`Error: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -737,7 +756,7 @@ export function registerSessionCommands(program: Command): void {
       // Read meta for provider names
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
       const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
       const providerNames: string[] = (meta.providers ?? []).map((p: any) => p.name);
@@ -746,16 +765,16 @@ export function registerSessionCommands(program: Command): void {
       const votePath = pathJoin(sessionPath, '07-vote.json');
       if (!existsSync(votePath)) {
         throw new CLIError(
-          chalk.red(`No vote data found at ${votePath}`) +
+          pc.red(`No vote data found at ${votePath}`) +
             '\n' +
-            chalk.dim('The session may have skipped the vote phase.'),
+            pc.dim('The session may have skipped the vote phase.'),
         );
       }
       const votePhase = JSON.parse(await readFile(votePath, 'utf-8'));
       const voteResponses: Record<string, string> = votePhase.responses ?? votePhase.entries ?? {};
 
       if (Object.keys(voteResponses).length < 2) {
-        throw new CLIError(chalk.red('Need at least 2 voters for a heatmap.'));
+        throw new CLIError(pc.red('Need at least 2 voters for a heatmap.'));
       }
 
       // Re-parse ballots from raw vote text (same logic as council-v2 extractBallots)
@@ -842,14 +861,14 @@ export function registerSessionCommands(program: Command): void {
       }
 
       if (ballots.length < 2) {
-        throw new CLIError(chalk.red('Could not parse enough ballots for a heatmap.'));
+        throw new CLIError(pc.red('Could not parse enough ballots for a heatmap.'));
       }
 
       const heatmap = generateHeatmap(ballots, providerNames);
       if (heatmap) {
         console.log(heatmap);
       } else {
-        console.log(chalk.dim('Not enough data to generate heatmap.'));
+        console.log(pc.dim('Not enough data to generate heatmap.'));
       }
     });
 
@@ -861,6 +880,15 @@ export function registerSessionCommands(program: Command): void {
     .option('--phase <name>', 'Filter to a single phase (e.g., debate, gather)')
     .option('--provider <name>', "Filter to a single provider's responses")
     .option('--speed <speed>', 'Typing speed: fast (5ms), normal (20ms), slow (50ms)', 'normal')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum replay last')}
+${pc.dim('  $ quorum replay last --phase debate --speed fast')}
+${pc.dim('  $ quorum replay last --provider claude')}
+`,
+    )
     .action(async (sessionArg: string, opts) => {
       const speedMap: Record<string, number> = { fast: 5, normal: 20, slow: 50 };
       const delay = speedMap[opts.speed as string] ?? 20;
@@ -901,20 +929,17 @@ export function registerSessionCommands(program: Command): void {
       // Read meta.json header
       const metaPath = pathJoin(sessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${sessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
       }
       const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
 
       console.log('');
-      console.log(chalk.bold.cyan('🎬 Replay'));
-      console.log(
-        chalk.dim(`Question: ${String(meta.input ?? meta.question ?? '').slice(0, 200)}`),
-      );
+      console.log(pc.bold(pc.cyan('🎬 Replay')));
+      console.log(pc.dim(`Question: ${String(meta.input ?? meta.question ?? '').slice(0, 200)}`));
       const providerNames = (meta.providers ?? []).map((p: any) => p.name).join(', ');
-      console.log(chalk.dim(`Providers: ${providerNames}`));
-      console.log(chalk.dim(`Profile: ${meta.profile ?? 'default'}`));
-      if (meta.startedAt)
-        console.log(chalk.dim(`Time: ${new Date(meta.startedAt).toLocaleString()}`));
+      console.log(pc.dim(`Providers: ${providerNames}`));
+      console.log(pc.dim(`Profile: ${meta.profile ?? 'default'}`));
+      if (meta.startedAt) console.log(pc.dim(`Time: ${new Date(meta.startedAt).toLocaleString()}`));
       console.log('');
 
       // Phase files in order
@@ -956,18 +981,18 @@ export function registerSessionCommands(program: Command): void {
         const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
         const responses = phase.responses ?? phase.entries ?? {};
 
-        console.log(chalk.bold.magenta(`═══ ${phase.phase ?? name} ═══`));
+        console.log(pc.bold(pc.magenta(`═══ ${phase.phase ?? name} ═══`)));
         console.log('');
 
         for (const [provider, content] of Object.entries(responses)) {
           if (providerFilter && provider.toLowerCase() !== providerFilter.toLowerCase()) continue;
-          console.log(chalk.bold.yellow(`── ${provider} ──`));
+          console.log(pc.bold(pc.yellow(`── ${provider} ──`)));
           await streamText(String(content));
           console.log('');
         }
 
         const dur = phase.duration != null ? `${(phase.duration / 1000).toFixed(1)}s` : '?';
-        console.log(chalk.dim(`  Phase duration: ${dur}`));
+        console.log(pc.dim(`  Phase duration: ${dur}`));
 
         // Show interventions after this phase
         const phaseInterventions = interventionsByPhase.get(name);
@@ -982,10 +1007,10 @@ export function registerSessionCommands(program: Command): void {
                   : iv.type === 'inject-evidence'
                     ? '📎'
                     : '❓';
-            console.log(chalk.bold.red(`  ${typeIcon} INTERVENTION: ${iv.type}`));
-            console.log(chalk.red(`    ${iv.content}`));
+            console.log(pc.bold(pc.red(`  ${typeIcon} INTERVENTION: ${iv.type}`)));
+            console.log(pc.red(`    ${iv.content}`));
             if (iv.constraints) {
-              console.log(chalk.dim(`    Constraints: ${iv.constraints.join(', ')}`));
+              console.log(pc.dim(`    Constraints: ${iv.constraints.join(', ')}`));
             }
           }
         }
@@ -998,7 +1023,7 @@ export function registerSessionCommands(program: Command): void {
         if (existsSync(synthPath)) {
           const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
 
-          console.log(chalk.bold.green('═══ SYNTHESIS ═══'));
+          console.log(pc.bold(pc.green('═══ SYNTHESIS ═══')));
           console.log('');
           if (synth.content) {
             await streamText(String(synth.content));
@@ -1011,7 +1036,7 @@ export function registerSessionCommands(program: Command): void {
             | undefined;
           const winner = synth.votes?.winner as string | undefined;
           if (rankings) {
-            console.log(chalk.bold('🗳️  Vote Rankings'));
+            console.log(pc.bold('🗳️  Vote Rankings'));
             for (const r of rankings) {
               console.log(`  ${r.provider}: ${r.score} pts${r.provider === winner ? ' 👑' : ''}`);
             }
@@ -1033,6 +1058,15 @@ export function registerSessionCommands(program: Command): void {
     .option('--timeout <seconds>', 'Override per-provider timeout in seconds')
     .option('-r, --rapid', 'Rapid mode')
     .option('--devils-advocate', "Assign one provider as devil's advocate")
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum rerun last --providers openai,gemini')}
+${pc.dim('  $ quorum rerun last --compare')}
+${pc.dim('  $ quorum rerun last --profile brainstorm --rapid')}
+`,
+    )
     .action(async (sessionArg: string, opts) => {
       // Resolve session path
       let originalSessionPath = sessionArg;
@@ -1064,25 +1098,25 @@ export function registerSessionCommands(program: Command): void {
       // Read original session meta to get the question
       const metaPath = pathJoin(originalSessionPath, 'meta.json');
       if (!existsSync(metaPath)) {
-        throw new CLIError(chalk.red(`Session not found: ${originalSessionPath}`));
+        throw new CLIError(pc.red(`Session not found: ${originalSessionPath}`));
       }
       const originalMeta = JSON.parse(await readFile(metaPath, 'utf-8'));
       const question = originalMeta.input as string;
       if (!question || !question.trim()) {
-        throw new CLIError(chalk.red('Original session has no question (input) in meta.json.'));
+        throw new CLIError(pc.red('Original session has no question (input) in meta.json.'));
       }
 
       // Load config
       const config = await loadConfig();
       if (config.providers.length === 0) {
-        throw new CLIError(chalk.red('No providers configured. Run: quorum init'));
+        throw new CLIError(pc.red('No providers configured. Run: quorum init'));
       }
 
       // Apply timeout override
       const timeoutOverride = opts.timeout ? parseInt(opts.timeout as string) : undefined;
       if (timeoutOverride !== undefined) {
         if (isNaN(timeoutOverride) || timeoutOverride <= 0) {
-          throw new CLIError(chalk.red(`Invalid --timeout value.`));
+          throw new CLIError(pc.red(`Invalid --timeout value.`));
         }
         for (const p of config.providers) p.timeout = timeoutOverride;
       }
@@ -1094,9 +1128,9 @@ export function registerSessionCommands(program: Command): void {
         providers = config.providers.filter((p) => names.includes(p.name));
         if (providers.length === 0) {
           throw new CLIError(
-            chalk.red(`No matching providers: ${opts.providers}`) +
+            pc.red(`No matching providers: ${opts.providers}`) +
               '\n' +
-              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+              pc.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
           );
         }
       }
@@ -1107,7 +1141,7 @@ export function registerSessionCommands(program: Command): void {
       const profileName = (opts.profile as string) ?? originalMeta.profile ?? 'default';
       const profile = await loadAgentProfile(profileName);
       if (!profile) {
-        throw new CLIError(chalk.red(`Profile not found: ${profileName}`));
+        throw new CLIError(pc.red(`Profile not found: ${profileName}`));
       }
 
       // Filter excluded providers
@@ -1118,9 +1152,7 @@ export function registerSessionCommands(program: Command): void {
 
       if (candidateProviders.length < 2) {
         throw new CLIError(
-          chalk.red(
-            `Need 2+ providers for deliberation (${candidateProviders.length} configured).`,
-          ),
+          pc.red(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`),
         );
       }
 
@@ -1128,13 +1160,13 @@ export function registerSessionCommands(program: Command): void {
 
       if (!isJSON) {
         console.log('');
-        console.log(chalk.bold.cyan(`🔄 Re-running previous deliberation`));
-        console.log(chalk.dim(`Original session: ${originalSessionPath}`));
+        console.log(pc.bold(pc.cyan(`🔄 Re-running previous deliberation`)));
+        console.log(pc.dim(`Original session: ${originalSessionPath}`));
         console.log(
-          chalk.dim(`Question: ${question.slice(0, 120)}${question.length > 120 ? '...' : ''}`),
+          pc.dim(`Question: ${question.slice(0, 120)}${question.length > 120 ? '...' : ''}`),
         );
-        console.log(chalk.dim(`Providers: ${candidateProviders.map((p) => p.name).join(', ')}`));
-        console.log(chalk.dim(`Profile: ${profile.name}`));
+        console.log(pc.dim(`Providers: ${candidateProviders.map((p) => p.name).join(', ')}`));
+        console.log(pc.dim(`Profile: ${profile.name}`));
         console.log('');
       }
 
@@ -1148,16 +1180,16 @@ export function registerSessionCommands(program: Command): void {
           const d = data as Record<string, unknown>;
           switch (event) {
             case 'phase':
-              process.stdout.write(chalk.bold(`  ▸ ${d.phase} `));
+              process.stdout.write(pc.bold(`  ▸ ${d.phase} `));
               break;
             case 'response': {
-              const fallback = d.fallback ? chalk.yellow('⚠') : chalk.green('✓');
-              process.stdout.write(`${fallback}${chalk.dim(d.provider as string)} `);
+              const fallback = d.fallback ? pc.yellow('⚠') : pc.green('✓');
+              process.stdout.write(`${fallback}${pc.dim(d.provider as string)} `);
               break;
             }
             case 'phase:done': {
               const secs = ((d.duration as number) / 1000).toFixed(1);
-              console.log(chalk.dim(`(${secs}s)`));
+              console.log(pc.dim(`(${secs}s)`));
               break;
             }
             case 'votes': {
@@ -1167,21 +1199,21 @@ export function registerSessionCommands(program: Command): void {
                 controversial: boolean;
               };
               console.log('');
-              console.log(chalk.bold('  🗳️  Results'));
+              console.log(pc.bold('  🗳️  Results'));
               const maxScore = v.rankings[0]?.score || 1;
               for (const r of v.rankings) {
                 const bar = '█'.repeat(Math.round((r.score / maxScore) * 12));
                 const crown = r.provider === v.winner ? ' 👑' : '';
                 console.log(
-                  `     ${chalk.dim(r.provider.padEnd(10))} ${chalk.cyan(bar)} ${r.score}${crown}`,
+                  `     ${pc.dim(r.provider.padEnd(10))} ${pc.cyan(bar)} ${r.score}${crown}`,
                 );
               }
               if (v.controversial)
-                console.log(chalk.yellow('     ⚠ Close vote — positions nearly tied'));
+                console.log(pc.yellow('     ⚠ Close vote — positions nearly tied'));
               break;
             }
             case 'complete':
-              console.log(chalk.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
+              console.log(pc.dim(`\n  ⏱  ${((d.duration as number) / 1000).toFixed(1)}s total`));
               break;
           }
         },
@@ -1206,7 +1238,7 @@ export function registerSessionCommands(program: Command): void {
         } else {
           // Display synthesis
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           console.log('');
           let displayContent = result.synthesis.content;
           for (const heading of ['## Minority Report', '## Scores', '## Minority']) {
@@ -1222,27 +1254,27 @@ export function registerSessionCommands(program: Command): void {
             result.synthesis.minorityReport.trim()
           ) {
             console.log('');
-            console.log(chalk.bold.yellow('── Minority Report ──'));
+            console.log(pc.bold(pc.yellow('── Minority Report ──')));
             console.log(result.synthesis.minorityReport);
           }
 
           console.log('');
-          console.log(chalk.bold.green('━'.repeat(60)));
+          console.log(pc.bold(pc.green('━'.repeat(60))));
           const meta = [
             `Winner: ${result.votes.winner}`,
             `Synthesized by: ${result.synthesis.synthesizer}`,
             `Consensus: ${result.synthesis.consensusScore}`,
             `Confidence: ${result.synthesis.confidenceScore}`,
           ].join(' | ');
-          console.log(chalk.dim(meta));
-          console.log(chalk.dim(`Session: ${result.sessionPath}`));
+          console.log(pc.dim(meta));
+          console.log(pc.dim(`Session: ${result.sessionPath}`));
         }
 
         // Summary
         if (!isJSON) {
           console.log('');
           console.log(
-            chalk.bold(
+            pc.bold(
               `Re-ran '${question.slice(0, 80)}${question.length > 80 ? '...' : ''}' with [${candidateProviders.map((p) => p.name).join(', ')}] — new session: ${result.sessionPath}`,
             ),
           );
@@ -1253,8 +1285,8 @@ export function registerSessionCommands(program: Command): void {
           const newSessionPath = result.sessionPath;
           if (!isJSON) {
             console.log('');
-            console.log(chalk.bold.cyan('📊 Auto-Compare: Original vs Re-run'));
-            console.log(chalk.dim('━'.repeat(60)));
+            console.log(pc.bold(pc.cyan('📊 Auto-Compare: Original vs Re-run')));
+            console.log(pc.dim('━'.repeat(60)));
           }
 
           // Load both sessions for comparison (reuse diff logic)
@@ -1318,37 +1350,36 @@ export function registerSessionCommands(program: Command): void {
           } else {
             // Providers
             console.log('');
-            console.log(chalk.bold('Providers:'));
+            console.log(pc.bold('Providers:'));
             if (onlyIn1.length === 0 && onlyIn2.length === 0) {
-              console.log(`  ${chalk.green('Same:')} ${providers1.join(', ')}`);
+              console.log(`  ${pc.green('Same:')} ${providers1.join(', ')}`);
             } else {
-              console.log(`  ${chalk.dim('Common:')} ${common.join(', ') || '(none)'}`);
+              console.log(`  ${pc.dim('Common:')} ${common.join(', ') || '(none)'}`);
               if (onlyIn1.length)
-                console.log(`  ${chalk.red('Only Original:')} ${onlyIn1.join(', ')}`);
-              if (onlyIn2.length)
-                console.log(`  ${chalk.red('Only Re-run:')} ${onlyIn2.join(', ')}`);
+                console.log(`  ${pc.red('Only Original:')} ${onlyIn1.join(', ')}`);
+              if (onlyIn2.length) console.log(`  ${pc.red('Only Re-run:')} ${onlyIn2.join(', ')}`);
             }
 
             // Winner
             console.log('');
-            console.log(chalk.bold('Winner:'));
+            console.log(pc.bold('Winner:'));
             if (winner1 === winner2) {
-              console.log(`  ${chalk.green(winner1)} (unchanged)`);
+              console.log(`  ${pc.green(winner1)} (unchanged)`);
             } else {
               console.log(
-                `  ${chalk.dim('Original:')} ${chalk.yellow(winner1)}  →  ${chalk.dim('Re-run:')} ${chalk.yellow(winner2)}  ${chalk.red('(changed)')}`,
+                `  ${pc.dim('Original:')} ${pc.yellow(winner1)}  →  ${pc.dim('Re-run:')} ${pc.yellow(winner2)}  ${pc.red('(changed)')}`,
               );
             }
 
             // Scores
             console.log('');
-            console.log(chalk.bold('Scores:'));
+            console.log(pc.bold('Scores:'));
             const fmtScore = (v: number | null) => (v != null ? v.toFixed(2) : '—');
             const fmtDelta = (a: number | null, b: number | null) => {
               if (a == null || b == null) return '';
               const d = b - a;
               const sign = d >= 0 ? '+' : '';
-              const color = d > 0 ? chalk.green : d < 0 ? chalk.red : chalk.dim;
+              const color = d > 0 ? pc.green : d < 0 ? pc.red : pc.dim;
               return color(` (${sign}${d.toFixed(2)})`);
             };
             console.log(
@@ -1360,7 +1391,7 @@ export function registerSessionCommands(program: Command): void {
 
             // Rankings
             console.log('');
-            console.log(chalk.bold('Vote Rankings:'));
+            console.log(pc.bold('Vote Rankings:'));
             const maxRankings = Math.max(rankings1.length, rankings2.length);
             if (maxRankings > 0) {
               console.log(`  ${'#'.padEnd(3)} ${'Original'.padEnd(25)} ${'Re-run'.padEnd(25)}`);
@@ -1375,15 +1406,15 @@ export function registerSessionCommands(program: Command): void {
             }
 
             console.log('');
-            console.log(chalk.dim(`Original: ${originalSessionPath}`));
-            console.log(chalk.dim(`Re-run:   ${newSessionPath}`));
+            console.log(pc.dim(`Original: ${originalSessionPath}`));
+            console.log(pc.dim(`Re-run:   ${newSessionPath}`));
             console.log('');
           }
         } else if (!isJSON) {
           console.log('');
         }
       } catch (err) {
-        throw new CLIError(chalk.red(`\nError: ${err instanceof Error ? err.message : err}`));
+        throw new CLIError(pc.red(`\nError: ${err instanceof Error ? err.message : err}`));
       }
     });
 
@@ -1396,6 +1427,15 @@ export function registerSessionCommands(program: Command): void {
     .option('--profile <name>', 'Agent profile', 'code-review')
     .option('-r, --rapid', 'Rapid mode (default: true for watch)', true)
     .option('--debounce <ms>', 'Debounce interval in ms', '1000')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum watch src/api.ts src/utils.ts')}
+${pc.dim('  $ quorum watch "src/**/*.ts" --providers claude,openai')}
+${pc.dim('  $ quorum watch src/ --debounce 2000 --profile code-review')}
+`,
+    )
     .action(async (fileArgs: string[], opts) => {
       const { watch, statSync, readdirSync } = await import('node:fs');
       const { resolve, dirname, relative } = await import('node:path');
@@ -1460,13 +1500,13 @@ export function registerSessionCommands(program: Command): void {
               }
             }
           } else {
-            throw new CLIError(chalk.red(`File not found: ${arg}`));
+            throw new CLIError(pc.red(`File not found: ${arg}`));
           }
         }
       }
 
       if (resolvedFiles.size === 0) {
-        throw new CLIError(chalk.red('No files matched the given patterns.'));
+        throw new CLIError(pc.red('No files matched the given patterns.'));
       }
 
       const fileList = [...resolvedFiles];
@@ -1474,13 +1514,13 @@ export function registerSessionCommands(program: Command): void {
 
       console.log('');
       console.log(
-        chalk.bold.cyan(`👁  Watching ${fileList.length} file(s) for changes... (Ctrl+C to stop)`),
+        pc.bold(pc.cyan(`👁  Watching ${fileList.length} file(s) for changes... (Ctrl+C to stop)`)),
       );
       for (const f of fileList.slice(0, 10)) {
-        console.log(chalk.dim(`  ${(await import('node:path')).relative(process.cwd(), f)}`));
+        console.log(pc.dim(`  ${(await import('node:path')).relative(process.cwd(), f)}`));
       }
       if (fileList.length > 10) {
-        console.log(chalk.dim(`  ... and ${fileList.length - 10} more`));
+        console.log(pc.dim(`  ... and ${fileList.length - 10} more`));
       }
       console.log('');
 
@@ -1528,10 +1568,10 @@ export function registerSessionCommands(program: Command): void {
 
         const timestamp = new Date().toLocaleTimeString();
         console.log('');
-        console.log(chalk.bold.cyan(`━━━ Change detected at ${timestamp} ━━━`));
+        console.log(pc.bold(pc.cyan(`━━━ Change detected at ${timestamp} ━━━`)));
         for (const f of filesToReview) {
           console.log(
-            chalk.dim(`  Changed: ${(await import('node:path')).relative(process.cwd(), f)}`),
+            pc.dim(`  Changed: ${(await import('node:path')).relative(process.cwd(), f)}`),
           );
         }
         console.log('');
@@ -1546,7 +1586,7 @@ export function registerSessionCommands(program: Command): void {
               content += `## File: ${(await import('node:path')).relative(process.cwd(), filePath)}\n\`\`\`${ext}\n${fileContent}\n\`\`\`\n\n`;
             } catch (err) {
               console.error(
-                chalk.yellow(
+                pc.yellow(
                   `  Warning: Could not read ${filePath}: ${err instanceof Error ? err.message : err}`,
                 ),
               );
@@ -1554,7 +1594,7 @@ export function registerSessionCommands(program: Command): void {
           }
 
           if (!content.trim()) {
-            console.log(chalk.yellow('No readable content in changed files.'));
+            console.log(pc.yellow('No readable content in changed files.'));
             running = false;
             return;
           }
@@ -1568,19 +1608,19 @@ export function registerSessionCommands(program: Command): void {
           await program.parseAsync(['node', 'quorum', ...askArgs]);
         } catch (err) {
           console.error(
-            chalk.red(`Error during deliberation: ${err instanceof Error ? err.message : err}`),
+            pc.red(`Error during deliberation: ${err instanceof Error ? err.message : err}`),
           );
         }
 
         running = false;
         console.log('');
-        console.log(chalk.dim(`Watching for more changes...`));
+        console.log(pc.dim(`Watching for more changes...`));
       }
 
       // Graceful shutdown
       process.on('SIGINT', () => {
         console.log('');
-        console.log(chalk.dim('Closing watchers...'));
+        console.log(pc.dim('Closing watchers...'));
         for (const w of watchers) {
           try {
             w.close();
@@ -1612,21 +1652,21 @@ export function registerSessionCommands(program: Command): void {
       });
 
       console.log('');
-      console.log(chalk.bold.cyan('🏛️  Quorum Workspace'));
+      console.log(pc.bold(pc.cyan('🏛️  Quorum Workspace')));
       console.log('');
-      console.log(`  ${chalk.green('▸')} http://localhost:${server.port}`);
+      console.log(`  ${pc.green('▸')} http://localhost:${server.port}`);
       if (sessionId) {
-        console.log(`  ${chalk.dim('Mode: replay')} — session ${sessionId}`);
+        console.log(`  ${pc.dim('Mode: replay')} — session ${sessionId}`);
       } else {
-        console.log(`  ${chalk.dim('Mode: live')} — waiting for deliberation...`);
+        console.log(`  ${pc.dim('Mode: live')} — waiting for deliberation...`);
       }
       console.log('');
-      console.log(chalk.dim('Press Ctrl+C to stop'));
+      console.log(pc.dim('Press Ctrl+C to stop'));
 
       // Keep process alive
       await new Promise<void>((resolve) => {
         process.on('SIGINT', async () => {
-          console.log(chalk.dim('\nShutting down workspace...'));
+          console.log(pc.dim('\nShutting down workspace...'));
           await server.close();
           resolve();
         });
