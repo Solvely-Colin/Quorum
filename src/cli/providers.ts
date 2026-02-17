@@ -1,11 +1,6 @@
 import type { Command } from 'commander';
 import chalk from 'chalk';
-import {
-  loadConfig,
-  saveConfig,
-  detectProviders,
-  CONFIG_PATH,
-} from '../config.js';
+import { loadConfig, saveConfig, detectProviders, CONFIG_PATH } from '../config.js';
 import { createProvider } from '../providers/base.js';
 import type { ProviderConfig } from '../types.js';
 import { CLIError, promptAddProvider } from './helpers.js';
@@ -200,7 +195,9 @@ export function registerProvidersCommand(program: Command): void {
           );
           console.log(chalk.green(`✅ "${response.slice(0, 50)}"`));
         } catch (err) {
-          console.log(chalk.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`));
+          console.log(
+            chalk.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`),
+          );
         }
       }
     });

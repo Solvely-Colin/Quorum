@@ -155,7 +155,9 @@ export function registerReviewCommands(program: Command): void {
         if (!content.trim()) {
           throw new CLIError(
             [
-              chalk.red('No input provided. Pass file paths, pipe content, or use --staged/--diff/--pr.'),
+              chalk.red(
+                'No input provided. Pass file paths, pipe content, or use --staged/--diff/--pr.',
+              ),
               chalk.dim('Usage: quorum review src/api.ts src/utils.ts'),
               chalk.dim('   or: quorum review --staged'),
               chalk.dim('   or: quorum review --diff main'),
@@ -409,7 +411,8 @@ export function registerReviewCommands(program: Command): void {
 
       if (candidateProviders.length < 2) {
         throw new CLIError(
-          `Need 2+ providers for deliberation (${candidateProviders.length} configured).`, 2,
+          `Need 2+ providers for deliberation (${candidateProviders.length} configured).`,
+          2,
         );
       }
 

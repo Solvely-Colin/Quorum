@@ -70,7 +70,11 @@ export function registerSessionCommands(program: Command): void {
         };
         const fileKey = phaseFiles[phaseName.toLowerCase()];
         if (!fileKey) {
-          throw new CLIError(chalk.red(`Unknown phase: ${phaseName}`) + '\n' + chalk.dim(`Available: ${Object.keys(phaseFiles).join(', ')}, synthesis`));
+          throw new CLIError(
+            chalk.red(`Unknown phase: ${phaseName}`) +
+              '\n' +
+              chalk.dim(`Available: ${Object.keys(phaseFiles).join(', ')}, synthesis`),
+          );
         }
         const phasePath = `${sessionPath}/${fileKey}.json`;
         if (!existsSync(phasePath)) {
@@ -123,7 +127,8 @@ export function registerSessionCommands(program: Command): void {
         const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
         console.log('');
         console.log(
-          chalk.bold.cyan(`═══ ${name} ═══`) + chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
+          chalk.bold.cyan(`═══ ${name} ═══`) +
+            chalk.dim(` (${(phase.duration / 1000).toFixed(1)}s)`),
         );
         const entries = phase.responses ?? phase.entries ?? {};
         for (const [provider, content] of Object.entries(entries)) {
@@ -154,7 +159,8 @@ export function registerSessionCommands(program: Command): void {
 
       // Show uncertainty metrics if available
       try {
-        const { loadUncertaintyMetrics, formatUncertaintyDisplay } = await import('../uncertainty.js');
+        const { loadUncertaintyMetrics, formatUncertaintyDisplay } =
+          await import('../uncertainty.js');
         const uncertainty = await loadUncertaintyMetrics(sessionPath);
         if (uncertainty) {
           console.log('');
@@ -251,7 +257,9 @@ export function registerSessionCommands(program: Command): void {
 
       console.log('');
       console.log(
-        chalk.bold(`📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`),
+        chalk.bold(
+          `📜 Session History (${Math.min(sessions.length, limit)} of ${sessions.length})`,
+        ),
       );
       console.log('');
 
@@ -318,7 +326,11 @@ export function registerSessionCommands(program: Command): void {
       // Get question
       if (!question) {
         if (process.stdin.isTTY) {
-          throw new CLIError(chalk.red('No follow-up question provided.') + '\n' + chalk.dim('Usage: quorum follow-up <session> "your question"'));
+          throw new CLIError(
+            chalk.red('No follow-up question provided.') +
+              '\n' +
+              chalk.dim('Usage: quorum follow-up <session> "your question"'),
+          );
         }
         question = await readStdin();
         if (!question.trim()) {
@@ -458,7 +470,11 @@ export function registerSessionCommands(program: Command): void {
     .action(async (provider1: string, provider2: string, question: string | undefined, opts) => {
       if (!question) {
         if (process.stdin.isTTY) {
-          throw new CLIError(chalk.red('No question provided.') + '\n' + chalk.dim('Usage: quorum versus <provider1> <provider2> "question"'));
+          throw new CLIError(
+            chalk.red('No question provided.') +
+              '\n' +
+              chalk.dim('Usage: quorum versus <provider1> <provider2> "question"'),
+          );
         }
         question = await readStdin();
         if (!question.trim()) {
@@ -479,10 +495,18 @@ export function registerSessionCommands(program: Command): void {
       const cfg1 = config.providers.find((p) => p.name === provider1);
       const cfg2 = config.providers.find((p) => p.name === provider2);
       if (!cfg1) {
-        throw new CLIError(chalk.red(`Provider not found: ${provider1}`) + '\n' + chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
+        throw new CLIError(
+          chalk.red(`Provider not found: ${provider1}`) +
+            '\n' +
+            chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+        );
       }
       if (!cfg2) {
-        throw new CLIError(chalk.red(`Provider not found: ${provider2}`) + '\n' + chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
+        throw new CLIError(
+          chalk.red(`Provider not found: ${provider2}`) +
+            '\n' +
+            chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+        );
       }
 
       const adapter1 = await createProvider(cfg1);
@@ -594,7 +618,9 @@ export function registerSessionCommands(program: Command): void {
 
       const format = (opts.format as string).toLowerCase();
       if (!['md', 'html', 'canonical'].includes(format)) {
-        throw new CLIError(chalk.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`));
+        throw new CLIError(
+          chalk.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`),
+        );
       }
 
       let result: string;
@@ -719,7 +745,11 @@ export function registerSessionCommands(program: Command): void {
       // Read vote phase
       const votePath = pathJoin(sessionPath, '07-vote.json');
       if (!existsSync(votePath)) {
-        throw new CLIError(chalk.red(`No vote data found at ${votePath}`) + '\n' + chalk.dim('The session may have skipped the vote phase.'));
+        throw new CLIError(
+          chalk.red(`No vote data found at ${votePath}`) +
+            '\n' +
+            chalk.dim('The session may have skipped the vote phase.'),
+        );
       }
       const votePhase = JSON.parse(await readFile(votePath, 'utf-8'));
       const voteResponses: Record<string, string> = votePhase.responses ?? votePhase.entries ?? {};
@@ -877,7 +907,9 @@ export function registerSessionCommands(program: Command): void {
 
       console.log('');
       console.log(chalk.bold.cyan('🎬 Replay'));
-      console.log(chalk.dim(`Question: ${String(meta.input ?? meta.question ?? '').slice(0, 200)}`));
+      console.log(
+        chalk.dim(`Question: ${String(meta.input ?? meta.question ?? '').slice(0, 200)}`),
+      );
       const providerNames = (meta.providers ?? []).map((p: any) => p.name).join(', ');
       console.log(chalk.dim(`Providers: ${providerNames}`));
       console.log(chalk.dim(`Profile: ${meta.profile ?? 'default'}`));
@@ -911,7 +943,11 @@ export function registerSessionCommands(program: Command): void {
       }
 
       for (const { file, name } of phaseFiles) {
-        if (phaseFilter && !name.toLowerCase().startsWith(phaseFilter) && !file.includes(phaseFilter))
+        if (
+          phaseFilter &&
+          !name.toLowerCase().startsWith(phaseFilter) &&
+          !file.includes(phaseFilter)
+        )
           continue;
 
         const phasePath = pathJoin(sessionPath, `${file}.json`);
@@ -1019,7 +1055,9 @@ export function registerSessionCommands(program: Command): void {
             );
           }
         } else {
-          originalSessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
+          originalSessionPath = await resolveLastSession(
+            pathJoin(homedir(), '.quorum', 'sessions'),
+          );
         }
       }
 
@@ -1055,7 +1093,11 @@ export function registerSessionCommands(program: Command): void {
         const names = (opts.providers as string).split(',').map((s) => s.trim());
         providers = config.providers.filter((p) => names.includes(p.name));
         if (providers.length === 0) {
-          throw new CLIError(chalk.red(`No matching providers: ${opts.providers}`) + '\n' + chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
+          throw new CLIError(
+            chalk.red(`No matching providers: ${opts.providers}`) +
+              '\n' +
+              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+          );
         }
       }
 
@@ -1076,7 +1118,9 @@ export function registerSessionCommands(program: Command): void {
 
       if (candidateProviders.length < 2) {
         throw new CLIError(
-          chalk.red(`Need 2+ providers for deliberation (${candidateProviders.length} configured).`),
+          chalk.red(
+            `Need 2+ providers for deliberation (${candidateProviders.length} configured).`,
+          ),
         );
       }
 
@@ -1281,7 +1325,8 @@ export function registerSessionCommands(program: Command): void {
               console.log(`  ${chalk.dim('Common:')} ${common.join(', ') || '(none)'}`);
               if (onlyIn1.length)
                 console.log(`  ${chalk.red('Only Original:')} ${onlyIn1.join(', ')}`);
-              if (onlyIn2.length) console.log(`  ${chalk.red('Only Re-run:')} ${onlyIn2.join(', ')}`);
+              if (onlyIn2.length)
+                console.log(`  ${chalk.red('Only Re-run:')} ${onlyIn2.join(', ')}`);
             }
 
             // Winner
@@ -1485,7 +1530,9 @@ export function registerSessionCommands(program: Command): void {
         console.log('');
         console.log(chalk.bold.cyan(`━━━ Change detected at ${timestamp} ━━━`));
         for (const f of filesToReview) {
-          console.log(chalk.dim(`  Changed: ${(await import('node:path')).relative(process.cwd(), f)}`));
+          console.log(
+            chalk.dim(`  Changed: ${(await import('node:path')).relative(process.cwd(), f)}`),
+          );
         }
         console.log('');
 

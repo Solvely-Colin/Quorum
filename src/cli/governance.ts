@@ -163,7 +163,9 @@ export function registerGovernanceCommands(program: Command): void {
         }
         console.log('');
       } catch (err) {
-        console.error(chalk.red(`Error loading stats: ${err instanceof Error ? err.message : err}`));
+        console.error(
+          chalk.red(`Error loading stats: ${err instanceof Error ? err.message : err}`),
+        );
       }
     });
 
@@ -239,7 +241,11 @@ export function registerGovernanceCommands(program: Command): void {
             ),
           );
         } else {
-          throw new CLIError([chalk.red(`✗ ${file} has errors:`), ...errors.map(e => chalk.red(`  - ${e}`))].join('\n'));
+          throw new CLIError(
+            [chalk.red(`✗ ${file} has errors:`), ...errors.map((e) => chalk.red(`  - ${e}`))].join(
+              '\n',
+            ),
+          );
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
@@ -295,7 +301,11 @@ export function registerGovernanceCommands(program: Command): void {
         if (errors.length === 0) {
           console.log(chalk.green(`✓ ${path} is valid`));
         } else {
-          throw new CLIError([chalk.red(`✗ ${path} has errors:`), ...errors.map(e => chalk.red(`  - ${e}`))].join('\n'));
+          throw new CLIError(
+            [chalk.red(`✗ ${path} has errors:`), ...errors.map((e) => chalk.red(`  - ${e}`))].join(
+              '\n',
+            ),
+          );
         }
       } catch (err) {
         if (err instanceof CLIError) throw err;
@@ -506,7 +516,9 @@ export function registerGovernanceCommands(program: Command): void {
     });
 
   // --- quorum arena ---
-  const arenaCmd = program.command('arena').description('Eval arena and provider reputation system');
+  const arenaCmd = program
+    .command('arena')
+    .description('Eval arena and provider reputation system');
 
   arenaCmd
     .command('leaderboard')
@@ -740,7 +752,8 @@ export function registerGovernanceCommands(program: Command): void {
     .action(async (session1: string, session2: string, opts) => {
       const { buildCanonicalRecord } = await import('../canonical.js');
       const { buildAttestationChain } = await import('../attestation.js');
-      const { diffAttestationChains, formatAttestationDiff } = await import('../attestation-diff.js');
+      const { diffAttestationChains, formatAttestationDiff } =
+        await import('../attestation-diff.js');
 
       async function buildChain(sessionPath: string) {
         const metaPath = pathJoin(sessionPath, 'meta.json');
@@ -926,7 +939,9 @@ export function registerGovernanceCommands(program: Command): void {
     });
 
   // --- quorum uncertainty trends ---
-  const uncertaintyCmd = program.command('uncertainty').description('Uncertainty tracking commands');
+  const uncertaintyCmd = program
+    .command('uncertainty')
+    .description('Uncertainty tracking commands');
 
   uncertaintyCmd
     .command('trends')

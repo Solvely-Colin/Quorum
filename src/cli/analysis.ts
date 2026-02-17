@@ -83,7 +83,11 @@ export function registerAnalysisCommands(program: Command): void {
       if (opts.provider) {
         const found = config.providers.find((p) => p.name === (opts.provider as string));
         if (!found) {
-          throw new CLIError(chalk.red(`Provider not found: ${opts.provider}`) + '\n' + chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
+          throw new CLIError(
+            chalk.red(`Provider not found: ${opts.provider}`) +
+              '\n' +
+              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+          );
         }
         providerConfig = found;
       } else {
@@ -409,7 +413,8 @@ export function registerAnalysisCommands(program: Command): void {
       let consensusCount = 0;
       let confidenceCount = 0;
       let totalDuration = 0;
-      let mostControversial: { sessionId: string; question: string; consensus: number } | null = null;
+      let mostControversial: { sessionId: string; question: string; consensus: number } | null =
+        null;
 
       for (const entry of entries) {
         totalDuration += entry.duration ?? 0;
@@ -564,8 +569,10 @@ export function registerAnalysisCommands(program: Command): void {
       // Load evidence report
       const reportPath = pathJoin(sessionPath, 'evidence-report.json');
       if (!existsSync(reportPath)) {
-        throw new CLIError(chalk.red(`No evidence report found at ${reportPath}`) + '\n' +
-          chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'),
+        throw new CLIError(
+          chalk.red(`No evidence report found at ${reportPath}`) +
+            '\n' +
+            chalk.dim('Run a deliberation with --evidence advisory or --evidence strict first.'),
         );
       }
 
@@ -619,7 +626,9 @@ export function registerAnalysisCommands(program: Command): void {
       }
 
       // Filter by tier
-      const tierFilter = opts.tier ? ((opts.tier as string).toUpperCase() as SourceTier) : undefined;
+      const tierFilter = opts.tier
+        ? ((opts.tier as string).toUpperCase() as SourceTier)
+        : undefined;
       if (tierFilter && !['A', 'B', 'C', 'D', 'F'].includes(tierFilter)) {
         throw new CLIError(chalk.red(`Invalid tier: ${opts.tier}. Must be A, B, C, D, or F.`));
       }

@@ -74,7 +74,11 @@ export function registerAskCommand(program: Command): void {
       // Read from stdin if no question arg
       if (!question) {
         if (process.stdin.isTTY) {
-          throw new CLIError(chalk.red('No question provided. Usage: quorum ask "your question"') + '\n' + chalk.dim('Or pipe: echo "question" | quorum ask'));
+          throw new CLIError(
+            chalk.red('No question provided. Usage: quorum ask "your question"') +
+              '\n' +
+              chalk.dim('Or pipe: echo "question" | quorum ask'),
+          );
         }
         question = await readStdin();
         if (!question.trim()) {
@@ -133,7 +137,11 @@ export function registerAskCommand(program: Command): void {
         const names = (opts.providers as string).split(',').map((s) => s.trim());
         providers = config.providers.filter((p) => names.includes(p.name));
         if (providers.length === 0) {
-          throw new CLIError(chalk.red(`No matching providers: ${opts.providers}`) + '\n' + chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`));
+          throw new CLIError(
+            chalk.red(`No matching providers: ${opts.providers}`) +
+              '\n' +
+              chalk.dim(`Available: ${config.providers.map((p) => p.name).join(', ')}`),
+          );
         }
       }
 
@@ -164,8 +172,12 @@ export function registerAskCommand(program: Command): void {
             /* dir doesn't exist */
           }
         }
-        throw new CLIError(chalk.red(`Profile not found: ${opts.profile}`) + '\n' +
-          chalk.dim(`Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`),
+        throw new CLIError(
+          chalk.red(`Profile not found: ${opts.profile}`) +
+            '\n' +
+            chalk.dim(
+              `Available: ${available.size > 0 ? [...available].join(', ') : '(none found)'}`,
+            ),
         );
       }
 
@@ -190,14 +202,18 @@ export function registerAskCommand(program: Command): void {
       if (opts.convergence) {
         const val = parseFloat(opts.convergence as string);
         if (isNaN(val) || val < 0 || val > 1) {
-          throw new CLIError(chalk.red(`Invalid --convergence: "${opts.convergence}". Must be 0.0-1.0.`));
+          throw new CLIError(
+            chalk.red(`Invalid --convergence: "${opts.convergence}". Must be 0.0-1.0.`),
+          );
         }
         profile.convergenceThreshold = val;
       }
       if (opts.rounds) {
         const val = parseInt(opts.rounds as string);
         if (isNaN(val) || val <= 0) {
-          throw new CLIError(chalk.red(`Invalid --rounds: "${opts.rounds}". Must be a positive integer.`));
+          throw new CLIError(
+            chalk.red(`Invalid --rounds: "${opts.rounds}". Must be a positive integer.`),
+          );
         }
         profile.rounds = val;
       }
@@ -348,7 +364,9 @@ export function registerAskCommand(program: Command): void {
             throw new CLIError(
               chalk.red(
                 `\nNeed at least 1 provider (${excludedNames.join(', ')} excluded by profile).`,
-              ) + '\n' + chalk.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`),
+              ) +
+                '\n' +
+                chalk.dim(`To include: quorum ask --providers ${excludedNames.join(',')}`),
             );
           } else {
             throw new CLIError(chalk.red(`\nNo providers configured. Run: quorum providers add`));
@@ -374,8 +392,10 @@ export function registerAskCommand(program: Command): void {
         activeSchema = (await loadSchema(opts.schema as string)) ?? undefined;
         if (!activeSchema) {
           const available = await listSchemas();
-          throw new CLIError(chalk.red(`Schema not found: ${opts.schema}`) + '\n' +
-            chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`),
+          throw new CLIError(
+            chalk.red(`Schema not found: ${opts.schema}`) +
+              '\n' +
+              chalk.dim(`Available: ${available.map((s) => s.name).join(', ') || '(none)'}`),
           );
         }
         if (!isJSON) {
@@ -406,7 +426,9 @@ export function registerAskCommand(program: Command): void {
           ? {
               enabled: true,
               checkpoints: opts.hitlCheckpoints
-                ? ((opts.hitlCheckpoints as string).split(',').map((s: string) => s.trim()) as any[])
+                ? ((opts.hitlCheckpoints as string)
+                    .split(',')
+                    .map((s: string) => s.trim()) as any[])
                 : ['after-vote', 'on-controversy'],
               controversyThreshold: opts.hitlThreshold
                 ? parseFloat(opts.hitlThreshold as string)
@@ -540,7 +562,9 @@ export function registerAskCommand(program: Command): void {
               console.log(chalk.dim(`  ℹ Synthesizer: ${d.provider} (${d.reason})`));
               break;
             case 'memory':
-              console.log(chalk.dim(`  🧠 Found ${(d as any).count} relevant prior deliberation(s)`));
+              console.log(
+                chalk.dim(`  🧠 Found ${(d as any).count} relevant prior deliberation(s)`),
+              );
               break;
             case 'contradictions':
               console.log(chalk.yellow('\n  ⚠ Contradictions with prior deliberations:'));

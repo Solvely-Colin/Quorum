@@ -40,7 +40,9 @@ import { registerGovernanceCommands } from './governance.js';
 
 const program = new Command();
 
-const _pkgVersion = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')).version as string;
+const _pkgVersion = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf-8'),
+).version as string;
 program.name('quorum').description('Multi-AI deliberation framework').version(_pkgVersion);
 
 registerProvidersCommand(program);
