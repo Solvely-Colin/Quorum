@@ -62,7 +62,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@mariozechner/pi-ai": "^0.52.9",
