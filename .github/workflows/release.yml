@@ -4,13 +4,13 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-
 jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -26,9 +26,17 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # Auto-generate release notes from conventional commits
+  release-notes:
+    name: Generate release notes
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
       - name: Update release notes
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           generate_release_notes: true
 
@@ -36,6 +44,9 @@ jobs:
     name: Post-publish smoke test
     needs: publish
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/setup-node@v4
         with:
@@ -43,7 +54,12 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Wait for npm propagation
-        run: sleep 30
+        env:
+          VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          for i in $(seq 1 12); do
+            npm view quorum-ai@$VERSION version && break || sleep 10
+          done
 
       - name: Verify published package
-        run: npx quorum-ai --version
+        run: npx quorum-ai@${{ github.event.release.tag_name }} ask --version
