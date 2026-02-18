@@ -11,13 +11,15 @@ permissions:
 
 jobs:
   build:
-    name: Build & Lint
+    name: Build & Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [20, 22]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -27,9 +29,33 @@ jobs:
       - run: npm ci
 
       - run: npm run lint
-
       - run: npm run format:check
-
+      - run: npm run typecheck
       - run: npm run build
+      - run: npm test
 
-      - run: npm test --if-present
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - name: License check
+        run: npx license-checker-rspack --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
+
+      - name: Bundle size check
+        run: npx size-limit
+
+  commitlint:
+    name: Lint commits
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
