@@ -1,5 +1,5 @@
 version: 1
-preset: node-lib
+preset: nextjs
 checks:
   required: [ci, test]
   license:
