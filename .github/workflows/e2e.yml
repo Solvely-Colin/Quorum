@@ -1,16 +1,23 @@
-name: E2E & Coverage
+name: Tests & Coverage
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   coverage:
     name: Tests with coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +31,13 @@ jobs:
 
       - name: Run tests with coverage
         run: npx vitest run --coverage
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
 
       - name: Coverage summary
         if: always()
