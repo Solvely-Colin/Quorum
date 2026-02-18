@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: Solvely-Colin/solvely-launchpad/.github/workflows/ci.yml@v1
+    uses: Solvely-Colin/solvely-launchpad/.github/workflows/ci.yml@main
     with:
       package-manager: npm
       bundle-size: "false"
