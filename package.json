@@ -80,7 +80,7 @@
     "@inquirer/prompts": "^7.5.0",
     "@mariozechner/pi-ai": "^0.52.9",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "commander": "^13.1.0",
+    "commander": "^14.0.3",
     "picocolors": "^1.1.1",
     "yaml": "^2.7.0",
     "zod": "^4.3.6"
