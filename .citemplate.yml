@@ -1,0 +1,19 @@
+version: 1
+preset: nextjs
+checks:
+  required: [ci, test]
+  license:
+    deny: [GPL-2.0, GPL-3.0]
+  security:
+    audit_level: critical
+    dependency_review: false
+    codeql: false
+    sbom: false
+    slsa_provenance: false
+    ossf_scorecard: false
+pr_feedback:
+  enabled: true
+  mode: aggregated
+  flaky_hints: true
+branches:
+  protected: [main]
