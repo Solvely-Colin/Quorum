@@ -18,4 +18,4 @@ jobs:
     uses: Solvely-Colin/solvely-launchpad/.github/workflows/ci.yml@v1
     with:
       package-manager: npm
-      bundle-size: false
+      bundle-size: "false"
