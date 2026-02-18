@@ -55,16 +55,16 @@ A **synthesis** phase follows: the runner-up (not the winner, to reduce bias) me
 
 Quorum auto-detects providers from environment variables:
 
-| Provider | Environment Variable | Install |
-|----------|---------------------|---------|
-| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) |
-| Anthropic (Claude) | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
-| Google (Gemini) | `GOOGLE_GENERATIVE_AI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
-| Kimi (Moonshot) | `KIMI_API_KEY` | [platform.moonshot.cn](https://platform.moonshot.cn) |
-| DeepSeek | `DEEPSEEK_API_KEY` | [platform.deepseek.com](https://platform.deepseek.com) |
-| Mistral | `MISTRAL_API_KEY` | [console.mistral.ai](https://console.mistral.ai) |
-| Groq | `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) |
-| Ollama | *(local, no key)* | [ollama.com](https://ollama.com) |
+| Provider           | Environment Variable           | Install                                                |
+| ------------------ | ------------------------------ | ------------------------------------------------------ |
+| OpenAI             | `OPENAI_API_KEY`               | [platform.openai.com](https://platform.openai.com)     |
+| Anthropic (Claude) | `ANTHROPIC_API_KEY`            | [console.anthropic.com](https://console.anthropic.com) |
+| Google (Gemini)    | `GOOGLE_GENERATIVE_AI_API_KEY` | [aistudio.google.com](https://aistudio.google.com)     |
+| Kimi (Moonshot)    | `KIMI_API_KEY`                 | [platform.moonshot.cn](https://platform.moonshot.cn)   |
+| DeepSeek           | `DEEPSEEK_API_KEY`             | [platform.deepseek.com](https://platform.deepseek.com) |
+| Mistral            | `MISTRAL_API_KEY`              | [console.mistral.ai](https://console.mistral.ai)       |
+| Groq               | `GROQ_API_KEY`                 | [console.groq.com](https://console.groq.com)           |
+| Ollama             | _(local, no key)_              | [ollama.com](https://ollama.com)                       |
 
 ```bash
 # Set your keys, then:
@@ -74,6 +74,7 @@ quorum providers test          # verify they work
 ```
 
 Or add manually:
+
 ```bash
 quorum providers add --name deepseek --type deepseek --model deepseek-chat --env DEEPSEEK_API_KEY
 ```
@@ -156,8 +157,8 @@ challengeStyle: adversarial
 evidence: strict
 adaptive: balanced
 roles:
-  claude: "OWASP security expert"
-  kimi: "penetration tester"
+  claude: 'OWASP security expert'
+  kimi: 'penetration tester'
 votingMethod: condorcet
 ```
 
@@ -205,6 +206,7 @@ quorum mcp
 ```
 
 Add to Claude Desktop config:
+
 ```json
 {
   "mcpServers": {
@@ -235,3 +237,11 @@ npm run format                        # format
 ## License
 
 [MIT](LICENSE) © Colin Johnson
+
+## CI/CD
+
+Managed by `solvely-launchpad`. Update with:
+
+```bash
+npx solvely-launchpad migrate --from v1 --to v1.x
+```

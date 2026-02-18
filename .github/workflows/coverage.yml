@@ -1,0 +1,9 @@
+name: Coverage
+on:
+  push:
+    branches: [main]
+jobs:
+  coverage:
+    uses: Solvely-Colin/solvely-launchpad/.github/workflows/coverage.yml@v1
+    with:
+      package-manager: npm

@@ -1,64 +1,11 @@
-name: Release to npm
-
+name: Release
 on:
   release:
     types: [published]
-
-permissions: {}
-
 jobs:
-  publish:
-    name: Publish to npm
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          cache: npm
-          registry-url: https://registry.npmjs.org
-
-      - run: npm ci
-      - run: npm run build
-      - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  release-notes:
-    name: Generate release notes
-    needs: publish
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Update release notes
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
-        with:
-          generate_release_notes: true
-
-  smoke-test:
-    name: Post-publish smoke test
-    needs: publish
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
-      - name: Wait for npm propagation and verify
-        run: |
-          VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
-          for i in $(seq 1 12); do
-            npm view quorum-ai@$VERSION version && break || sleep 10
-          done
-          npx -p quorum-ai@$VERSION quorum --version
+  release:
+    uses: Solvely-Colin/solvely-launchpad/.github/workflows/release.yml@v1
+    with:
+      package-name: your-package-name
+    secrets:
+      npm-token: ${{ secrets.NPM_TOKEN }}
