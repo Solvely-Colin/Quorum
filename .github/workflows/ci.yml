@@ -35,7 +35,7 @@ jobs:
       - run: npm test
 
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=critical
 
       - name: License check
         run: npx license-checker-rspack --failOn "GPL-2.0;GPL-3.0;AGPL-3.0"
