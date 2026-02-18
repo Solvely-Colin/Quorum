@@ -6,8 +6,12 @@ on:
     branches: [main]
 
 permissions:
+  actions: read
   contents: read
   pull-requests: write
+  security-events: write
+  id-token: write
+  attestations: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
