@@ -4,6 +4,6 @@ on:
     branches: [main]
 jobs:
   commitlint:
-    uses: Solvely-Colin/solvely-launchpad/.github/workflows/commitlint.yml@main
+    uses: Solvely-Colin/solvely-launchpad/.github/workflows/commitlint.yml@v1
     with:
       strict: false
