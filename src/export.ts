@@ -270,6 +270,20 @@ export function exportHtml(sessionPath: string): string {
 </html>`;
 }
 
+export function exportJson(sessionPath: string): string {
+  const meta = readJSON<MetaJson>(join(sessionPath, 'meta.json'));
+  const phases: Record<string, PhaseJson> = {};
+  for (const { file, label } of PHASE_FILES) {
+    const phase = readJSON<PhaseJson>(join(sessionPath, file));
+    if (phase) phases[label.toLowerCase()] = phase;
+  }
+  const vote = readJSON<PhaseJson>(join(sessionPath, '07-vote.json'));
+  if (vote) phases['vote'] = vote;
+  const synthesis = readJSON<SynthesisJson>(join(sessionPath, 'synthesis.json'));
+
+  return JSON.stringify({ meta, phases, synthesis }, null, 2);
+}
+
 function esc(s: string): string {
   return s
     .replace(/&/g, '&amp;')

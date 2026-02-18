@@ -604,14 +604,14 @@ ${pc.dim('  $ quorum versus gemini claude "Explain quantum computing" --json')}
     .command('export')
     .description('Export a deliberation session as a formatted document')
     .argument('<session>', 'Session path or "last" for most recent')
-    .option('--format <format>', 'Output format: md, html, or canonical', 'md')
-    .option('--output <file>', 'Output file path (default: stdout)')
+    .option('--format <format>', 'Output format: md, json, html, or canonical', 'md')
+    .option('-o, --output <file>', 'Output file path (default: stdout)')
     .action(async (sessionArg: string, opts) => {
-      const { exportMarkdown, exportHtml } = await import('../export.js');
+      const { exportMarkdown, exportHtml, exportJson } = await import('../export.js');
 
       // Resolve session path
       let sessionPath = sessionArg;
-      if (sessionPath === 'last') {
+      if (sessionPath === 'last' || sessionPath === 'latest') {
         const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
         const indexPath = pathJoin(sessionsDir, 'index.json');
         if (existsSync(indexPath)) {
@@ -638,8 +638,10 @@ ${pc.dim('  $ quorum versus gemini claude "Explain quantum computing" --json')}
       }
 
       const format = (opts.format as string).toLowerCase();
-      if (!['md', 'html', 'canonical'].includes(format)) {
-        throw new CLIError(pc.red(`Invalid format: ${format}. Use "md", "html", or "canonical".`));
+      if (!['md', 'json', 'html', 'canonical'].includes(format)) {
+        throw new CLIError(
+          pc.red(`Invalid format: ${format}. Use "md", "json", "html", or "canonical".`),
+        );
       }
 
       let result: string;
@@ -647,6 +649,8 @@ ${pc.dim('  $ quorum versus gemini claude "Explain quantum computing" --json')}
         const { buildCanonicalRecord } = await import('../canonical.js');
         const record = await buildCanonicalRecord(sessionPath);
         result = JSON.stringify(record, null, 2);
+      } else if (format === 'json') {
+        result = exportJson(sessionPath);
       } else {
         result = format === 'html' ? exportHtml(sessionPath) : exportMarkdown(sessionPath);
       }
