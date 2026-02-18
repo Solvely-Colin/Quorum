@@ -1,6 +1,6 @@
 [
   {
-    "path": "dist/council-v2.js",
-    "limit": "50 kB"
+    "path": "dist/**/*.js",
+    "limit": "200 kB"
   }
 ]
