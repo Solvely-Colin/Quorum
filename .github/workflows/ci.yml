@@ -6,12 +6,8 @@ on:
     branches: [main]
 
 permissions:
-  actions: read
   contents: read
   pull-requests: write
-  security-events: write
-  id-token: write
-  attestations: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,7 +15,4 @@ concurrency:
 
 jobs:
   ci:
-    uses: Solvely-Colin/solvely-launchpad/.github/workflows/ci.yml@main
-    with:
-      package-manager: npm
-      bundle-size: "false"
+    uses: Solvely-Colin/solvely-launchpad/.github/workflows/ci.yml@v1
