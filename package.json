@@ -77,7 +77,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.5.0",
+    "@inquirer/prompts": "^8.2.1",
     "@mariozechner/pi-ai": "^0.52.9",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "commander": "^13.1.0",
