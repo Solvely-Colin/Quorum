@@ -6,6 +6,6 @@ jobs:
   release:
     uses: Solvely-Colin/solvely-launchpad/.github/workflows/release.yml@v1
     with:
-      package-name: your-package-name
+      package-name: quorum-ai
     secrets:
       npm-token: ${{ secrets.NPM_TOKEN }}
