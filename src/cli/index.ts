@@ -37,6 +37,7 @@ import { registerAuthCommand } from './auth.js';
 import { registerSessionCommands } from './session.js';
 import { registerAnalysisCommands } from './analysis.js';
 import { registerGovernanceCommands } from './governance.js';
+import { registerDoctorCommand } from './doctor.js';
 
 const program = new Command();
 
@@ -52,6 +53,7 @@ registerAuthCommand(program);
 registerSessionCommands(program);
 registerAnalysisCommands(program);
 registerGovernanceCommands(program);
+registerDoctorCommand(program);
 
 // Ensure clean exit after any command (prevents event-loop hangs from dangling handles)
 program.hook('postAction', (_thisCommand, actionCommand) => {
