@@ -201,7 +201,8 @@ ${pc.dim('  $ quorum init --non-interactive')}
             'Say "OK" in one word.',
             'You are a helpful assistant. Reply concisely.',
           );
-          console.log(pc.green(`✅ "${response.slice(0, 50)}"`));
+          const text = typeof response === 'string' ? response : response.content;
+          console.log(pc.green(`✅ "${text.slice(0, 50)}"`));
         } catch (err) {
           console.log(pc.red(`❌ ${err instanceof Error ? err.message.slice(0, 80) : 'failed'}`));
         }

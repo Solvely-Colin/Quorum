@@ -9,11 +9,26 @@
 
 import { SessionStore, type PhaseOutput } from './session.js';
 import { availableInput, fitToBudget } from './context.js';
-import type { AgentProfile, ProviderAdapter, ProviderConfig, Synthesis } from './types.js';
+import type {
+  AgentProfile,
+  ProviderAdapter,
+  ProviderConfig,
+  ProviderGenerateResult,
+  ProviderResponse,
+  Synthesis,
+} from './types.js';
 import { tallyWithMethod, type Ballot } from './voting.js';
 import { generateHeatmap } from './heatmap.js';
 import { runHook, type HookEnv } from './hooks.js';
 import { executeTools } from './tools.js';
+import {
+  buildProviderMetadata,
+  collectUsageRecordsFromPhase,
+  normalizeProviderResponse,
+  summarizeUsageRecords,
+  type PhaseRunResult,
+  type SessionUsageRecord,
+} from './usage.js';
 import {
   generateEvidenceReport,
   EVIDENCE_INSTRUCTION,
@@ -146,6 +161,7 @@ export class CouncilV2 {
     duration: number;
     responses: Record<string, string>;
   }> = [];
+  private sessionUsageRecords: SessionUsageRecord[] = [];
 
   constructor(
     adapters: ProviderAdapter[],
@@ -347,7 +363,7 @@ export class CouncilV2 {
             `\nAvailable tools: ${toolList.join(', ')}. Max 3 tool uses per response.`;
         }
         const sys = this.prompt('gather', gatherSys, adapter.name);
-        let response = await this.adapterGenerate(adapter, input, sys);
+        let response = (await this.adapterGenerate(adapter, input, sys)).content;
 
         // Tool execution in gather phase
         if (this.profile.tools) {
@@ -368,7 +384,7 @@ export class CouncilV2 {
               .map((tr) => `[${tr.tool}] Input: ${tr.input}\nOutput: ${tr.output}`)
               .join('\n\n');
             const followUp = `Your previous response invoked tools. Here are the results:\n\n${toolSummary}\n\nPlease incorporate these findings into a revised, comprehensive response.`;
-            response = await this.adapterGenerate(adapter, followUp, sys);
+            response = (await this.adapterGenerate(adapter, followUp, sys)).content;
           }
         }
 
@@ -854,9 +870,9 @@ export class CouncilV2 {
         this.emit('response', { provider: `${rtAdapter.name} (red-team)`, phase: 'red_team' });
 
         // Parse and score
-        const attacks = parseRedTeamResponse(rtResponse, currentPositions);
+        const attacks = parseRedTeamResponse(rtResponse.content, currentPositions);
         this.redTeamResult = scoreResilience(attacks, currentPositions);
-        this.redTeamResult.rawResponse = rtResponse;
+        this.redTeamResult.rawResponse = rtResponse.content;
         this.redTeamResult.attackPacks = packNames;
 
         this.emit('redTeam', { result: this.redTeamResult });
@@ -1115,17 +1131,21 @@ export class CouncilV2 {
     ].join('\n');
 
     this.currentPhase = 'SYNTHESIZE';
-    let synthContent: string;
+    let synthResponse: ProviderResponse;
     if (this.streaming) {
       try {
-        synthContent = await this.generateStreaming(synthAdapter, synthPrompt, synthSys);
+        synthResponse = await this.generateStreaming(synthAdapter, synthPrompt, synthSys);
       } catch {
-        synthContent = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
+        synthResponse = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
       }
     } else {
-      synthContent = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
+      synthResponse = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
     }
+    const synthContent = synthResponse.content;
     this.emit('response', { provider: synthAdapter.name, phase: 'synthesize' });
+    const synthesisUsageRecords: SessionUsageRecord[] = [
+      this.buildUsageRecord('SYNTHESIZE', synthAdapter.name, synthResponse),
+    ].filter((record): record is SessionUsageRecord => record !== null);
 
     // Parse scores — flexible regex
     const consensusMatch = synthContent.match(/Consensus[:\s]*\*?\*?([\d.]+)/i);
@@ -1156,7 +1176,14 @@ export class CouncilV2 {
       ].join('\n');
       const wwcmSys = `You are a critical thinker examining a council's conclusion for potential weaknesses and conditions under which it should be revised.`;
       try {
-        whatWouldChange = await this.generateWithRetry(synthAdapter, wwcmPrompt, wwcmSys);
+        const wwcmResponse = await this.generateWithRetry(synthAdapter, wwcmPrompt, wwcmSys);
+        whatWouldChange = wwcmResponse.content;
+        const wwcmUsageRecord = this.buildUsageRecord(
+          'WHAT_WOULD_CHANGE',
+          synthAdapter.name,
+          wwcmResponse,
+        );
+        if (wwcmUsageRecord) synthesisUsageRecords.push(wwcmUsageRecord);
         this.emit('response', { provider: synthAdapter.name, phase: 'what_would_change' });
       } catch (err) {
         this.emit('warn', {
@@ -1180,7 +1207,15 @@ export class CouncilV2 {
     };
 
     try {
-      await this.store.writeSynthesis({ ...synthesis, votes });
+      await this.store.writeSynthesis({
+        ...synthesis,
+        votes,
+        usageRecords: synthesisUsageRecords,
+        usageSummary: summarizeUsageRecords([
+          ...this.sessionUsageRecords,
+          ...synthesisUsageRecords,
+        ]),
+      });
     } catch (err) {
       this.emit('warn', {
         message: `Failed to write synthesis: ${err instanceof Error ? err.message : err}`,
@@ -1455,10 +1490,36 @@ export class CouncilV2 {
                 }
               }),
             );
-            return Object.fromEntries(results);
+            const responses = Object.fromEntries(
+              results.map(([providerName, response]) => [
+                providerName,
+                typeof response === 'string' ? response : response.content,
+              ]),
+            );
+            const responseMetadata: PhaseRunResult['responseMetadata'] = {};
+            for (const [providerName, response] of results) {
+              const metadata =
+                typeof response === 'string'
+                  ? buildProviderMetadata(
+                      this.normalizeAdapterResult(
+                        this.adapters.find((a) => a.name === providerName)!,
+                        response,
+                      ),
+                    )
+                  : buildProviderMetadata(response);
+              if (metadata) responseMetadata[providerName] = metadata;
+            }
+            return {
+              responses,
+              ...(Object.keys(responseMetadata).length > 0 ? { responseMetadata } : {}),
+            };
           } else {
             // Sequential execution
             const results: Record<string, string> = {};
+            const responseMetadata: Record<
+              string,
+              NonNullable<ReturnType<typeof buildProviderMetadata>>
+            > = {};
             for (const providerName of phase.participants) {
               const adapter = this.adapters.find((a) => a.name === providerName);
               if (!adapter) {
@@ -1492,7 +1553,9 @@ export class CouncilV2 {
               try {
                 const response = await this.adapterGenerate(adapter, prompt, sys);
                 this.emit('response', { provider: providerName, phase: phase.name });
-                results[providerName] = response;
+                results[providerName] = response.content;
+                const metadata = buildProviderMetadata(response);
+                if (metadata) responseMetadata[providerName] = metadata;
               } catch (err) {
                 this.emit('warn', {
                   message: `${providerName} failed in ${phase.name}: ${err instanceof Error ? err.message : String(err)}`,
@@ -1500,7 +1563,10 @@ export class CouncilV2 {
                 results[providerName] = `[${providerName} failed]`;
               }
             }
-            return results;
+            return {
+              responses: results,
+              ...(Object.keys(responseMetadata).length > 0 ? { responseMetadata } : {}),
+            };
           }
         },
       );
@@ -1556,16 +1622,20 @@ export class CouncilV2 {
     const synthPrompt = `Original question: ${input}\n\n## Responses:\n${allPositionText}\n\nProduce:\n## Synthesis\n[Best answer]\n\n## Minority Report\n[Dissenting views]\n\n## Scores\nConsensus: [0.0-1.0]\nConfidence: [0.0-1.0]`;
 
     this.currentPhase = 'SYNTHESIZE';
-    let synthContent: string;
+    let synthResponse: ProviderResponse;
     if (this.streaming) {
       try {
-        synthContent = await this.generateStreaming(synthProvider, synthPrompt, synthSys);
+        synthResponse = await this.generateStreaming(synthProvider, synthPrompt, synthSys);
       } catch {
-        synthContent = await this.generateWithRetry(synthProvider, synthPrompt, synthSys);
+        synthResponse = await this.generateWithRetry(synthProvider, synthPrompt, synthSys);
       }
     } else {
-      synthContent = await this.generateWithRetry(synthProvider, synthPrompt, synthSys);
+      synthResponse = await this.generateWithRetry(synthProvider, synthPrompt, synthSys);
     }
+    const synthContent = synthResponse.content;
+    const synthesisUsageRecords: SessionUsageRecord[] = [
+      this.buildUsageRecord('SYNTHESIZE', synthProvider.name, synthResponse),
+    ].filter((record): record is SessionUsageRecord => record !== null);
 
     const consensusMatch = synthContent.match(/Consensus[:\s]*\*?\*?([\d.]+)/i);
     const confidenceMatch = synthContent.match(/Confidence[:\s]*\*?\*?([\d.]+)/i);
@@ -1584,7 +1654,15 @@ export class CouncilV2 {
     };
 
     try {
-      await this.store.writeSynthesis({ ...synthesis, votes });
+      await this.store.writeSynthesis({
+        ...synthesis,
+        votes,
+        usageRecords: synthesisUsageRecords,
+        usageSummary: summarizeUsageRecords([
+          ...this.sessionUsageRecords,
+          ...synthesisUsageRecords,
+        ]),
+      });
     } catch {
       /* non-fatal */
     }
@@ -1818,17 +1896,21 @@ export class CouncilV2 {
     ].join('\n');
 
     this.currentPhase = 'SYNTHESIZE';
-    let synthContent: string;
+    let synthResponse: ProviderResponse;
     if (this.streaming) {
       try {
-        synthContent = await this.generateStreaming(synthAdapter, synthPrompt, synthSys);
+        synthResponse = await this.generateStreaming(synthAdapter, synthPrompt, synthSys);
       } catch {
-        synthContent = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
+        synthResponse = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
       }
     } else {
-      synthContent = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
+      synthResponse = await this.generateWithRetry(synthAdapter, synthPrompt, synthSys);
     }
+    const synthContent = synthResponse.content;
     this.emit('response', { provider: synthAdapter.name, phase: 'synthesize' });
+    const synthesisUsageRecords: SessionUsageRecord[] = [
+      this.buildUsageRecord('SYNTHESIZE', synthAdapter.name, synthResponse),
+    ].filter((record): record is SessionUsageRecord => record !== null);
 
     const consensusMatch = synthContent.match(/Consensus[:\s]*\*?\*?([\d.]+)/i);
     const confidenceMatch = synthContent.match(/Confidence[:\s]*\*?\*?([\d.]+)/i);
@@ -1857,7 +1939,15 @@ export class CouncilV2 {
     };
 
     try {
-      await this.store.writeSynthesis({ ...synthesis, votes });
+      await this.store.writeSynthesis({
+        ...synthesis,
+        votes,
+        usageRecords: synthesisUsageRecords,
+        usageSummary: summarizeUsageRecords([
+          ...this.sessionUsageRecords,
+          ...synthesisUsageRecords,
+        ]),
+      });
     } catch (err) {
       this.emit('warn', {
         message: `Failed to write synthesis: ${err instanceof Error ? err.message : err}`,
@@ -1992,26 +2082,33 @@ export class CouncilV2 {
     prompt: string,
     system: string,
     fallback?: string,
-  ): Promise<string> {
+  ): Promise<ProviderResponse> {
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        let result: string;
+        let result: ProviderResponse;
         if (this.streaming && adapter.generateStream) {
           const start = Date.now();
           this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
-          result = await adapter.generateStream(prompt, system, (delta) => {
-            this.onStreamDelta(adapter.name, this.currentPhase, delta);
-            this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
-          });
+          result = this.normalizeAdapterResult(
+            adapter,
+            await adapter.generateStream(prompt, system, (delta) => {
+              this.onStreamDelta(adapter.name, this.currentPhase, delta);
+              this.emit('stream:delta', {
+                provider: adapter.name,
+                phase: this.currentPhase,
+                delta,
+              });
+            }),
+          );
           this.emit('stream:end', {
             provider: adapter.name,
             phase: this.currentPhase,
             duration: Date.now() - start,
           });
         } else {
-          result = await adapter.generate(prompt, system);
+          result = this.normalizeAdapterResult(adapter, await adapter.generate(prompt, system));
         }
-        if (result && result.trim().length > 0) return result;
+        if (result.content && result.content.trim().length > 0) return result;
 
         this.emit('warn', {
           message: `${adapter.name} returned empty response (attempt ${attempt + 1}/${MAX_RETRIES + 1})`,
@@ -2039,7 +2136,38 @@ export class CouncilV2 {
       message: `${adapter.name} exhausted retries, using fallback`,
       phase: 'generate',
     });
-    return fallbackText;
+    return this.normalizeAdapterResult(adapter, fallbackText);
+  }
+
+  private normalizeAdapterResult(
+    adapter: ProviderAdapter,
+    result: ProviderGenerateResult,
+  ): ProviderResponse {
+    return normalizeProviderResponse(result, {
+      provider: adapter.config?.provider,
+      model: adapter.config?.model,
+    });
+  }
+
+  private buildUsageRecord(
+    phase: string,
+    name: string,
+    response: ProviderResponse,
+  ): SessionUsageRecord | null {
+    if (!response.provider && !response.model && !response.usage) return null;
+    return {
+      phase,
+      name,
+      provider: response.provider,
+      model: response.model,
+      usage: response.usage,
+    };
+  }
+
+  private isPhaseRunResult(
+    value: PhaseRunResult | Record<string, string>,
+  ): value is PhaseRunResult {
+    return typeof value === 'object' && value !== null && 'responses' in value;
   }
 
   /**
@@ -2087,7 +2215,7 @@ export class CouncilV2 {
   private async runPhase(
     fileKey: string,
     phaseName: string,
-    fn: () => Promise<Record<string, string>>,
+    fn: () => Promise<PhaseRunResult | Record<string, string>>,
   ): Promise<PhaseOutput> {
     this.currentPhase = phaseName;
 
@@ -2097,12 +2225,16 @@ export class CouncilV2 {
 
     this.emit('phase', { phase: phaseName });
     const start = Date.now();
-    const responses = await fn();
+    const phaseResult = await fn();
+    const normalized = this.isPhaseRunResult(phaseResult)
+      ? phaseResult
+      : { responses: phaseResult };
     const output: PhaseOutput = {
       phase: phaseName,
       timestamp: start,
       duration: Date.now() - start,
-      responses,
+      responses: normalized.responses,
+      ...(normalized.responseMetadata ? { responseMetadata: normalized.responseMetadata } : {}),
     };
     try {
       await this.store.writePhase(fileKey, output);
@@ -2119,6 +2251,7 @@ export class CouncilV2 {
       duration: output.duration,
       responses: output.responses,
     });
+    this.sessionUsageRecords.push(...collectUsageRecordsFromPhase(output));
 
     // Post-hook — write phase output to temp file for QUORUM_PHASE_OUTPUT
     const { writeFileSync, unlinkSync } = await import('node:fs');
@@ -2126,7 +2259,7 @@ export class CouncilV2 {
     const { join } = await import('node:path');
     const tmpFile = join(tmpdir(), `quorum-phase-${phaseKey}-${Date.now()}.json`);
     try {
-      writeFileSync(tmpFile, JSON.stringify(responses, null, 2), 'utf-8');
+      writeFileSync(tmpFile, JSON.stringify(output.responses, null, 2), 'utf-8');
       await this.executeHook(`post-${phaseKey}`, { QUORUM_PHASE_OUTPUT: tmpFile });
     } finally {
       try {
@@ -2143,15 +2276,15 @@ export class CouncilV2 {
    * Run fn for all adapters in parallel, with retry/fallback per adapter.
    */
   private async parallel(
-    fn: (adapter: ProviderAdapter, index: number) => Promise<string>,
+    fn: (adapter: ProviderAdapter, index: number) => Promise<ProviderGenerateResult>,
     fallbacks?: Record<string, string>,
-  ): Promise<Record<string, string>> {
+  ): Promise<PhaseRunResult> {
     const results = await Promise.all(
       this.adapters.map(async (adapter, i) => {
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            const result = await fn(adapter, i);
-            if (result && result.trim().length > 0) {
+            const result = this.normalizeAdapterResult(adapter, await fn(adapter, i));
+            if (result.content && result.content.trim().length > 0) {
               this.emit('response', { provider: adapter.name });
               return [adapter.name, result] as const;
             }
@@ -2181,10 +2314,19 @@ export class CouncilV2 {
           message: `${adapter.name} exhausted retries, using fallback`,
         });
         this.emit('response', { provider: adapter.name, fallback: true });
-        return [adapter.name, fallback] as const;
+        return [adapter.name, this.normalizeAdapterResult(adapter, fallback)] as const;
       }),
     );
-    return Object.fromEntries(results);
+    const responses = Object.fromEntries(results.map(([name, result]) => [name, result.content]));
+    const responseMetadata: PhaseRunResult['responseMetadata'] = {};
+    for (const [name, result] of results) {
+      const metadata = buildProviderMetadata(result);
+      if (metadata) responseMetadata[name] = metadata;
+    }
+    return {
+      responses,
+      ...(Object.keys(responseMetadata).length > 0 ? { responseMetadata } : {}),
+    };
   }
 
   /**
@@ -2195,14 +2337,17 @@ export class CouncilV2 {
     adapter: ProviderAdapter,
     prompt: string,
     system: string,
-  ): Promise<string> {
+  ): Promise<ProviderResponse> {
     if (this.streaming && adapter.generateStream) {
       const start = Date.now();
       this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
-      const result = await adapter.generateStream(prompt, system, (delta) => {
-        this.onStreamDelta(adapter.name, this.currentPhase, delta);
-        this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
-      });
+      const result = this.normalizeAdapterResult(
+        adapter,
+        await adapter.generateStream(prompt, system, (delta) => {
+          this.onStreamDelta(adapter.name, this.currentPhase, delta);
+          this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
+        }),
+      );
       this.emit('stream:end', {
         provider: adapter.name,
         phase: this.currentPhase,
@@ -2210,21 +2355,28 @@ export class CouncilV2 {
       });
       return result;
     }
-    return adapter.generate(prompt, system);
+    return this.normalizeAdapterResult(adapter, await adapter.generate(prompt, system));
   }
 
   /**
    * Generate for a given adapter — uses streaming when available, otherwise direct.
    * Intended for use inside parallel() callbacks instead of adapter.generate().
    */
-  async adapterGenerate(adapter: ProviderAdapter, prompt: string, system: string): Promise<string> {
+  async adapterGenerate(
+    adapter: ProviderAdapter,
+    prompt: string,
+    system: string,
+  ): Promise<ProviderResponse> {
     if (this.streaming && adapter.generateStream) {
       const start = Date.now();
       this.emit('stream:start', { provider: adapter.name, phase: this.currentPhase });
-      const result = await adapter.generateStream(prompt, system, (delta) => {
-        this.onStreamDelta(adapter.name, this.currentPhase, delta);
-        this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
-      });
+      const result = this.normalizeAdapterResult(
+        adapter,
+        await adapter.generateStream(prompt, system, (delta) => {
+          this.onStreamDelta(adapter.name, this.currentPhase, delta);
+          this.emit('stream:delta', { provider: adapter.name, phase: this.currentPhase, delta });
+        }),
+      );
       this.emit('stream:end', {
         provider: adapter.name,
         phase: this.currentPhase,
@@ -2232,7 +2384,7 @@ export class CouncilV2 {
       });
       return result;
     }
-    return adapter.generate(prompt, system);
+    return this.normalizeAdapterResult(adapter, await adapter.generate(prompt, system));
   }
 
   private budgetFor(adapterIndex: number): number {
@@ -2730,7 +2882,7 @@ export class CouncilV2 {
     emit('response', { provider: judgeAdapter.name });
     emit('phase:done', { phase: 'JUDGMENT', duration: 0 });
 
-    return comparison;
+    return typeof comparison === 'string' ? comparison : comparison.content;
   }
 
   /**

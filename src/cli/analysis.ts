@@ -255,10 +255,12 @@ ${pc.dim('  $ quorum diff session1 session2 --json')}
           console.log(pc.dim(`Analyzing with ${providerConfig.name}...`));
         }
         try {
-          analysisNarrative = await adapter.generate(
+          const analysisResponse = await adapter.generate(
             prompt,
             'You are an expert analyst comparing two AI deliberation outcomes. Be concise and insightful.',
           );
+          analysisNarrative =
+            typeof analysisResponse === 'string' ? analysisResponse : analysisResponse.content;
         } catch (err) {
           if (!opts.json) {
             console.error(

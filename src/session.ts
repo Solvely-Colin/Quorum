@@ -8,12 +8,14 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { computePhaseHash, type HashChainEntry } from './integrity.js';
+import type { ProviderResponseMetadata } from './types.js';
 
 export interface PhaseOutput {
   phase: string;
   timestamp: number;
   duration: number;
   responses: Record<string, string>;
+  responseMetadata?: Record<string, ProviderResponseMetadata>;
 }
 
 export class SessionStore {
