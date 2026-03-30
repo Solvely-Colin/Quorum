@@ -56,14 +56,41 @@ export interface AuthStore {
 export interface ProviderAdapter {
   name: string;
   config?: ProviderConfig;
-  generate(prompt: string, systemPrompt?: string): Promise<string>;
+  generate(prompt: string, systemPrompt?: string): Promise<ProviderGenerateResult>;
   /** Streaming generate — calls onDelta with text chunks, returns full text */
   generateStream?(
     prompt: string,
     systemPrompt: string | undefined,
     onDelta: (delta: string) => void,
-  ): Promise<string>;
+  ): Promise<ProviderGenerateResult>;
 }
+
+export interface ProviderUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    total: number;
+  };
+}
+
+export interface ProviderResponseMetadata {
+  provider?: string;
+  model?: string;
+  usage?: ProviderUsage;
+}
+
+export interface ProviderResponse extends ProviderResponseMetadata {
+  content: string;
+}
+
+export type ProviderGenerateResult = string | ProviderResponse;
 
 // --- Agent File (Deliberation Profile) ---
 

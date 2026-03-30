@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 const exec = promisify(execFile);
@@ -64,7 +64,7 @@ describe('Basic CLI', () => {
   it('--help lists expected top-level commands', async () => {
     const { stdout, exitCode } = await run('--help');
     expect(exitCode).toBe(0);
-    for (const cmd of ['ask', 'review', 'providers', 'auth', 'session', 'history']) {
+    for (const cmd of ['ask', 'review', 'providers', 'auth', 'session', 'usage', 'history']) {
       expect(stdout).toContain(cmd);
     }
   });
@@ -130,6 +130,96 @@ describe('Error paths', () => {
   it('history with no sessions dir handles gracefully', async () => {
     const { exitCode } = await runIsolated('history');
     expect(exitCode).toBe(0);
+  });
+
+  it('usage "last" with no sessions dir exits non-zero', async () => {
+    const { stderr, exitCode } = await runIsolated('usage', 'last');
+    expect(exitCode).not.toBe(0);
+    expect(stderr).toMatch(/no sessions|not found|error/i);
+  });
+});
+
+describe('Usage command', () => {
+  it('usage last prints token and cost summary from session metadata', async () => {
+    const tmpHome = await mkdtemp(join(tmpdir(), 'quorum-usage-test-'));
+    try {
+      const sessionId = 'session-123';
+      const sessionsDir = join(tmpHome, '.quorum', 'sessions');
+      const sessionDir = join(sessionsDir, sessionId);
+      await mkdir(sessionDir, { recursive: true });
+
+      await writeFile(
+        join(sessionsDir, 'index.json'),
+        JSON.stringify([{ sessionId }], null, 2),
+        'utf-8',
+      );
+      await writeFile(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify(
+          {
+            input: 'How expensive was this run?',
+            profile: 'test',
+            providers: [{ name: 'claude', provider: 'anthropic', model: 'claude-sonnet' }],
+            startedAt: Date.now(),
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+      await writeFile(
+        join(sessionDir, '01-gather.json'),
+        JSON.stringify(
+          {
+            phase: 'GATHER',
+            timestamp: Date.now(),
+            duration: 100,
+            responses: { claude: 'Answer' },
+            responseMetadata: {
+              claude: {
+                provider: 'anthropic',
+                model: 'claude-sonnet',
+                usage: {
+                  input: 120,
+                  output: 80,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  totalTokens: 200,
+                  cost: {
+                    input: 0.00036,
+                    output: 0.0012,
+                    cacheRead: 0,
+                    cacheWrite: 0,
+                    total: 0.00156,
+                  },
+                },
+              },
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      const { stdout } = await exec('node', [CLI, 'usage', 'last'], {
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          HOME: tmpHome,
+          XDG_CONFIG_HOME: join(tmpHome, '.config'),
+          NO_COLOR: '1',
+          FORCE_COLOR: '0',
+        },
+      });
+
+      expect(stdout).toContain('Usage Summary');
+      expect(stdout).toContain('claude');
+      expect(stdout).toContain('200');
+      expect(stdout).toContain('$0.001560');
+    } finally {
+      await rm(tmpHome, { recursive: true, force: true });
+    }
   });
 });
 

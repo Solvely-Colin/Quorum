@@ -97,8 +97,9 @@ async function checkProvider(config: ProviderConfig): Promise<CheckResult> {
   try {
     const adapter = await createProvider(config);
     const result = await adapter.generate('Say "ok".', 'Respond with only the word ok.');
+    const text = typeof result === 'string' ? result : result.content;
     const elapsed = Date.now() - start;
-    if (result && result.length > 0) {
+    if (text && text.length > 0) {
       return { status: 'ok', label, detail: `${config.model} — authenticated, ${elapsed}ms` };
     }
     return { status: 'warn', label, detail: `${config.model} — empty response, ${elapsed}ms` };

@@ -1,4 +1,4 @@
-import type { ProviderAdapter, ProviderConfig } from '../types.js';
+import type { ProviderAdapter, ProviderConfig, ProviderResponse, ProviderUsage } from '../types.js';
 import { resolveCredential } from '../auth.js';
 import { completeSimple, streamSimple, getModels } from '@mariozechner/pi-ai';
 import type {
@@ -7,6 +7,8 @@ import type {
   SimpleStreamOptions,
   KnownProvider,
   AssistantMessageEvent,
+  AssistantMessage,
+  Usage,
 } from '@mariozechner/pi-ai';
 
 // ============================================================================
@@ -275,6 +277,31 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
     return '';
   };
 
+  const normalizeUsage = (usage?: Usage): ProviderUsage | undefined => {
+    if (!usage) return undefined;
+    return {
+      input: usage.input,
+      output: usage.output,
+      cacheRead: usage.cacheRead,
+      cacheWrite: usage.cacheWrite,
+      totalTokens: usage.totalTokens,
+      cost: {
+        input: usage.cost.input,
+        output: usage.cost.output,
+        cacheRead: usage.cost.cacheRead,
+        cacheWrite: usage.cost.cacheWrite,
+        total: usage.cost.total,
+      },
+    };
+  };
+
+  const buildResponse = (result: AssistantMessage, fallbackText?: string): ProviderResponse => ({
+    content: extractText(result) || fallbackText || '',
+    provider: model.provider,
+    model: model.id,
+    usage: normalizeUsage(result.usage),
+  });
+
   const withTimeout = <T>(promise: Promise<T>, label: string): Promise<T> => {
     return Promise.race([
       promise,
@@ -295,7 +322,7 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
         completeSimple(model, buildContext(prompt, systemPrompt), buildOpts()),
         `${resolved.name}`,
       );
-      return extractText(result as any);
+      return buildResponse(result as AssistantMessage);
     },
     async generateStream(
       prompt: string,
@@ -306,6 +333,7 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
       const timeoutId = setTimeout(() => ac.abort(), timeoutMs);
       const stream = streamSimple(model, buildContext(prompt, systemPrompt), buildOpts());
       let text = '';
+      let latestUsage: ProviderUsage | undefined;
       try {
         const abortPromise = new Promise<never>((_, reject) => {
           ac.signal.addEventListener(
@@ -338,6 +366,12 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
           try {
             for await (const event of stream as AsyncIterable<AssistantMessageEvent>) {
               if (ac.signal.aborted) break;
+              if ('partial' in event && event.partial?.usage) {
+                latestUsage = normalizeUsage(event.partial.usage);
+              }
+              if (event.type === 'done') {
+                latestUsage = normalizeUsage(event.message.usage);
+              }
               if (event.type === 'text_delta') {
                 lastChunkTime = Date.now();
                 gotFirstChunk = true;
@@ -355,17 +389,19 @@ export async function createProvider(config: ProviderConfig): Promise<ProviderAd
       } catch (err) {
         // If we have partial text and it was a timeout, return what we have
         if (text && ac.signal.aborted) {
-          return text;
+          return {
+            content: text,
+            provider: model.provider,
+            model: model.id,
+            usage: latestUsage,
+          };
         }
         throw err;
       } finally {
         clearTimeout(timeoutId);
       }
-      if (!text) {
-        const result = await stream.result();
-        return extractText(result as any);
-      }
-      return text;
+      const result = (await stream.result()) as AssistantMessage;
+      return buildResponse(result, text);
     },
   };
 }
@@ -399,7 +435,7 @@ async function createGeminiCli(config: ProviderConfig): Promise<ProviderAdapter>
       if (config.model) args.push('-m', config.model);
 
       const { spawn } = await import('node:child_process');
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<ProviderResponse>((resolve, reject) => {
         let settled = false;
         const proc = spawn('gemini', args, {
           env: { ...process.env },
@@ -417,7 +453,11 @@ async function createGeminiCli(config: ProviderConfig): Promise<ProviderAdapter>
           if (settled) return;
           settled = true;
           if (code === 0) {
-            resolve(stdout.trim());
+            resolve({
+              content: stdout.trim(),
+              provider: config.provider,
+              model: config.model,
+            });
           } else {
             reject(new Error(`gemini-cli exited ${code}: ${stderr}`));
           }

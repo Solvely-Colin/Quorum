@@ -8,6 +8,122 @@ import { loadConfig, loadAgentProfile } from '../config.js';
 import { CouncilV2 } from '../council-v2.js';
 import { createProvider } from '../providers/base.js';
 import { CLIError, readStdin, resolveLastSession } from './helpers.js';
+import {
+  collectUsageRecordsFromPhase,
+  formatUsd,
+  summarizeUsageRecords,
+  type SessionUsageRecord,
+  type SessionUsageSummary,
+} from '../usage.js';
+
+const SESSION_PHASE_FILES = [
+  { file: '01-gather', name: 'GATHER' },
+  { file: '02-plan', name: 'PLAN' },
+  { file: '03-formulate', name: 'FORMULATE' },
+  { file: '04-debate', name: 'DEBATE' },
+  { file: '05-adjust', name: 'ADJUST' },
+  { file: '06-rebuttal', name: 'REBUTTAL' },
+  { file: '07-vote', name: 'VOTE' },
+];
+
+async function resolveSessionArg(sessionPath: string): Promise<string> {
+  if (sessionPath !== 'last') return sessionPath;
+
+  const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
+  const indexPath = pathJoin(sessionsDir, 'index.json');
+  if (existsSync(indexPath)) {
+    try {
+      const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
+        sessionId: string;
+      }>;
+      if (entries.length > 0) {
+        return pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return resolveLastSession(sessionsDir);
+}
+
+async function loadSessionUsageSummary(sessionPath: string): Promise<SessionUsageSummary> {
+  const synthPath = pathJoin(sessionPath, 'synthesis.json');
+  if (existsSync(synthPath)) {
+    try {
+      const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
+      if (synth.usageSummary) return synth.usageSummary as SessionUsageSummary;
+    } catch {
+      // fall through
+    }
+  }
+
+  const records: SessionUsageRecord[] = [];
+  for (const { file } of SESSION_PHASE_FILES) {
+    const phasePath = pathJoin(sessionPath, `${file}.json`);
+    if (!existsSync(phasePath)) continue;
+    const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
+    records.push(...collectUsageRecordsFromPhase(phase));
+  }
+
+  if (existsSync(synthPath)) {
+    try {
+      const synth = JSON.parse(await readFile(synthPath, 'utf-8'));
+      if (Array.isArray(synth.usageRecords)) records.push(...synth.usageRecords);
+    } catch {
+      // ignore malformed synthesis extras
+    }
+  }
+
+  return summarizeUsageRecords(records);
+}
+
+function printUsageSummary(summary: SessionUsageSummary): void {
+  if (summary.providers.length === 0) {
+    console.log(pc.dim('No usage data recorded for this session.'));
+    return;
+  }
+
+  const widths = {
+    name: Math.max(8, ...summary.providers.map((row) => row.name.length)),
+    provider: Math.max(7, ...summary.providers.map((row) => (row.provider ?? '-').length)),
+    model: Math.max(5, ...summary.providers.map((row) => (row.model ?? '-').length)),
+    input: Math.max(5, ...summary.providers.map((row) => String(row.input).length)),
+    output: Math.max(6, ...summary.providers.map((row) => String(row.output).length)),
+    total: Math.max(5, ...summary.providers.map((row) => String(row.totalTokens).length)),
+    cost: Math.max(8, ...summary.providers.map((row) => formatUsd(row.totalCost).length)),
+  };
+  const pad = (value: string | number, width: number) => String(value).padEnd(width);
+
+  console.log(pc.bold('Usage Summary'));
+  console.log(
+    [
+      pad('Name', widths.name),
+      pad('API', widths.provider),
+      pad('Model', widths.model),
+      pad('Input', widths.input),
+      pad('Output', widths.output),
+      pad('Total', widths.total),
+      pad('Cost', widths.cost),
+    ].join('  '),
+  );
+  for (const row of summary.providers) {
+    console.log(
+      [
+        pad(row.name, widths.name),
+        pad(row.provider ?? '-', widths.provider),
+        pad(row.model ?? '-', widths.model),
+        pad(row.input, widths.input),
+        pad(row.output, widths.output),
+        pad(row.totalTokens, widths.total),
+        pad(formatUsd(row.totalCost), widths.cost),
+      ].join('  '),
+    );
+  }
+  console.log('');
+  console.log(
+    `${pc.bold('Totals')}: ${summary.totals.totalTokens} tokens across ${summary.totals.calls} calls, ${formatUsd(summary.totals.totalCost)}`,
+  );
+}
 
 export function registerSessionCommands(program: Command): void {
   // --- quorum session ---
@@ -28,27 +144,7 @@ ${pc.dim('  $ quorum session ~/.quorum/sessions/abc123 --phase synthesis')}
 `,
     )
     .action(async (sessionPath: string, opts) => {
-      // Resolve "last" to most recent session
-      if (sessionPath === 'last') {
-        const sessionsDir = pathJoin(homedir(), '.quorum', 'sessions');
-        const indexPath = pathJoin(sessionsDir, 'index.json');
-        if (existsSync(indexPath)) {
-          try {
-            const entries = JSON.parse(await readFile(indexPath, 'utf-8')) as Array<{
-              sessionId: string;
-            }>;
-            if (entries.length > 0) {
-              sessionPath = pathJoin(sessionsDir, entries[entries.length - 1].sessionId);
-            } else {
-              sessionPath = await resolveLastSession(sessionsDir);
-            }
-          } catch {
-            sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
-          }
-        } else {
-          sessionPath = await resolveLastSession(pathJoin(homedir(), '.quorum', 'sessions'));
-        }
-      }
+      sessionPath = await resolveSessionArg(sessionPath);
 
       const phaseName = opts.phase as string | undefined;
 
@@ -120,17 +216,7 @@ ${pc.dim('  $ quorum session ~/.quorum/sessions/abc123 --phase synthesis')}
         );
       }
 
-      const phases = [
-        { file: '01-gather', name: 'GATHER' },
-        { file: '02-plan', name: 'PLAN' },
-        { file: '03-formulate', name: 'FORMULATE' },
-        { file: '04-debate', name: 'DEBATE' },
-        { file: '05-adjust', name: 'ADJUST' },
-        { file: '06-rebuttal', name: 'REBUTTAL' },
-        { file: '07-vote', name: 'VOTE' },
-      ];
-
-      for (const { file, name } of phases) {
+      for (const { file, name } of SESSION_PHASE_FILES) {
         const phasePath = `${sessionPath}/${file}.json`;
         if (!existsSync(phasePath)) continue;
         const phase = JSON.parse(await readFile(phasePath, 'utf-8'));
@@ -179,6 +265,44 @@ ${pc.dim('  $ quorum session ~/.quorum/sessions/abc123 --phase synthesis')}
         /* no uncertainty data */
       }
 
+      const usageSummary = await loadSessionUsageSummary(sessionPath);
+      if (usageSummary.providers.length > 0) {
+        console.log('');
+        printUsageSummary(usageSummary);
+      }
+
+      console.log('');
+    });
+
+  // --- quorum usage ---
+  program
+    .command('usage <path>')
+    .description('Show token and cost usage for a saved session. Use "last" for most recent.')
+    .addHelpText(
+      'after',
+      `
+${pc.dim('Examples:')}
+${pc.dim('  $ quorum usage last')}
+${pc.dim('  $ quorum usage ~/.quorum/sessions/abc123')}
+`,
+    )
+    .action(async (sessionPath: string) => {
+      sessionPath = await resolveSessionArg(sessionPath);
+
+      const metaPath = pathJoin(sessionPath, 'meta.json');
+      if (!existsSync(metaPath)) {
+        throw new CLIError(pc.red(`Session not found: ${sessionPath}`));
+      }
+
+      const meta = JSON.parse(await readFile(metaPath, 'utf-8'));
+      const usageSummary = await loadSessionUsageSummary(sessionPath);
+
+      console.log('');
+      console.log(pc.bold(pc.cyan('═══ Usage ═══')));
+      console.log(pc.dim(`Question: ${String(meta.input ?? '').slice(0, 200)}`));
+      console.log(pc.dim(`Session: ${sessionPath}`));
+      console.log('');
+      printUsageSummary(usageSummary);
       console.log('');
     });
 
